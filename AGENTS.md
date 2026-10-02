@@ -48,7 +48,8 @@ always comes with the colour, and a phone has no hover.
 **Secrets are reported as set or not set, never shown.** The Setup page is where people look
 when something breaks, so it is the page that ends up in screenshots. `SetupTest` guards it.
 
-**Tests never reach Jira or Anthropic.** Fake HTTP and `Process`. Never put a real ticket in a
+**Tests never reach Jira or Anthropic.** Fake HTTP and `Process`; `TestCase` calls
+`Http::preventStrayRequests()`, so a request a test forgot to fake fails it. Never put a real ticket in a
 test or a fixture: tickets carry customers' names, addresses and screenshots.
 
 **Do not read this machine's config in a test.** The next machine's `.env` differs; set what a

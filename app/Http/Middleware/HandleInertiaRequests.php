@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -31,6 +32,11 @@ class HandleInertiaRequests extends Middleware
                 'name' => config('app.name'),
                 // Shown next to the name everywhere but production, so dev is never mistaken for it.
                 'env' => app()->environment(),
+            ],
+            'hyper' => fn () => Setting::hyper(),
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
             ],
         ];
     }

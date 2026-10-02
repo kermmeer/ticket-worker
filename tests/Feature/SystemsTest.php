@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Jobs\PrepareSystemFolder;
 use App\Models\System;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -13,8 +12,6 @@ use Tests\TestCase;
 
 class SystemsTest extends TestCase
 {
-    use RefreshDatabase;
-
     private string $root;
 
     protected function setUp(): void

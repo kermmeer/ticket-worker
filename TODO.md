@@ -12,12 +12,15 @@ to it, including work you finish.
 
 ## Step 1: Jira and spaces
 
-- [ ] Jira client: search with `nextPageToken`, issue and comments, attachments, ADF to Markdown
-- [ ] Space wizard: pick the space, its type from `projectTypeKey` with an override, ticket rules
-      with a live preview, the done rule
-- [ ] For a service space, check that the Jira account is an agent in it
-- [ ] Sync every 10 minutes and on demand; hyper mode (every minute) as a header switch
-- [ ] The overview grouped by what a ticket needs
+- [x] Jira client: spaces, the space's words, permissions, search with `nextPageToken`,
+      approximate count; retries on 429 and 5xx (2026-10-02)
+- [x] Space setup: pick the space, its type from `projectTypeKey` with an override, ticket rules
+      with the space's words to click and a live preview, the done rule, systems (2026-10-02)
+- [x] For a service space, show whether the Jira account is an agent in it (2026-10-02)
+- [x] Sync every 10 minutes and on demand; hyper mode (every minute) as a header switch (2026-10-02)
+- [x] The overview grouped by what a ticket needs, filter by space, search with `/` (2026-10-02)
+- [ ] Issue and comments, attachments, ADF to Markdown: needed for the analysis (step 3)
+- [ ] `j`/`k` to move through the overview, `Enter` to open
 
 ## Step 2: agent runner and systems
 

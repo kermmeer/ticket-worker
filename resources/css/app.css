@@ -24,6 +24,15 @@
     --working: #1d5fc9;
     --waiting: #8a5a00;
     --done: #2f6b4f;
+
+    /* Space labels: a dot beside the label, never the text itself, so these only need to
+       be told apart, not read. */
+    --space-teal: #0f766e;
+    --space-violet: #6d28d9;
+    --space-rose: #be123c;
+    --space-sky: #0369a1;
+    --space-olive: #4d7c0f;
+    --space-slate: #475569;
 }
 
 .dark {
@@ -38,6 +47,13 @@
     --working: #6fa0ff;
     --waiting: #e2b04a;
     --done: #6fc39a;
+
+    --space-teal: #2dd4bf;
+    --space-violet: #a78bfa;
+    --space-rose: #fb7185;
+    --space-sky: #38bdf8;
+    --space-olive: #a3e635;
+    --space-slate: #94a3b8;
 }
 
 @theme inline {
@@ -80,6 +96,11 @@
         outline: 2px solid var(--signal);
         outline-offset: 2px;
     }
+
+    input[type='checkbox'],
+    input[type='radio'] {
+        accent-color: var(--signal);
+    }
 }
 
 @layer components {
@@ -93,7 +114,7 @@
     }
 
     .btn {
-        @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-ink/40;
+        @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-ink/40 disabled:cursor-not-allowed disabled:opacity-45;
     }
 
     /* The page colour on signal: 4.6:1 in Day, 7.2:1 in Night. */

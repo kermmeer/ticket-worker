@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Process;
 
 /**
@@ -19,6 +20,11 @@ class System extends Model
     public const FAILED = 'failed';
 
     protected $fillable = ['name', 'branch', 'state', 'error'];
+
+    public function spaces(): BelongsToMany
+    {
+        return $this->belongsToMany(Space::class);
+    }
 
     public function path(): string
     {

@@ -2,6 +2,8 @@
 
 namespace App\Setup;
 
+use App\Jira\JiraClient;
+use App\Jira\JiraException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,8 @@ class SetupChecks
 
     /** The scheduler asks every minute; a report older than this means nobody answered. */
     private const FRESH_SECONDS = 180;
+
+    public function __construct(private readonly JiraClient $jira) {}
 
     /**
      * @return list<array{key: string, group: string, title: string, state: string, detail: string}>
@@ -97,8 +101,15 @@ class SetupChecks
                 'Not connected. Set '.implode(', ', $missing).' in shared/.env.');
         }
 
+        try {
+            // Asked once a minute at most: this page is opened often while setting up.
+            $me = Cache::remember('setup.jira.'.md5($settings['JIRA_BASE'].$settings['JIRA_EMAIL']), 60, fn () => $this->jira->myself());
+        } catch (JiraException $e) {
+            return $this->item('jira', 'Jira', 'Connection', self::TODO, $e->getMessage());
+        }
+
         return $this->item('jira', 'Jira', 'Connection', self::OK,
-            'Reads '.$settings['JIRA_BASE'].' as '.$settings['JIRA_EMAIL'].'.');
+            'Connected to '.$settings['JIRA_BASE'].' as '.($me['displayName'] ?? $settings['JIRA_EMAIL']).'.');
     }
 
     private function jiraWrite(): array

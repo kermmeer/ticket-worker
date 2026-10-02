@@ -1,12 +1,13 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import ThemeSwitch from '../components/ThemeSwitch.vue';
 
 const page = usePage();
 
 const nav = [
     { href: '/', label: 'Overview', active: (url) => url === '/' },
+    { href: '/spaces', label: 'Spaces', active: (url) => url.startsWith('/spaces') },
     { href: '/systems', label: 'Systems', active: (url) => url.startsWith('/systems') },
     { href: '/setup', label: 'Setup', active: (url) => url.startsWith('/setup') },
     { href: '/docs/concept', label: 'Concept', active: (url) => url.startsWith('/docs') },
@@ -15,6 +16,12 @@ const nav = [
 
 const url = computed(() => page.url.split(/[?#]/)[0]);
 const env = computed(() => page.props.app?.env);
+const hyper = computed(() => page.props.hyper);
+const flash = computed(() => page.props.flash ?? {});
+
+function toggleHyper() {
+    router.post('/hyper', {}, { preserveScroll: true, preserveState: true });
+}
 </script>
 
 <template>
@@ -26,7 +33,17 @@ const env = computed(() => page.props.app?.env);
                     <span class="display text-xl leading-none">Ticket Worker</span>
                     <span v-if="env && env !== 'production'" class="eyebrow">{{ env }}</span>
                 </Link>
-                <div class="ml-auto pb-2.5 sm:order-last">
+                <div class="ml-auto flex items-center gap-2 pb-2.5 sm:order-last">
+                    <!-- On, it says so in the signal colour: every minute is not something to forget about. -->
+                    <button
+                        type="button"
+                        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
+                        :class="hyper ? 'border-signal text-signal' : 'border-line bg-surface text-muted hover:text-ink'"
+                        :aria-pressed="hyper"
+                        @click="toggleHyper"
+                    >
+                        {{ hyper ? 'Hyper: every minute' : 'Hyper off' }}
+                    </button>
                     <ThemeSwitch />
                 </div>
                 <nav aria-label="Main" class="-mb-px flex w-full gap-6 overflow-x-auto text-sm sm:w-auto">
@@ -45,6 +62,12 @@ const env = computed(() => page.props.app?.env);
         </header>
 
         <main class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+            <p v-if="flash.success" role="status" class="mb-8 rounded-md border border-done/40 bg-surface px-4 py-2.5 text-sm text-done">
+                {{ flash.success }}
+            </p>
+            <p v-if="flash.error" role="alert" class="mb-8 rounded-md border border-signal/40 bg-surface px-4 py-2.5 text-sm text-signal">
+                {{ flash.error }}
+            </p>
             <slot />
         </main>
     </div>

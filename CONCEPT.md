@@ -6,8 +6,9 @@ everything on it, works out which system it is about, searches that system's cod
 went wrong, and proposes a fix. You then keep talking to that agent on that ticket until it
 is solved or you close the session.
 
-> **Status:** 2 October 2026. Built: the skeleton, the worker containers and the Systems page
-> (see the [build order](#15-build-order)). The answers to the first round of questions are
+> **Status:** 2 October 2026. Built: the skeleton, the worker containers, the Systems page,
+> and step 1: the Jira connection, space setup, sync and the overview (see the
+> [build order](#15-build-order)). The answers to the first round of questions are
 > recorded in [§17](#17-decisions-and-open-questions); with them this file is the build brief,
 > the way jira-outbox's README is.
 
@@ -550,7 +551,7 @@ Each step ends in something usable.
 | Step | What | Done when |
 |---|---|---|
 | 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, design tokens, both themes; Overview, Setup, Concept and Design | the shell looks right in Day and Night, on desktop and phone. **Built 2026-10-02.** |
-| 1. Jira and spaces | Jira client, space wizard with the space type and a live preview, sync with hyper mode, overview | the overview lists exactly what the JQL lists in Jira |
+| 1. Jira and spaces | Jira client, space wizard with the space type and a live preview, sync with hyper mode, overview | the overview lists exactly what the JQL lists in Jira. **Built 2026-10-02**; until step 3 a ticket opens in Jira |
 | 2. Agent runner and systems | worker containers and the Systems page (**built 2026-10-02**); turn runner, event trail on screen, context scans, review and edit | a scanned context is one you would hand to a new colleague |
 | 3. Analysis | ticket workspace, gather, route, dig, reply language, proposal screen, code viewer | the backtest (§16) gets most real tickets right |
 | 4. Conversation | resume, stop, close and reopen, passing on new activity, proposal versions, patches | a ticket can be worked in the tool from first look to closing note |

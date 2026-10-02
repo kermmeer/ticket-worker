@@ -4,11 +4,15 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class SetupTest extends TestCase
 {
+    /** What Jira answers to "who am I": 200 with a name, or a refusal. */
+    private int $jiraStatus = 200;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -22,6 +26,9 @@ class SetupTest extends TestCase
             'agent.claude.api_key' => 'sk-ant-key-that-must-not-leak',
             'queue.default' => 'database',
         ]);
+        Http::fake(fn () => $this->jiraStatus === 200
+            ? Http::response(['displayName' => 'Support Bot'])
+            : Http::response(['errorMessages' => []], $this->jiraStatus));
     }
 
     public function test_secrets_show_as_set_never_as_their_value(): void
@@ -32,6 +39,18 @@ class SetupTest extends TestCase
         $response->assertDontSee('sk-ant-key-that-must-not-leak', false);
         $this->assertSame('ok', $this->check('jira')['state']);
         $this->assertSame('ok', $this->check('anthropic')['state']);
+    }
+
+    public function test_the_connection_counts_only_when_jira_answers(): void
+    {
+        $this->assertStringContainsString('as Support Bot', $this->check('jira')['detail']);
+
+        Cache::flush();
+        $this->jiraStatus = 401;
+
+        $jira = $this->check('jira');
+        $this->assertSame('todo', $jira['state']);
+        $this->assertStringContainsString('refused the credentials', $jira['detail']);
     }
 
     public function test_missing_jira_settings_are_named(): void
