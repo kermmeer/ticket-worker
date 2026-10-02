@@ -6,8 +6,8 @@ everything on it, works out which system it is about, searches that system's cod
 went wrong, and proposes a fix. You then keep talking to that agent on that ticket until it
 is solved or you close the session.
 
-> **Status:** concept, 2 October 2026. Nothing is built yet. This file is the idea to agree
-> on first. Once the [open questions](#17-open-questions) are answered it becomes the build
+> **Status:** concept, 2 October 2026. Only the skeleton is built (step 0 of the
+> [build order](#15-build-order)). This file is the idea to agree on first. Once the [open questions](#17-open-questions) are answered it becomes the build
 > brief, the way jira-outbox's README is.
 
 ---
@@ -48,7 +48,7 @@ decide, and you are the one who answers in Jira.
 |---|---|
 | **Space** | A Jira space. Jira's REST API still calls these *projects*, so the code says `project` wherever it talks to Jira. One Jira site, set in `.env`, serves all spaces. |
 | **Ticket rules** | The JQL that picks which tickets of a space this tool looks at, for example only escalated ones. |
-| **System** | A codebase tickets can be about, available as a folder the agent can read. One system can serve several spaces. |
+| **System** | A codebase tickets can be about: a Git repository the tool clones and keeps fetched, and the agent reads. One system can serve several spaces. |
 | **System context** | A short Markdown brief per system: what it is, where things are, what users call things. Written by an agent, reviewed by you. |
 | **Analysis** | The first scan of a ticket's problem. It ends in a proposal. |
 | **Proposal** | The structured result: which system, what went wrong, the evidence, the fix, a workaround, a reply draft. Versioned. |
@@ -87,9 +87,14 @@ is a short wizard. You can come back to any step later.
    always adds `project = KEY`. A live preview shows how many tickets match and the first
    few, so you see what you are about to get. A second rule says when a ticket counts as
    done. The default is Jira's *Done* status category.
-3. **Systems.** Pick this space's folders. The picker only offers the roots set in `.env`,
-   never the whole disk. Each system can get routing hints: Jira components, labels or words
-   that point to it. A system that another space already uses is reused, context and all.
+3. **Systems.** Add the systems this space's tickets can be about. A system is a Git
+   repository plus the branch production runs. The tool clones it itself into
+   `shared/systems/<name>` on minas, a folder outside the containers that survives every
+   rebuild, and fetches it before each context scan and each analysis. Each system gets its
+   own read-only deploy key: the tool generates it and shows the public half for you to add
+   to the repository, as the toolbox does for apps. A system can also get routing hints:
+   Jira components, labels or words that point to it. A system that another space already
+   uses is reused, context and all.
 4. **Context scan.** For each system that has no context yet, an agent writes one (§5). You
    read each one, edit it if needed, and approve it. Scans run side by side up to the agent
    limit, and you can watch them work.
@@ -129,9 +134,10 @@ moved since (*context is 214 commits behind*) and offers a refresh. A refresh gi
 the old context plus what changed since then, and asks it to update. Every version is kept,
 so an edit or a refresh can be undone.
 
-Contexts live in the tool's database, not in the folders. The folders may be checkouts that
-something else resets, and writing into them would mean the agent changes systems after all
-(see [open question 4](#17-open-questions)).
+Contexts live in the tool's database, not in the folders. The folders are the tool's own
+clones: every fetch resets them to the remote, and the agent sees them read-only. A context
+file inside one would have to be protected from both, and the database keeps the versions
+besides (see [open question 4](#17-open-questions)).
 
 ---
 
@@ -249,7 +255,7 @@ claude -p "<this turn's message>" \
   --tools "Read,Grep,Glob,Bash" \
   --allowedTools "Read" "Grep" "Glob" "Bash(git log *)" "Bash(git show *)" "Bash(git blame *)" \
   --permission-prompts none \
-  --add-dir /systems/billing /systems/portal \
+  --add-dir /app/shared/systems/billing /app/shared/systems/portal \
   --append-system-prompt "<role, rules, and the contexts of the space's systems>" \
   --max-budget-usd 3
 ```
@@ -260,7 +266,9 @@ Later turns pass `--resume <uuid>` instead of `--session-id`.
   only its ID. Two things must hold for that to work. A ticket's turns always run from the
   same workspace folder, because the CLI files sessions by working directory. And the CLI's
   config directory (`CLAUDE_CONFIG_DIR`) must sit on a persistent volume, or a container
-  rebuild forgets every session.
+  rebuild forgets every session. The CLI also deletes transcripts after 30 days by default
+  (`cleanupPeriodDays`); the tool sets that to match its own retention (§11), or *Reopen*
+  quietly stops working on older sessions.
 - **The workspace** is `shared/agent/tickets/<KEY>/`, outside the repository. That keeps
   ticket data out of any checkout, and keeps the agent from loading this repo's own
   instructions, which are written for whoever builds the tool, not for the ticket agents.
@@ -299,17 +307,30 @@ own work.
 
 ## 11. Boundaries
 
-- **Read-only, twice over.** The systems are mounted read-only into the worker, and the
-  agent's tools cannot write to them anyway.
+- **Read-only, twice over.** The systems are mounted read-only into the agent container, and
+  the agent's tools cannot write to them anyway.
 - **Ticket text is untrusted.** Reporters write the tickets, and an attachment can contain
   anything, including instructions aimed at the agent. The agent can only read code and talk
   to you, so the worst a hostile ticket can do is mislead the analysis. That is why it gets
   no network, no Jira tool and no write access. Keep it that way when adding features.
 - **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders. Better
-  still, the agent reads git checkouts, which contain no `.env` to begin with.
-- **Personal data.** Tickets carry names, email addresses and screenshots, and everything the
-  agent reads goes to Anthropic's API. Check that the customers' and the employer's
-  agreements allow that before the first real ticket ([open question 11](#17-open-questions)).
+  still, the systems are the tool's own clones, which contain no `.env` to begin with, and the
+  deploy keys are not mounted where the agent runs.
+- **Personal data.** Tickets carry names, email addresses and screenshots.
+  - *On minas* they sit in the database, in the ticket's workspace (`ticket.md`,
+    `attachments/`) and in the CLI's session transcripts, which are plain text. A ticket's
+    workspace and transcripts are deleted 30 days after its session closes; its proposals and
+    closing note stay. The database backups hold ticket data too.
+  - *At Anthropic* goes only what the agent reads during a turn: the ticket text, the
+    attachments it opens, and code. With an API key (Commercial Terms) Anthropic does not
+    train models on it and keeps it for 30 days. With a Pro or Max subscription (Consumer
+    Terms) it is used for training when the account's *help improve Claude* setting is on,
+    and then kept for five years. That is why this design uses an API key. Zero data
+    retention exists, but only for qualifying Enterprise organisations.
+  - Claude Code's own usage metrics carry no prompts, code or file paths, and the agent
+    container switches them off anyway (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`).
+  - Whether customers' data may go to Anthropic at all is for the employer to decide
+    ([open question 11](#17-open-questions)).
 - **Money.** There is a budget per turn, each ticket shows its cost, and the settings page
   shows the monthly total. In v1, only you start an agent.
 - **Separate from your own Claude.** The worker runs Claude Code under its own config
@@ -329,21 +350,18 @@ own work.
                                          └───────────────────┘
                                                │         ▲
                                                ▼         │
- worker · same image + Claude Code ────────────────────────────────────────────────
+ worker, scheduler, agent · the same image, the agent's with Claude Code ───────────
    schedule:work   ticket sync, every 10 minutes
    queue:work      one job per turn ─► claude -p
                                          cwd    shared/agent/tickets/SUP-1234/
-                                         reads  /systems/*  (mounted read-only)
+                                         reads  shared/systems/*  (read-only)
                                          calls  the Anthropic API
 ```
 
-- **Stack, same as palantir:** Laravel 13, Inertia with Vue 3, Tailwind 4, and the Authentik
-  login through Socialite.
-- **The worker is new infrastructure.** Today the environment runs only php-fpm and nginx,
-  and the queue is synchronous. The agent needs a long-running worker with the Claude Code
-  binary, the systems mounted read-only, a persistent volume for the CLI's config and
-  sessions, and the database queue. That changes `compose.yml` and `Dockerfile.deploy`,
-  which live outside this repo ([open question 10](#17-open-questions)).
+- **Stack, same as palantir:** Laravel 13, Inertia with Vue 3, Tailwind 4. The login waits on
+  [open question 2](#17-open-questions): the Authentik gate in front of the site, or the app's
+  own Authentik login through Socialite as in palantir.
+- **The worker containers** are new infrastructure; see below.
 - **Live output by polling.** While a turn runs, the page asks once a second for the events
   after the last one it has. There is no websocket server to run. Reverb can come later if
   polling falls short.
@@ -351,9 +369,34 @@ own work.
   `GET /rest/api/3/issue/{key}` and its comments for gathering, and
   `GET /rest/api/3/attachment/content/{id}` for downloads. Basic auth with an API token, as
   in jira-outbox.
-- **One thing to fix when the skeleton lands:** the toolbox's `.env` uses the old Laravel
-  names `QUEUE_DRIVER` and `CACHE_DRIVER`. Laravel 13 reads `QUEUE_CONNECTION` and
-  `CACHE_STORE`.
+
+### The worker containers
+
+Today the environment runs `app` (php-fpm) and `web` (nginx), and the queue is synchronous.
+Three services join them in `compose.yml`, all from the same image so they run the same code:
+
+| Service | Runs | Sees |
+|---|---|---|
+| `worker` | `queue:work` for everything except agent turns: Jira sync, clones and fetches | the whole app folder, like `app` |
+| `scheduler` | `schedule:work`: the sync every 10 minutes, the clean-ups | the whole app folder |
+| `agent` | `queue:work --queue=agents`, two replicas (`AGENT_MAX_PARALLEL`) | the code read-only, `shared/agent/` read-write, `shared/systems/` read-only, nothing else of `shared/` |
+
+- `agent` builds a second stage of `Dockerfile.deploy`: the PHP image plus the Claude Code
+  binary (a pinned version that never updates itself), ripgrep and an SSH client. `app`
+  builds the first stage, so php-fpm never carries the CLI.
+- All three run as the tree's owner with the `www-data` group (`1000:33`), as the toolbox's
+  own commands do, so whatever they write stays editable from both sides.
+- Paths are the same in every container (`/app/shared/systems/billing`), so a path stored in
+  the database means the same thing everywhere.
+- The systems' deploy keys live in `shared/keys/`, which `agent` does not mount: the agent has
+  nothing to clone or push with.
+- `agent` gets `CLAUDE_CONFIG_DIR=/app/shared/agent/claude` and
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A deploy stops it with a grace period; a turn
+  it interrupts is marked stopped, and the session carries on with your next message.
+- `shared/.env` then switches to `QUEUE_CONNECTION=database`.
+
+`compose.yml` and `Dockerfile.deploy` live outside this repository, so this waits for your go
+([open question 10](#17-open-questions)).
 
 ### Data model
 
@@ -385,7 +428,9 @@ own work.
 | `CLAUDE_EFFORT` | `high` | |
 | `AGENT_MAX_PARALLEL` | `2` | turns running at once |
 | `AGENT_TURN_BUDGET_USD` | `3` | default ceiling per turn; a space can override it |
-| `SYSTEM_ROOTS` | `/systems` | the only places the folder picker offers |
+| `SYSTEMS_PATH` | `shared/systems` | where the tool keeps its clones |
+| `AGENT_WORKSPACES_PATH` | `shared/agent/tickets` | one folder per ticket |
+| `CLAUDE_CONFIG_DIR` | `shared/agent/claude` | the CLI's sessions; must outlive the container |
 | `SYNC_EVERY_MINUTES` | `10` | |
 
 Everything per space (rules, systems, budgets, model) lives in the database and is edited in
@@ -410,7 +455,7 @@ applied before the first paint, so the page never flashes the wrong theme.
 
 | Token | Day | Night | Used for |
 |---|---|---|---|
-| `bg` | `#F4F1EA` | `#111318` | page |
+| `page` | `#F4F1EA` | `#111318` | page |
 | `surface` | `#FBF9F4` | `#181B22` | cards, panes |
 | `sunken` | `#EAE5DA` | `#0B0D11` | sidebars, code |
 | `line` | `#D8D0C0` | `#2A2F3A` | borders |
@@ -421,9 +466,9 @@ applied before the first paint, so the page never flashes the wrong theme.
 | `waiting` | `#8A5A00` | `#E2B04A` | waiting on someone else |
 | `done` | `#2F6B4F` | `#6FC39A` | closed, confirmed |
 
-Every text colour passes WCAG AA (4.5:1) on `bg` and `surface` in its own theme. There is
+Every text colour passes WCAG AA (4.5:1) on `page` and `surface` in its own theme. There is
 one exception: Day `signal` on `sunken` only reaches 4.1:1, so signal-coloured text goes on
-paper or cards, never on the sunken shade. Labels on a signal-coloured button use the `bg`
+paper or cards, never on the sunken shade. Labels on a signal-coloured button use the `page`
 colour (4.6:1 in Day, 7.2:1 in Night).
 
 **Type.** Instrument Sans for the interface. Instrument Serif only for large headings, which
@@ -471,7 +516,7 @@ Each step ends in something usable.
 
 | Step | What | Done when |
 |---|---|---|
-| 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, Authentik login, design tokens, both themes, empty screens | the shell looks right in Day and Night, on desktop and phone |
+| 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, Authentik login, design tokens, both themes, empty screens | the shell looks right in Day and Night, on desktop and phone. **Built 2026-10-02, except the login.** |
 | 1. Jira and spaces | Jira client, wizard steps 1–2 with live preview, sync, overview | the overview lists exactly what the JQL lists in Jira |
 | 2. Agent runner and systems | worker container, turn runner, event trail on screen, systems, context scans, review and edit | a scanned context is one you would hand to a new colleague |
 | 3. Analysis | ticket workspace, gather, route, dig, proposal screen, code viewer | the backtest (§16) gets most real tickets right |
@@ -496,12 +541,18 @@ contexts. It is the only honest way to tell whether a change helped.
 
 Answer by number. The value in brackets is what this design assumes until then.
 
-1. **Jira.** Is it the same Cloud site as jira-outbox? Jira Software or Jira Service
-   Management (which decides public reply versus internal note)? *[Cloud, same site]*
+1. **Jira.** Is it the same Cloud site as jira-outbox? And are the last-line tickets in a
+   *service* space or a plain one? In a service space (Jira Service Management) customers
+   raise requests through a portal or by email, and every comment is either a public reply
+   that reaches the customer or an internal note. In a plain space every comment is visible
+   to everyone who can open the ticket. A ticket tells you which: a service space offers
+   *Reply to customer* and *Add internal note*, a plain one only *Add a comment*. It decides
+   how replies get posted later, and whether a reply draft is written for a customer or for
+   the colleagues who escalated. *[Cloud, same site]*
 2. **Users.** Only you, or a team later? *[only you, with Authentik in front]*
-3. **Systems.** Where do the folders live: checkouts already on this machine, or should the
-   tool clone the repos itself and keep them fetched? Which branch is what production runs?
-   *[the tool clones and fetches; `main`]*
+3. **Systems.** *Decided 2026-10-02:* on minas, cloned and fetched by the tool itself into
+   `shared/systems/`, outside the containers (§4, §12). Still open: where are the
+   repositories hosted (GitHub?), and can you add a deploy key to each of them?
 4. **Contexts.** In the tool, as designed, or written into each folder as a file? *[in the tool]*
 5. **Beyond code.** May the agent see more than code and git history: logs, a read-only
    database replica, the running app? *[code and history only]*
@@ -511,8 +562,8 @@ Answer by number. The value in brackets is what this design assumes until then.
 8. **Language.** Which languages are tickets written in? *[the agent talks to you in the
    language you write in; reply drafts follow the ticket's language]*
 9. **Sync.** Is every 10 minutes enough, or should Jira webhooks come later? *[10 minutes]*
-10. **Infrastructure.** May the worker container go into `compose.yml` and
-    `Dockerfile.deploy` (outside this repo), with read-only mounts and the Claude Code
-    binary? *[yes, once you say go]*
-11. **Personal data.** Is sending ticket contents to Anthropic's API acceptable to the
-    customers and the employer? *[must be yes before real tickets go in]*
+10. **Infrastructure.** May the worker containers go into `compose.yml` and
+    `Dockerfile.deploy` as described in §12? *[yes, once you say go]*
+11. **Personal data.** What stays on minas and what Anthropic does with the rest is in §11.
+    Is that acceptable to the customers and the employer? *[must be yes before real tickets
+    go in]*
