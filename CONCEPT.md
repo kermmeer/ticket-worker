@@ -98,7 +98,14 @@ is a short wizard. You can come back to any step later.
    so it never pulls. The folder is a checkout that accepts pushes to its branch
    (`receive.denyCurrentBranch=updateInstead`), so a push updates the files at once, history
    included, which is what the agent's `git log` and `git blame` need. Every context scan and
-   analysis records the commit it read. A system can also get routing hints: Jira
+   analysis records the commit it read.
+
+   Your PC is the bridge: it has the VPN (GlobalProtect) and can reach the server, and the
+   server never runs the VPN. Each clone on the PC gets a second remote, `ticket-worker`,
+   once. From then on `tools/push-systems.sh` (in this repository) fetches every such clone
+   from GitLab and pushes it to the server, mirroring GitLab, rewrites included. Run it by
+   hand or on a schedule. If the VPN blocks the server while connected, run `fetch` with
+   it on and `push` with it off. A system can also get routing hints: Jira
    components, labels or words that point to it. A system that another space already uses is
    reused, context and all.
 4. **Context scan.** For each system that has no context yet, an agent writes one (§5). You
@@ -158,11 +165,18 @@ needs from you:
 | **New activity** | Someone commented on or changed the ticket since the last analysis |
 | **Not analysed** | Synced, nothing started yet |
 | **Parked** | Session closed, but the ticket is still open in Jira |
+| **Sleeping** | Waiting on the requester: in a second segment below the rest, folded away |
 
-Each row shows the key, summary, space label, system (once known), Jira status, priority, age
-and last update, the agent's state, and the cost so far. You can filter by space, system and
-priority, and search by key or text. `/` jumps to search, `j`/`k` move up and down, `Enter`
-opens a ticket.
+Each row shows the key with the Jira status stamped below it, the summary, space label, system
+(once known), priority, reporter and last update, the agent's state, and the cost so far.
+Every status has a colour of its own: Jira's grouping (to do, in progress, done) first, the
+name second, so *Waiting for support* and *Waiting for customer* differ at a glance; the
+space's setup can recolour any status. You can show one space or one status only, and search
+by key or text. `/` jumps to search, `j`/`k` move up and down, `Enter` opens a ticket.
+
+Which statuses sleep is part of each space's setup. Until you choose, it is automatic: any
+status that says it waits for the customer, reporter or requester. A sleeping ticket wakes
+up by itself when its status changes in Jira.
 
 Sync runs every 10 minutes, and each space has a *Sync now* button. **Hyper mode**, a switch
 in the header, makes it every minute, for when you are watching the queue closely. It stays on
@@ -465,8 +479,32 @@ repository is on the list (§17).
 | `CLAUDE_CONFIG_DIR` | `shared/agent/claude` | the CLI's sessions; must outlive the container |
 | `SYNC_EVERY_MINUTES` | `10` | |
 
-Everything per space (rules, type, systems, budgets, model) lives in the database and is
-edited in the app. Nothing outside `.env` may assume minas: another person's instance runs on
+### Getting an Anthropic API key
+
+1. Sign in to the Claude Console at [platform.claude.com](https://platform.claude.com), or
+   create an account there. The API is billed on its own, not through a Claude subscription:
+   add credits or a payment method in the Console's billing settings first.
+2. Worth it: create a workspace for Ticket Worker
+   ([Settings → Workspaces](https://platform.claude.com/settings/workspaces)) and give it a
+   spend limit, so its usage and cost show on their own and can never run away.
+3. Go to [Settings → API keys](https://platform.claude.com/settings/keys) and click
+   **Create key**. Name it after the instance (`ticket-worker-dev`), choose an expiration,
+   link it to yourself (a personal key, for your own instance) or to a service account (for
+   one others rely on), and scope it to the workspace from step 2.
+4. Copy the key. It starts with `sk-ant-` and is shown **only once**; lose it and you create
+   a new one.
+5. Add it to `shared/.env` as `ANTHROPIC_API_KEY=sk-ant-…` with an editor. Afterwards the
+   file must still be group `www-data`: if pages fail with a missing APP_KEY, run
+   `sudo chgrp www-data /data/apps/ticket-worker-dev/shared/.env`.
+6. Restart the queue containers so they read it:
+   `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml restart worker scheduler agent`.
+   The Setup page then shows the key as set.
+
+Calls with this key fall under Anthropic's Commercial Terms: no training on them, kept for
+30 days (§11).
+
+Everything per space (rules, type, statuses, systems, budgets, model) lives in the database
+and is edited in the app. Nothing outside `.env` may assume minas: another person's instance runs on
 their own machine with their own settings.
 
 ---
@@ -503,6 +541,10 @@ Every text colour passes WCAG AA (4.5:1) on `page` and `surface` in its own them
 one exception: Day `signal` on `sunken` only reaches 4.1:1, so signal-coloured text goes on
 paper or cards, never on the sunken shade. Labels on a signal-coloured button use the `page`
 colour (4.6:1 in Day, 7.2:1 in Night).
+
+**Status labels** use seven more colours, `--tone-grey` to `--tone-teal`, each at least
+4.5:1 on page, surface and sunken in both themes. **The frame is full width**; text keeps its
+own reading measure.
 
 **Type.** Geist for everything you read, with headings in the same face set heavier and
 tighter, and Geist Mono for anything you would copy or match: ticket keys, paths, commits,

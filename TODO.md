@@ -19,6 +19,10 @@ to it, including work you finish.
 - [x] For a service space, show whether the Jira account is an agent in it (2026-10-02)
 - [x] Sync every 10 minutes and on demand; hyper mode (every minute) as a header switch (2026-10-02)
 - [x] The overview grouped by what a ticket needs, filter by space, search with `/` (2026-10-02)
+- [x] Status stamped under the key, a colour per status, recolourable per space; show one
+      status only; full-width frame (2026-10-02)
+- [x] Sleeping: statuses waiting on the requester, chosen per space (automatic until then),
+      in a folded segment of their own (2026-10-02)
 - [ ] Issue and comments, attachments, ADF to Markdown: needed for the analysis (step 3)
 - [ ] `j`/`k` to move through the overview, `Enter` to open
 
@@ -26,6 +30,8 @@ to it, including work you finish.
 
 - [x] Worker containers `worker`, `scheduler` and `agent`, with health reports on Setup (2026-10-02)
 - [x] Systems page: folders you push into, `updateInstead`, last push shown (2026-10-02)
+- [x] `tools/push-systems.sh`: from your PC (VPN on) fetch every clone from GitLab and push it
+      to the server, mirroring rewrites; `fetch` and `push` apart when the VPN is in the way (2026-10-02)
 - [ ] Remove a system (its row and its folder)
 - [ ] Turn runner: `claude -p` per turn, stream-json into `agent_events`, budget, stop
 - [ ] Context scan per system; review, edit, versions; staleness against the last push
