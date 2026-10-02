@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use App\Jobs\ReportHealth;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// Each queue proves it is being served; the Setup page reads the answers.
+Schedule::job(new ReportHealth('default'))->everyMinute();
+Schedule::job(new ReportHealth('agents'))->everyMinute();

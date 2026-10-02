@@ -7,6 +7,7 @@ const page = usePage();
 
 const nav = [
     { href: '/', label: 'Overview', active: (url) => url === '/' },
+    { href: '/systems', label: 'Systems', active: (url) => url.startsWith('/systems') },
     { href: '/setup', label: 'Setup', active: (url) => url.startsWith('/setup') },
     { href: '/docs/concept', label: 'Concept', active: (url) => url.startsWith('/docs') },
     { href: '/design', label: 'Design', active: (url) => url.startsWith('/design') },

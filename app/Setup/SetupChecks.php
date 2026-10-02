@@ -2,8 +2,9 @@
 
 namespace App\Setup;
 
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Process;
 use Throwable;
 
 /**
@@ -21,6 +22,9 @@ class SetupChecks
 
     public const NOTE = 'note';
 
+    /** The scheduler asks every minute; a report older than this means nobody answered. */
+    private const FRESH_SECONDS = 180;
+
     /**
      * @return list<array{key: string, group: string, title: string, state: string, detail: string}>
      */
@@ -32,9 +36,9 @@ class SetupChecks
             $this->jira(),
             $this->jiraWrite(),
             $this->anthropicKey(),
-            $this->claudeCli(),
+            $this->agentContainer(),
             $this->folder('systems', 'Systems', config('agent.systems_path'),
-                'where the tool keeps its own clones of the systems'),
+                'the folders you push the systems into'),
             $this->folder('workspaces', 'Agent workspaces', config('agent.workspaces_path'),
                 'one folder per ticket, where its agent works'),
         ];
@@ -65,10 +69,18 @@ class SetupChecks
     {
         $connection = config('queue.default');
 
-        return $connection === 'sync'
-            ? $this->item('queue', 'Basics', 'Queue worker', self::TODO,
-                'Jobs run inside the web request: there is no worker yet. It comes with the worker containers (CONCEPT.md §12).')
-            : $this->item('queue', 'Basics', 'Queue worker', self::OK, "Jobs go to the {$connection} queue.");
+        if ($connection === 'sync') {
+            return $this->item('queue', 'Basics', 'Queue worker', self::TODO,
+                'Jobs run inside the web request: there is no worker. Set QUEUE_CONNECTION=database once the worker containers run.');
+        }
+
+        $report = Cache::get('health.default');
+
+        return $this->fresh($report)
+            ? $this->item('queue', 'Basics', 'Queue worker', self::OK,
+                "The worker takes jobs from the {$connection} queue; it last reported {$this->ago($report)}.")
+            : $this->item('queue', 'Basics', 'Queue worker', self::TODO,
+                "Jobs go to the {$connection} queue, but no worker has reported {$this->since($report)}. Are the worker and scheduler containers running?");
     }
 
     private function jira(): array
@@ -106,20 +118,37 @@ class SetupChecks
                 'Not set. Agents need ANTHROPIC_API_KEY in shared/.env.');
     }
 
-    private function claudeCli(): array
+    private function agentContainer(): array
     {
-        try {
-            $result = Process::timeout(10)->run([config('agent.claude.bin'), '--version']);
-        } catch (Throwable) {
-            $result = null;
+        $report = Cache::get('health.agents');
+
+        if (! $this->fresh($report)) {
+            return $this->item('agent', 'Claude', 'Agent container', self::TODO,
+                "The agent container has not reported {$this->since($report)}. Agents run there (CONCEPT.md §12).");
         }
 
-        if ($result?->successful()) {
-            return $this->item('claude-cli', 'Claude', 'Claude Code CLI', self::OK, trim($result->output()));
+        if (blank($report['claude'] ?? null)) {
+            return $this->item('agent', 'Claude', 'Agent container', self::TODO,
+                'The agent container runs, but Claude Code does not answer in it.');
         }
 
-        return $this->item('claude-cli', 'Claude', 'Claude Code CLI', self::TODO,
-            'Not installed where this page runs. Agents run in the agent container, which does not exist yet (CONCEPT.md §12).');
+        return $this->item('agent', 'Claude', 'Agent container', self::OK,
+            "{$report['claude']}, last reported {$this->ago($report)}.");
+    }
+
+    private function fresh(?array $report): bool
+    {
+        return $report !== null && Carbon::parse($report['at'])->isAfter(now()->subSeconds(self::FRESH_SECONDS));
+    }
+
+    private function ago(array $report): string
+    {
+        return Carbon::parse($report['at'])->diffForHumans();
+    }
+
+    private function since(?array $report): string
+    {
+        return $report === null ? 'yet' : 'since '.$this->ago($report);
     }
 
     private function folder(string $key, string $title, string $path, string $purpose): array

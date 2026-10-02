@@ -30,8 +30,13 @@ return [
     // One folder per ticket, where its agent works: ticket.md and attachments/.
     'workspaces_path' => env('AGENT_WORKSPACES_PATH', $shared.'/agent/tickets'),
 
-    // The tool's own clones of the systems, one folder each.
+    // One folder per system: a checkout you push into, since nothing here can reach
+    // your Git server (CONCEPT.md §4).
     'systems_path' => env('SYSTEMS_PATH', $shared.'/systems'),
+
+    // Where that folder is as seen from your own machine, to show the push command:
+    // e.g. kermmeer@minas:/data/apps/ticket-worker-dev/shared/systems
+    'systems_push_base' => env('SYSTEMS_PUSH_BASE'),
 
     'sync_every_minutes' => (int) env('SYNC_EVERY_MINUTES', 10),
 

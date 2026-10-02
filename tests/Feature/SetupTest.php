@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -22,7 +22,6 @@ class SetupTest extends TestCase
             'agent.claude.api_key' => 'sk-ant-key-that-must-not-leak',
             'queue.default' => 'database',
         ]);
-        Process::fake();
     }
 
     public function test_secrets_show_as_set_never_as_their_value(): void
@@ -55,15 +54,20 @@ class SetupTest extends TestCase
         $this->assertSame('note', $this->check('jira-write')['state']);
     }
 
-    public function test_the_claude_cli_counts_only_when_it_answers(): void
+    public function test_the_agent_container_counts_only_while_it_reports(): void
     {
-        Process::fake(['*' => Process::result('2.1.282 (Claude Code)')]);
-        $cli = $this->check('claude-cli');
-        $this->assertSame('ok', $cli['state']);
-        $this->assertSame('2.1.282 (Claude Code)', $cli['detail']);
+        $this->assertSame('todo', $this->check('agent')['state']);
 
-        Process::fake(['*' => Process::result(exitCode: 127)]);
-        $this->assertSame('todo', $this->check('claude-cli')['state']);
+        Cache::put('health.agents', ['at' => now()->subSeconds(30)->toIso8601String(), 'claude' => '2.1.282 (Claude Code)']);
+        $agent = $this->check('agent');
+        $this->assertSame('ok', $agent['state']);
+        $this->assertStringContainsString('2.1.282 (Claude Code)', $agent['detail']);
+
+        Cache::put('health.agents', ['at' => now()->subMinutes(10)->toIso8601String(), 'claude' => '2.1.282 (Claude Code)']);
+        $this->assertSame('todo', $this->check('agent')['state']);
+
+        Cache::put('health.agents', ['at' => now()->toIso8601String(), 'claude' => null]);
+        $this->assertStringContainsString('does not answer', $this->check('agent')['detail']);
     }
 
     public function test_a_synchronous_queue_means_there_is_no_worker(): void
@@ -71,6 +75,15 @@ class SetupTest extends TestCase
         config(['queue.default' => 'sync']);
 
         $this->assertSame('todo', $this->check('queue')['state']);
+    }
+
+    public function test_a_queue_counts_as_served_only_while_the_worker_reports(): void
+    {
+        $this->assertSame('todo', $this->check('queue')['state']);
+
+        Cache::put('health.default', ['at' => now()->toIso8601String()]);
+
+        $this->assertSame('ok', $this->check('queue')['state']);
     }
 
     /** One check, as the page receives it. */
