@@ -27,7 +27,7 @@ function toggleHyper() {
 <template>
     <div class="min-h-screen">
         <header class="sticky top-0 z-10 border-b border-line bg-page/90 backdrop-blur">
-            <div class="mx-auto flex max-w-6xl flex-wrap items-end gap-x-10 px-4 pt-4 sm:px-6">
+            <div class="flex w-full flex-wrap items-end gap-x-10 px-4 pt-4 sm:px-6 lg:px-10">
                 <Link href="/" class="flex items-center gap-2 pb-3">
                     <span class="size-3 rounded-[3px] bg-signal" aria-hidden="true"></span>
                     <span class="display text-xl leading-none">Ticket Worker</span>
@@ -61,7 +61,7 @@ function toggleHyper() {
             </div>
         </header>
 
-        <main class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+        <main class="w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-10">
             <p v-if="flash.success" role="status" class="mb-8 rounded-md border border-done/40 bg-surface px-4 py-2.5 text-sm text-done">
                 {{ flash.success }}
             </p>

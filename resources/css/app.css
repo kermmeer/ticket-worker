@@ -33,6 +33,16 @@
     --space-sky: #0369a1;
     --space-olive: #4d7c0f;
     --space-slate: #475569;
+
+    /* Status labels: text in these colours, so each is at least 4.5:1 on page, surface
+       and sunken in its theme (checked 2026-10-02). */
+    --tone-grey: #57534e;
+    --tone-blue: #1d5fc9;
+    --tone-amber: #8a5a00;
+    --tone-green: #2f6b4f;
+    --tone-rose: #b4233f;
+    --tone-violet: #6d28d9;
+    --tone-teal: #0f6b63;
 }
 
 .dark {
@@ -54,6 +64,14 @@
     --space-sky: #38bdf8;
     --space-olive: #a3e635;
     --space-slate: #94a3b8;
+
+    --tone-grey: #a8a29e;
+    --tone-blue: #6fa0ff;
+    --tone-amber: #e2b04a;
+    --tone-green: #6fc39a;
+    --tone-rose: #fb7185;
+    --tone-violet: #b39dfa;
+    --tone-teal: #2dd4bf;
 }
 
 @theme inline {

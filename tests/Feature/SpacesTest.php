@@ -91,6 +91,26 @@ class SpacesTest extends TestCase
         $this->assertSame('project = "SUP" AND (labels = "last-line") AND NOT (statusCategory = Done) ORDER BY updated DESC', $space->jql());
     }
 
+    public function test_saving_keeps_status_colours_and_which_statuses_sleep(): void
+    {
+        $space = self::space();
+
+        $this->put("/spaces/{$space->id}", [
+            'label' => 'Support', 'colour' => 'teal', 'type' => Space::SERVICE, 'done_rule' => 'statusCategory = Done',
+            'status_colours' => ['On Hold' => 'teal'],
+            'sleep_statuses' => ['Waiting for customer', 'On Hold'],
+        ])->assertSessionHasNoErrors();
+
+        $space->refresh();
+        $this->assertSame('teal', $space->statusTone('On Hold', 'new'));
+        $this->assertTrue($space->sleeps('On Hold'));
+
+        $this->put("/spaces/{$space->id}", [
+            'label' => 'Support', 'colour' => 'teal', 'type' => Space::SERVICE, 'done_rule' => 'statusCategory = Done',
+            'status_colours' => ['On Hold' => 'fuchsia'],
+        ])->assertSessionHasErrors('status_colours.On Hold');
+    }
+
     public function test_rules_cannot_bring_their_own_order(): void
     {
         $space = self::space();
@@ -137,7 +157,10 @@ class SpacesTest extends TestCase
         $space = self::space();
         Http::fake([
             '*/rest/api/3/project/SUP' => Http::response(['id' => 10, 'key' => 'SUP', 'name' => 'Support', 'projectTypeKey' => 'service_desk', 'issueTypes' => [['name' => 'Incident']]]),
-            '*/rest/api/3/project/SUP/statuses' => Http::response([['name' => 'Incident', 'statuses' => [['name' => 'Waiting for support']]]]),
+            '*/rest/api/3/project/SUP/statuses' => Http::response([['name' => 'Incident', 'statuses' => [
+                ['name' => 'Waiting for support', 'statusCategory' => ['key' => 'indeterminate']],
+                ['name' => 'Waiting for customer', 'statusCategory' => ['key' => 'undefined']],
+            ]]]),
             '*/rest/api/3/project/SUP/components' => Http::response([['name' => 'Billing']]),
             '*/rest/api/3/mypermissions*' => Http::response(['permissions' => [
                 'BROWSE_PROJECTS' => ['havePermission' => true],
@@ -149,7 +172,11 @@ class SpacesTest extends TestCase
         $this->get("/spaces/{$space->id}/edit")->assertInertia(fn (Assert $page) => $page
             ->component('Spaces/Edit', true)
             ->where('permissions.data.SERVICEDESK_AGENT', false)
-            ->where('vocabulary.data.statuses', ['Waiting for support'])
+            ->where('vocabulary.data.statuses.0', [
+                'name' => 'Waiting for customer', 'category' => 'undefined', 'default_tone' => 'amber', 'asleep_by_default' => true,
+            ])
+            ->where('vocabulary.data.statuses.1.default_tone', 'rose')
+            ->where('vocabulary.data.statuses.1.asleep_by_default', false)
             ->where('vocabulary.data.components', ['Billing']));
 
         Http::assertSent(fn (Request $request) => str_contains(urldecode($request->url()), 'permissions=BROWSE_PROJECTS,ADD_COMMENTS,SERVICEDESK_AGENT'));

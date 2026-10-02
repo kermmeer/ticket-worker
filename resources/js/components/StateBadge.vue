@@ -11,7 +11,7 @@ const states = {
     'needs-you': { label: 'Needs you', tone: 'text-signal', shape: 'dot' },
     'new-activity': { label: 'New activity', tone: 'text-signal', shape: 'spark' },
     working: { label: 'Working', tone: 'text-working', shape: 'half' },
-    waiting: { label: 'Waiting on reporter', tone: 'text-waiting', shape: 'clock' },
+    sleeping: { label: 'Sleeping', tone: 'text-waiting', shape: 'moon' },
     'not-analysed': { label: 'Not analysed', tone: 'text-muted', shape: 'ring' },
     parked: { label: 'Parked', tone: 'text-muted', shape: 'pause' },
     closed: { label: 'Closed', tone: 'text-done', shape: 'check' },
@@ -32,10 +32,7 @@ const current = computed(() => states[props.state] ?? states['not-analysed']);
                 <circle cx="6" cy="6" r="4" />
                 <path d="M6 2a4 4 0 0 1 0 8z" fill="currentColor" stroke="none" />
             </template>
-            <template v-else-if="current.shape === 'clock'">
-                <circle cx="6" cy="6" r="4" />
-                <path d="M6 4v2.2l1.5 1" />
-            </template>
+            <path v-else-if="current.shape === 'moon'" d="M9.5 7.6A4 4 0 0 1 4.4 2.5 4 4 0 1 0 9.5 7.6z" fill="currentColor" stroke="none" />
             <path v-else-if="current.shape === 'pause'" d="M4.5 3v6M7.5 3v6" />
             <path v-else-if="current.shape === 'check'" d="M2.5 6.5 5 9l4.5-6" />
             <path v-else d="M6 1.5v9M1.5 6h9M2.8 2.8l6.4 6.4M9.2 2.8l-6.4 6.4" />

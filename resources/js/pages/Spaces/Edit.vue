@@ -2,12 +2,14 @@
 import { computed, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import SpaceLabel from '../../components/SpaceLabel.vue';
+import StatusLabel from '../../components/StatusLabel.vue';
 import { ago } from '../../time.js';
 
 const props = defineProps({
     space: { type: Object, required: true },
     systems: { type: Array, required: true },
     colours: { type: Array, required: true },
+    tones: { type: Array, required: true },
     vocabulary: { type: Object, required: true },
     permissions: { type: Object, required: true },
 });
@@ -19,7 +21,31 @@ const form = useForm({
     rules: props.space.rules ?? '',
     done_rule: props.space.done_rule,
     system_ids: [...props.space.system_ids],
+    status_colours: { ...props.space.status_colours },
+    // null: automatic, until a box is ticked or unticked.
+    sleep_statuses: props.space.sleep_statuses,
 });
+
+const statuses = computed(() => props.vocabulary.data?.statuses ?? []);
+
+function toneOf(status) {
+    return form.status_colours[status.name] || status.default_tone;
+}
+
+function setTone(status, tone) {
+    if (tone === '') {
+        delete form.status_colours[status.name];
+    } else {
+        form.status_colours[status.name] = tone;
+    }
+}
+
+const sleeping = computed(() => form.sleep_statuses ?? statuses.value.filter((status) => status.asleep_by_default).map((status) => status.name));
+
+function setSleeps(status, sleeps) {
+    const others = sleeping.value.filter((name) => name !== status.name);
+    form.sleep_statuses = sleeps ? [...others, status.name] : others;
+}
 
 function save() {
     form.put(`/spaces/${props.space.id}`, { preserveScroll: true });
@@ -167,7 +193,7 @@ async function runPreview() {
             <p v-if="form.errors.rules" class="mt-1 text-sm text-signal">{{ form.errors.rules }}</p>
 
             <div v-if="vocabulary.data" class="mt-3 space-y-2 text-sm">
-                <p v-for="(values, field) in { issuetype: vocabulary.data.issueTypes, status: vocabulary.data.statuses, component: vocabulary.data.components }" :key="field" class="flex flex-wrap items-center gap-1.5">
+                <p v-for="(values, field) in { issuetype: vocabulary.data.issueTypes, status: statuses.map((status) => status.name), component: vocabulary.data.components }" :key="field" class="flex flex-wrap items-center gap-1.5">
                     <span class="w-24 shrink-0 text-muted">{{ field === 'issuetype' ? 'Issue type' : field === 'status' ? 'Status' : 'Component' }}</span>
                     <span v-if="values.length === 0" class="text-muted">none</span>
                     <button
@@ -213,6 +239,51 @@ async function runPreview() {
                 </template>
                 <p v-if="preview.jql" class="mt-3 font-mono text-xs break-words text-muted">{{ preview.jql }}</p>
             </div>
+        </section>
+
+        <!-- Statuses -->
+        <section class="card p-5">
+            <h2 class="text-lg font-medium">Statuses</h2>
+            <p class="mt-1 max-w-3xl text-sm text-muted">
+                The colour of each status's label in the overview, and which statuses put a ticket to sleep: waiting on the
+                requester, so it moves to the sleeping segment below the rest.
+            </p>
+            <p v-if="vocabulary.error" class="mt-3 text-sm text-signal">The statuses did not load: {{ vocabulary.error }}</p>
+            <p v-else-if="form.sleep_statuses === null" class="mt-2 text-sm text-muted">
+                Sleep is automatic for now: statuses that say they wait for the customer. Ticking or unticking a box makes the list yours.
+            </p>
+            <table v-if="statuses.length" class="mt-4 w-full text-sm">
+                <thead>
+                    <tr class="text-left text-muted">
+                        <th class="pb-2 font-normal">Status</th>
+                        <th class="pb-2 font-normal">Colour</th>
+                        <th class="pb-2 font-normal">Sleeps</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line">
+                    <tr v-for="status in statuses" :key="status.name">
+                        <td class="py-2 pr-4"><StatusLabel :status="status.name" :tone="toneOf(status)" /></td>
+                        <td class="py-2 pr-4">
+                            <label class="sr-only" :for="`tone-${status.name}`">Colour for {{ status.name }}</label>
+                            <select
+                                :id="`tone-${status.name}`"
+                                :value="form.status_colours[status.name] ?? ''"
+                                class="rounded-md border border-line bg-page px-2 py-1 text-sm"
+                                @change="setTone(status, $event.target.value)"
+                            >
+                                <option value="">Automatic ({{ status.default_tone }})</option>
+                                <option v-for="tone in tones" :key="tone" :value="tone">{{ tone }}</option>
+                            </select>
+                        </td>
+                        <td class="py-2">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" :checked="sleeping.includes(status.name)" @change="setSleeps(status, $event.target.checked)" />
+                                <span class="text-muted">{{ sleeping.includes(status.name) ? 'sleeps' : 'awake' }}</span>
+                            </label>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </section>
 
         <!-- Systems -->

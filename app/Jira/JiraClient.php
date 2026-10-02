@@ -84,7 +84,7 @@ class JiraClient
     /**
      * The space's own words, to build ticket rules from.
      *
-     * @return array{issueTypes: list<string>, statuses: list<string>, components: list<string>}
+     * @return array{issueTypes: list<string>, statuses: list<array{name: string, category: ?string}>, components: list<string>}
      */
     public function vocabulary(string $key): array
     {
@@ -93,8 +93,9 @@ class JiraClient
         return [
             'issueTypes' => $this->project($key)['issueTypes'],
             'statuses' => collect($this->send('get', $path.'/statuses'))
-                ->flatMap(fn ($issueType) => collect($issueType['statuses'] ?? [])->pluck('name'))
-                ->unique()->sort()->values()->all(),
+                ->flatMap(fn ($issueType) => $issueType['statuses'] ?? [])
+                ->map(fn ($status) => ['name' => (string) $status['name'], 'category' => $status['statusCategory']['key'] ?? null])
+                ->unique('name')->sortBy('name')->values()->all(),
             'components' => collect($this->send('get', $path.'/components'))
                 ->pluck('name')->sort()->values()->all(),
         ];

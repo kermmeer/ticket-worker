@@ -90,11 +90,15 @@ class SpaceController extends Controller
                 'rules' => $space->rules,
                 'done_rule' => $space->done_rule,
                 'system_ids' => $space->systems()->pluck('systems.id'),
+                'status_colours' => (object) ($space->status_colours ?? []),
+                // Null until chosen: the page then shows what the automatic choice puts to sleep.
+                'sleep_statuses' => $space->sleep_statuses,
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
             'colours' => Space::COLOURS,
+            'tones' => Space::TONES,
             // Both come from Jira; the page still works when it does not answer.
-            'vocabulary' => $this->attempt(fn () => $jira->vocabulary($space->project_key)),
+            'vocabulary' => $this->attempt(fn () => $this->withDefaults($jira->vocabulary($space->project_key))),
             'permissions' => $this->attempt(fn () => $jira->permissions($space->project_key, $this->permissionKeys($space))),
         ]);
     }
@@ -109,6 +113,10 @@ class SpaceController extends Controller
             'done_rule' => ['required', 'string', 'max:2000', self::NO_ORDER],
             'system_ids' => ['array'],
             'system_ids.*' => ['integer', Rule::exists('systems', 'id')],
+            'status_colours' => ['array'],
+            'status_colours.*' => [Rule::in(Space::TONES)],
+            'sleep_statuses' => ['nullable', 'array'],
+            'sleep_statuses.*' => ['string', 'max:255'],
         ], [
             'rules.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',
             'done_rule.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',
@@ -179,6 +187,17 @@ class SpaceController extends Controller
         $space->delete();
 
         return to_route('spaces.index')->with('success', 'Removed '.$space->label.', with its tickets.');
+    }
+
+    /** Each status with the colour and sleep it gets when nobody chose. */
+    private function withDefaults(array $vocabulary): array
+    {
+        $vocabulary['statuses'] = array_map(fn (array $status) => $status + [
+            'default_tone' => Space::defaultTone($status['name'], $status['category']),
+            'asleep_by_default' => Space::looksAsleep($status['name']),
+        ], $vocabulary['statuses']);
+
+        return $vocabulary;
     }
 
     private function summary(Space $space): array

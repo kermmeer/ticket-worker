@@ -5,7 +5,9 @@ import ActivityLine from '../components/ActivityLine.vue';
 import EvidenceChip from '../components/EvidenceChip.vue';
 import LogEntry from '../components/LogEntry.vue';
 import StateBadge from '../components/StateBadge.vue';
+import StatusLabel from '../components/StatusLabel.vue';
 import TicketKey from '../components/TicketKey.vue';
+import TicketRow from '../components/TicketRow.vue';
 import { theme } from '../theme.js';
 
 // The specimen: the look of Ticket Worker on sample data, so both themes can be judged
@@ -35,13 +37,25 @@ function readValues() {
 onMounted(readValues);
 watch(theme, () => nextTick(readValues));
 
-const states = ['needs-you', 'new-activity', 'working', 'waiting', 'not-analysed', 'parked', 'closed'];
+const states = ['needs-you', 'new-activity', 'working', 'sleeping', 'not-analysed', 'parked', 'closed'];
 
+const toneSamples = [
+    ['To Do', 'grey'],
+    ['In Progress', 'blue'],
+    ['Waiting for customer', 'amber'],
+    ['Waiting for support', 'rose'],
+    ['On Hold', 'violet'],
+    ['Done', 'green'],
+    ['Escalated to vendor', 'teal'],
+];
+
+const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60000).toISOString();
+const space = { label: 'Support', colour: 'teal' };
 const tickets = [
-    { key: 'SUP-1234', summary: 'Invoices not sent after a credit note', system: 'billing', state: 'needs-you', age: '3 d', priority: 'High', cost: '$1.84' },
-    { key: 'SUP-1241', summary: 'Export to accounting stops at 1,000 rows', system: 'portal', state: 'working', age: '1 d', priority: 'Medium', cost: '$0.62' },
-    { key: 'SUP-1236', summary: 'Delivery address reverts after saving', system: 'portal', state: 'waiting', age: '2 d', priority: 'Medium', cost: '$0.97' },
-    { key: 'SUP-1198', summary: 'Password reset mail arrives twice', system: '', state: 'not-analysed', age: '6 d', priority: 'Low', cost: '' },
+    { id: 1, key: 'SUP-1234', summary: 'Invoices not sent after a credit note', status: 'Waiting for support', status_tone: 'rose', priority: 'High', reporter: 'Finance team', updated_at: minutesAgo(4), group: 'needs-you', url: '#' },
+    { id: 2, key: 'SUP-1241', summary: 'Export to accounting stops at 1,000 rows', status: 'In Progress', status_tone: 'blue', priority: 'Medium', reporter: 'Accounting', updated_at: minutesAgo(50), group: 'working', url: '#' },
+    { id: 3, key: 'SUP-1198', summary: 'Password reset mail arrives twice', status: 'To Do', status_tone: 'grey', priority: 'Low', reporter: 'Helpdesk', updated_at: minutesAgo(600), group: 'not-analysed', url: '#' },
+    { id: 4, key: 'SUP-1236', summary: 'Delivery address reverts after saving', status: 'Waiting for customer', status_tone: 'amber', priority: 'Medium', reporter: 'Shop team', updated_at: minutesAgo(2900), group: 'sleeping', url: '#' },
 ];
 
 const rail = ['Synced', 'Analysed', 'Proposed', 'Working', 'Closed'];
@@ -101,28 +115,18 @@ const railAt = 2;
         <div class="mt-4 flex flex-wrap gap-2">
             <StateBadge v-for="state in states" :key="state" :state="state" />
         </div>
+        <h2 class="eyebrow mt-8">Jira statuses: a stamp like the key, a colour per status</h2>
+        <div class="mt-4 flex flex-wrap gap-1.5">
+            <StatusLabel v-for="[name, tone] in toneSamples" :key="name" :status="name" :tone="tone" />
+        </div>
     </section>
 
     <!-- Overview rows -->
     <section class="mt-16">
         <h2 class="eyebrow">The overview</h2>
         <ul class="card mt-4 divide-y divide-line">
-            <li
-                v-for="ticket in tickets"
-                :key="ticket.key"
-                class="grid gap-x-4 gap-y-2 p-4 sm:grid-cols-[6.5rem_1fr_auto] sm:items-center"
-                :class="{ 'working-edge': ticket.state === 'working' }"
-            >
-                <div><TicketKey :value="ticket.key" /></div>
-                <div class="min-w-0">
-                    <p class="font-medium">{{ ticket.summary }}</p>
-                    <p class="mt-0.5 text-sm text-muted">
-                        <span v-if="ticket.system">System {{ ticket.system }}</span>
-                        <span v-else>System not known yet</span>
-                        · {{ ticket.priority }} · {{ ticket.age }}<template v-if="ticket.cost"> · {{ ticket.cost }}</template>
-                    </p>
-                </div>
-                <div><StateBadge :state="ticket.state" /></div>
+            <li v-for="ticket in tickets" :key="ticket.id" :class="{ 'working-edge': ticket.group === 'working' }">
+                <TicketRow :ticket="ticket" :space="space" />
             </li>
         </ul>
     </section>
