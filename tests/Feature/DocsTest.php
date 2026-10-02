@@ -14,9 +14,17 @@ class DocsTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Docs', true)
                 ->where('title', 'Ticket Worker: concept')
-                // CONCEPT.md links to its sections as GitHub names them.
-                ->where('html', fn (string $html) => str_contains($html, 'id="17-open-questions"')
-                    && str_contains($html, 'href="#17-open-questions"')));
+                ->where('html', function (string $html) {
+                    // CONCEPT.md links to its own sections as GitHub names them; every such
+                    // link must land on a heading here too.
+                    preg_match_all('/href="#([^"]+)"/', $html, $links);
+                    $this->assertNotEmpty($links[1]);
+                    foreach (array_unique($links[1]) as $anchor) {
+                        $this->assertStringContainsString('id="'.$anchor.'"', $html, "No heading for #{$anchor}");
+                    }
+
+                    return true;
+                }));
     }
 
     public function test_only_known_documents_are_served(): void

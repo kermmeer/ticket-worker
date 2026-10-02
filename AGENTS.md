@@ -25,6 +25,16 @@ corepack npm@11 install && corepack npm@11 run build   # minas has no global npm
 - `shared/.env` (linked as `work/.env`) holds the real settings and secrets. `.env.example`
   documents every setting; keep the two in step, with no real values in the example.
 - Work leaves as patches (`toolbox-dev … patch`). Nothing here can push.
+- Five containers: `app` (php-fpm), `web`, `worker`, `scheduler` and `agent`
+  (`CONCEPT.md` §12). Their definitions live outside the repository, in
+  `/data/apps/ticket-worker-dev/compose.yml` and `Dockerfile.deploy`.
+- Queue workers keep the code they started with. After changing a job:
+  `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml restart worker scheduler agent`.
+- Artisan in a container, as the tree's owner (tinker needs a writable `HOME`):
+  `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml --project-directory /data/apps/ticket-worker-dev exec -T --user 1000:33 -e HOME=/tmp -w /app/work app php artisan …`
+- **Never `sed -i` `shared/.env`**, or anything else that replaces the file: the new file
+  loses the `www-data` group, php-fpm can no longer read it, and every page fails with a
+  missing APP_KEY. Append to it, or `sudo chgrp www-data` it afterwards.
 
 ## Rules the code does not tell you
 
@@ -43,6 +53,10 @@ test or a fixture: tickets carry customers' names, addresses and screenshots.
 
 **Do not read this machine's config in a test.** The next machine's `.env` differs; set what a
 test needs with `config([...])`.
+
+**Systems arrive by push.** Your Git servers are out of reach (GitLab, behind a VPN), so the
+code comes in by `git push` into `shared/systems/<name>`. Nothing in the tool may pull, clone
+or otherwise reach a Git server, and the agent sees those folders read-only.
 
 **`CONCEPT.md` is the design record.** When a decision in it changes, change the document in
 the same commit.

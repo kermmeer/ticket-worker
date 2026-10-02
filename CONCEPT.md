@@ -6,9 +6,10 @@ everything on it, works out which system it is about, searches that system's cod
 went wrong, and proposes a fix. You then keep talking to that agent on that ticket until it
 is solved or you close the session.
 
-> **Status:** concept, 2 October 2026. Only the skeleton is built (step 0 of the
-> [build order](#15-build-order)). This file is the idea to agree on first. Once the [open questions](#17-open-questions) are answered it becomes the build
-> brief, the way jira-outbox's README is.
+> **Status:** 2 October 2026. Built: the skeleton, the worker containers and the Systems page
+> (see the [build order](#15-build-order)). The answers to the first round of questions are
+> recorded in [§17](#17-decisions-and-open-questions); with them this file is the build brief,
+> the way jira-outbox's README is.
 
 ---
 
@@ -37,8 +38,10 @@ decide, and you are the one who answers in Jira.
 
 - Analysing tickets automatically as they arrive. Every analysis costs money, so you start it.
 - The agent posting to Jira or changing tickets. It drafts; you post (with a button, in v1.x).
-- The agent changing code. It reads the systems and never writes to them.
-- More than one Jira site, several users with roles, Jira webhooks.
+- The agent changing the systems. It reads them; a patch you ask for is written in a scratch
+  copy of its own (§8), and you apply it.
+- More than one Jira site, Jira webhooks, and accounts: an instance belongs to one person, and
+  someone else who wants Ticket Worker runs an instance of their own.
 
 ---
 
@@ -46,9 +49,9 @@ decide, and you are the one who answers in Jira.
 
 | Word | Meaning |
 |---|---|
-| **Space** | A Jira space. Jira's REST API still calls these *projects*, so the code says `project` wherever it talks to Jira. One Jira site, set in `.env`, serves all spaces. |
+| **Space** | A Jira space: a service space (Jira Service Management) or a plain one. Jira's REST API still calls these *projects*, so the code says `project` wherever it talks to Jira. One Jira site, set in `.env`, serves all spaces. |
 | **Ticket rules** | The JQL that picks which tickets of a space this tool looks at, for example only escalated ones. |
-| **System** | A codebase tickets can be about: a Git repository the tool clones and keeps fetched, and the agent reads. One system can serve several spaces. |
+| **System** | A codebase tickets can be about: a folder on minas that you push the code into, and the agent reads. One system can serve several spaces. |
 | **System context** | A short Markdown brief per system: what it is, where things are, what users call things. Written by an agent, reviewed by you. |
 | **Analysis** | The first scan of a ticket's problem. It ends in a proposal. |
 | **Proposal** | The structured result: which system, what went wrong, the evidence, the fix, a workaround, a reply draft. Versioned. |
@@ -64,7 +67,7 @@ decide, and you are the one who answers in Jira.
  ──────────────                              ────────────────────────
  1  pick the space                           Analyse
  2  ticket rules (JQL, live preview)           ├─ gather   text, comments, attachments
- 3  systems (folders)                          ├─ route    which system? (contexts)
+ 3  systems (pushed by you)                   ├─ route    which system? (contexts)
  4  context scan, one agent per system         ├─ dig      code and git history
  5  activate ─► sync ─► overview ─────────►    └─ propose  cause, evidence, fix, reply draft
                                                      │
@@ -81,20 +84,22 @@ A space stays a draft until its setup is finished, and only active spaces sync t
 is a short wizard. You can come back to any step later.
 
 1. **Space.** Pick one of the spaces the Jira account can see. Give it a short label and a
-   colour for the overview.
+   colour for the overview. Its type is read from Jira (a service space has the project type
+   `service_desk`) and can be overridden here; it decides how replies are posted (§9).
 2. **Ticket rules.** Build the filter from the space's own fields (issue types, statuses,
    labels, components, whatever field marks last line), or write the JQL yourself. The tool
    always adds `project = KEY`. A live preview shows how many tickets match and the first
    few, so you see what you are about to get. A second rule says when a ticket counts as
    done. The default is Jira's *Done* status category.
-3. **Systems.** Add the systems this space's tickets can be about. A system is a Git
-   repository plus the branch production runs. The tool clones it itself into
-   `shared/systems/<name>` on minas, a folder outside the containers that survives every
-   rebuild, and fetches it before each context scan and each analysis. Each system gets its
-   own read-only deploy key: the tool generates it and shows the public half for you to add
-   to the repository, as the toolbox does for apps. A system can also get routing hints:
-   Jira components, labels or words that point to it. A system that another space already
-   uses is reused, context and all.
+3. **Systems.** Pick the systems this space's tickets can be about, from the Systems page.
+   A system is a folder on minas, `shared/systems/<name>`, that you push its code into from
+   your own machine: Ticket Worker cannot reach your Git server (mostly GitLab, behind a VPN),
+   so it never pulls. The folder is a checkout that accepts pushes to its branch
+   (`receive.denyCurrentBranch=updateInstead`), so a push updates the files at once, history
+   included, which is what the agent's `git log` and `git blame` need. Every context scan and
+   analysis records the commit it read. A system can also get routing hints: Jira
+   components, labels or words that point to it. A system that another space already uses is
+   reused, context and all.
 4. **Context scan.** For each system that has no context yet, an agent writes one (§5). You
    read each one, edit it if needed, and approve it. Scans run side by side up to the agent
    limit, and you can watch them work.
@@ -134,10 +139,9 @@ moved since (*context is 214 commits behind*) and offers a refresh. A refresh gi
 the old context plus what changed since then, and asks it to update. Every version is kept,
 so an edit or a refresh can be undone.
 
-Contexts live in the tool's database, not in the folders. The folders are the tool's own
-clones: every fetch resets them to the remote, and the agent sees them read-only. A context
-file inside one would have to be protected from both, and the database keeps the versions
-besides (see [open question 4](#17-open-questions)).
+Contexts live in the tool's database, not in the folders. The folders hold exactly what you
+pushed, and the agent sees them read-only; a context file inside one would be overwritten or
+refused by your next push. The database keeps the versions besides.
 
 ---
 
@@ -159,16 +163,20 @@ and last update, the agent's state, and the cost so far. You can filter by space
 priority, and search by key or text. `/` jumps to search, `j`/`k` move up and down, `Enter`
 opens a ticket.
 
-Sync runs on a schedule (every 10 minutes by default), and each space has a *Sync now*
-button. Tickets that no longer match the rules (solved, moved, relabelled) leave the overview.
+Sync runs every 10 minutes, and each space has a *Sync now* button. **Hyper mode**, a switch
+in the header, makes it every minute, for when you are watching the queue closely. It stays on
+until you switch it off, and the header shows it in the signal colour while it is on, so it is
+never on by accident. Tickets that no longer match the rules (solved, moved, relabelled) leave the overview.
 If one still has an open session, the tool suggests closing it.
 
 ---
 
 ## 7. Analysing a ticket
 
-Open a ticket and press **Analyse**. The steps show as a checklist that ticks off as the agent
-works:
+Open a ticket and press **Analyse**. Next to the button you pick the language of the reply
+draft: *Auto*, the ticket's own language, unless you choose English, Nederlands, Français,
+Dansk or another. The agent always talks to you in English; the instance has a setting for
+that. The steps show as a checklist that ticks off as the agent works:
 
 1. **Gather.** The tool fetches the ticket fresh: description, every comment, attachments,
    linked issues. It converts Jira's rich text (ADF) to Markdown and downloads the
@@ -193,7 +201,7 @@ works:
 | Fix | What to change and where: code, data or configuration |
 | Workaround | What the reporter can do in the meantime, if anything |
 | Questions | What the ticket does not say, and who should answer |
-| Reply draft | An answer to the reporter, in the ticket's language |
+| Reply draft | An answer to the reporter, in the language picked; in a service space, marked as a public reply or an internal note |
 | Confidence | Low, medium or high, with a one-line reason |
 
 Evidence that points to code opens a read-only viewer at that line, so you can check the
@@ -205,10 +213,15 @@ claim without leaving the ticket.
 
 After the proposal, the session stays open. You talk, and the agent carries on with the whole
 investigation in mind: *look at the batch job instead*, *the reporter says it worked last
-week*, *show the fix as a diff* (shown, never applied). When the conversation changes the
+week*, *show the fix as a diff*. When the conversation changes the
 conclusion, **Update proposal** asks the agent to restate it in the proposal format. That
 makes a new version, and the earlier ones stay visible.
 
+- **Patch.** *Prepare a patch* has the agent make the change in a scratch copy of the system
+  inside the ticket's workspace, the one place it may write, starting from the commit it
+  analysed. The tool turns that into a `git format-patch` file with a commit message the
+  agent drafts: download it, `git am` it in your own checkout, test it, push it. The agent
+  cannot run the code, so a patch is untested until you test it, and the page says so.
 - **New ticket activity.** If a comment arrives while the session is open, the ticket shows
   it and offers to pass it to the agent.
 - **Stop.** You can stop a turn while it runs. The session stays, and you carry on from there.
@@ -229,8 +242,12 @@ progress (§10).
 Version 1 only reads from Jira. The next step adds writing, but only when you press the
 button:
 
-- **Post a reply.** You edit the reply draft in place and post it as a comment. On a Jira
-  Service Management space, you choose between a public reply and an internal note.
+- **Post a reply.** You edit the reply draft in place and post it as a comment. In a service
+  space both are offered, **Reply to customer** and **Add internal note**, through the service
+  desk API (`POST /rest/servicedeskapi/request/{key}/comment`, `public` true or false). The
+  Jira account the tool uses must be an agent in that space for either to work; the space's
+  setup checks it. A plain space has one kind of comment, visible to everyone who can open
+  the ticket.
 - **Transition and assign** from the ticket header.
 - **A dry-run switch** in `.env` (`JIRA_WRITE=dummy|real`), like jira-outbox's `SEND_MODE`.
   In dummy mode nothing reaches Jira. That is how the tool is developed and demonstrated.
@@ -283,6 +300,8 @@ Later turns pass `--resume <uuid>` instead of `--session-id`.
   permissions.
 - **The system prompt** holds its role, its rules and the contexts of the space's systems.
   It is recorded at the session's first turn and reused on every resume.
+- **Patch turns** add `Edit` and `Write`, which restricted mode confines to the workspace,
+  where the scratch copy is. The systems themselves stay read-only mounts.
 - **Structured answers.** The analysis turn and *Update proposal* pass `--json-schema`, so
   their final answer is the proposal as validated JSON. Conversation turns stay plain prose.
 - **Limits.** Each turn has a budget ceiling (`--max-budget-usd`, default set per space). At
@@ -312,10 +331,17 @@ own work.
 - **Ticket text is untrusted.** Reporters write the tickets, and an attachment can contain
   anything, including instructions aimed at the agent. The agent can only read code and talk
   to you, so the worst a hostile ticket can do is mislead the analysis. That is why it gets
-  no network, no Jira tool and no write access. Keep it that way when adding features.
-- **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders. Better
-  still, the systems are the tool's own clones, which contain no `.env` to begin with, and the
-  deploy keys are not mounted where the agent runs.
+  no open network, no Jira tool, and no write access outside its scratch copy. Data tools
+  (next) only read. Keep it that way when adding features.
+- **Data, when a system offers it.** Normally the agent sees code and history only. Some
+  systems come with API definitions and a token to fetch data, or a read-only database
+  account. For those the tool will offer data tools: GET requests to that system's configured
+  API, and SELECT queries on its read-only account, each with a time and row limit, every call
+  shown in the trail. The token or password stays in the tool: the agent asks the tool to make
+  the call and never sees the secret, so none ends up in a transcript or at Anthropic. Keep
+  tokens out of the code you push; put them in the system's settings instead.
+- **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders, and the
+  systems hold what you pushed, which is committed code, not a server's `.env`.
 - **Personal data.** Tickets carry names, email addresses and screenshots.
   - *On minas* they sit in the database, in the ticket's workspace (`ticket.md`,
     `attachments/`) and in the CLI's session transcripts, which are plain text. A ticket's
@@ -329,8 +355,7 @@ own work.
     retention exists, but only for qualifying Enterprise organisations.
   - Claude Code's own usage metrics carry no prompts, code or file paths, and the agent
     container switches them off anyway (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`).
-  - Whether customers' data may go to Anthropic at all is for the employer to decide
-    ([open question 11](#17-open-questions)).
+  - Accepted on 2026-10-02 on these terms: an API key, no training, 30 days.
 - **Money.** There is a budget per turn, each ticket shows its cost, and the settings page
   shows the monthly total. In v1, only you start an agent.
 - **Separate from your own Claude.** The worker runs Claude Code under its own config
@@ -358,10 +383,11 @@ own work.
                                          calls  the Anthropic API
 ```
 
-- **Stack, same as palantir:** Laravel 13, Inertia with Vue 3, Tailwind 4. The login waits on
-  [open question 2](#17-open-questions): the Authentik gate in front of the site, or the app's
-  own Authentik login through Socialite as in palantir.
-- **The worker containers** are new infrastructure; see below.
+- **Stack, same as palantir:** Laravel 13, Inertia with Vue 3, Tailwind 4.
+- **No accounts.** One person per instance, so there is nothing to log in to inside the app.
+  The site sits behind a gate instead: Authentik on minas. An instance without one gets a
+  single password from `.env` (`APP_PASSWORD`, still to build).
+- **The worker containers**: see below.
 - **Live output by polling.** While a turn runs, the page asks once a second for the events
   after the last one it has. There is no websocket server to run. Reverb can come later if
   polling falls short.
@@ -372,31 +398,35 @@ own work.
 
 ### The worker containers
 
-Today the environment runs `app` (php-fpm) and `web` (nginx), and the queue is synchronous.
-Three services join them in `compose.yml`, all from the same image so they run the same code:
+Built 2026-10-02. Besides `app` (php-fpm) and `web` (nginx), three services run from the same
+image, so they run the same code:
 
 | Service | Runs | Sees |
 |---|---|---|
-| `worker` | `queue:work` for everything except agent turns: Jira sync, clones and fetches | the whole app folder, like `app` |
-| `scheduler` | `schedule:work`: the sync every 10 minutes, the clean-ups | the whole app folder |
+| `worker` | `queue:work` for everything except agent turns: Jira sync, preparing the systems' folders | the whole app folder, like `app` |
+| `scheduler` | `schedule:work`: the sync, the health reports, the clean-ups | the whole app folder |
 | `agent` | `queue:work --queue=agents`, two replicas (`AGENT_MAX_PARALLEL`) | the code read-only, `shared/agent/` read-write, `shared/systems/` read-only, nothing else of `shared/` |
 
 - `agent` builds a second stage of `Dockerfile.deploy`: the PHP image plus the Claude Code
-  binary (a pinned version that never updates itself), ripgrep and an SSH client. `app`
-  builds the first stage, so php-fpm never carries the CLI.
+  binary (a pinned version that never updates itself) and ripgrep. `app` builds the first
+  stage, so php-fpm never carries the CLI.
 - All three run as the tree's owner with the `www-data` group (`1000:33`), as the toolbox's
-  own commands do, so whatever they write stays editable from both sides.
+  own commands do, so whatever they write stays editable from both sides, including by your
+  pushes.
 - Paths are the same in every container (`/app/shared/systems/billing`), so a path stored in
   the database means the same thing everywhere.
-- The systems' deploy keys live in `shared/keys/`, which `agent` does not mount: the agent has
-  nothing to clone or push with.
+- Nothing here can reach a Git server, and nothing needs to: systems arrive by your push.
 - `agent` gets `CLAUDE_CONFIG_DIR=/app/shared/agent/claude` and
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A deploy stops it with a grace period; a turn
   it interrupts is marked stopped, and the session carries on with your next message.
-- `shared/.env` then switches to `QUEUE_CONNECTION=database`.
+- **Health.** php-fpm cannot look into the other containers, so every minute the scheduler
+  sends a small job to each queue, and whoever serves it leaves a report: the agent's says
+  which Claude Code it has. The Setup page reads those reports.
+- Queue workers keep the code they started with: after changing a job, restart them.
 
-`compose.yml` and `Dockerfile.deploy` live outside this repository, so this waits for your go
-([open question 10](#17-open-questions)).
+`compose.yml` and `Dockerfile.deploy` live outside this repository, in the environment's own
+folder. Someone running their own instance needs an equivalent; a generic one for the
+repository is on the list (§17).
 
 ### Data model
 
@@ -422,19 +452,21 @@ Three services join them in `compose.yml`, all from the same image so they run t
 | `JIRA_BASE` | — | `https://<site>.atlassian.net`, the one Jira site. Same names as jira-outbox |
 | `JIRA_EMAIL`, `JIRA_TOKEN` | — | API token of the account the tool reads as |
 | `JIRA_WRITE` | `dummy` | `real` lets the post and transition buttons reach Jira (later) |
-| `ANTHROPIC_API_KEY` | — | or a subscription token, see [open question 6](#17-open-questions) |
+| `ANTHROPIC_API_KEY` | — | an API key, not a subscription token: see §11 for why |
 | `CLAUDE_BIN` | `claude` | path to the CLI inside the worker |
 | `CLAUDE_MODEL` | `claude-opus-5` | a space can override it |
 | `CLAUDE_EFFORT` | `high` | |
 | `AGENT_MAX_PARALLEL` | `2` | turns running at once |
 | `AGENT_TURN_BUDGET_USD` | `3` | default ceiling per turn; a space can override it |
-| `SYSTEMS_PATH` | `shared/systems` | where the tool keeps its clones |
+| `SYSTEMS_PATH` | `shared/systems` | the folders you push the systems into |
+| `SYSTEMS_PUSH_BASE` | — | the same folder as your machine sees it, for the push command, e.g. `kermmeer@minas:/data/apps/ticket-worker-dev/shared/systems` |
 | `AGENT_WORKSPACES_PATH` | `shared/agent/tickets` | one folder per ticket |
 | `CLAUDE_CONFIG_DIR` | `shared/agent/claude` | the CLI's sessions; must outlive the container |
 | `SYNC_EVERY_MINUTES` | `10` | |
 
-Everything per space (rules, systems, budgets, model) lives in the database and is edited in
-the app.
+Everything per space (rules, type, systems, budgets, model) lives in the database and is
+edited in the app. Nothing outside `.env` may assume minas: another person's instance runs on
+their own machine with their own settings.
 
 ---
 
@@ -516,6 +548,15 @@ Each step ends in something usable.
 
 | Step | What | Done when |
 |---|---|---|
+| 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, design tokens, both themes; Overview, Setup, Concept and Design | the shell looks right in Day and Night, on desktop and phone. **Built 2026-10-02.** |
+| 1. Jira and spaces | Jira client, space wizard with the space type and a live preview, sync with hyper mode, overview | the overview lists exactly what the JQL lists in Jira |
+| 2. Agent runner and systems | worker containers and the Systems page (**built 2026-10-02**); turn runner, event trail on screen, context scans, review and edit | a scanned context is one you would hand to a new colleague |
+| 3. Analysis | ticket workspace, gather, route, dig, reply language, proposal screen, code viewer | the backtest (§16) gets most real tickets right |
+| 4. Conversation | resume, stop, close and reopen, passing on new activity, proposal versions, patches | a ticket can be worked in the tool from first look to closing note |
+| 5. Back to Jira, and learning | reply to customer and internal note, transitions, the dummy/real switch, closing notes into contexts, cost overview | a whole ticket handled without opening Jira |
+| 6. Data tools | per system, read-only API calls and SELECT queries made by the tool, secrets kept by the tool | an analysis checks a claim against real data without ever seeing a token |
+
+---|---|---|
 | 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, Authentik login, design tokens, both themes, empty screens | the shell looks right in Day and Night, on desktop and phone. **Built 2026-10-02, except the login.** |
 | 1. Jira and spaces | Jira client, wizard steps 1–2 with live preview, sync, overview | the overview lists exactly what the JQL lists in Jira |
 | 2. Agent runner and systems | worker container, turn runner, event trail on screen, systems, context scans, review and edit | a scanned context is one you would hand to a new colleague |
@@ -537,33 +578,39 @@ contexts. It is the only honest way to tell whether a change helped.
 
 ---
 
-## 17. Open questions
+## 17. Decisions and open questions
 
-Answer by number. The value in brackets is what this design assumes until then.
+### Decided on 2 October 2026
 
-1. **Jira.** Is it the same Cloud site as jira-outbox? And are the last-line tickets in a
-   *service* space or a plain one? In a service space (Jira Service Management) customers
-   raise requests through a portal or by email, and every comment is either a public reply
-   that reaches the customer or an internal note. In a plain space every comment is visible
-   to everyone who can open the ticket. A ticket tells you which: a service space offers
-   *Reply to customer* and *Add internal note*, a plain one only *Add a comment*. It decides
-   how replies get posted later, and whether a reply draft is written for a customer or for
-   the colleagues who escalated. *[Cloud, same site]*
-2. **Users.** Only you, or a team later? *[only you, with Authentik in front]*
-3. **Systems.** *Decided 2026-10-02:* on minas, cloned and fetched by the tool itself into
-   `shared/systems/`, outside the containers (§4, §12). Still open: where are the
-   repositories hosted (GitHub?), and can you add a deploy key to each of them?
-4. **Contexts.** In the tool, as designed, or written into each folder as a file? *[in the tool]*
-5. **Beyond code.** May the agent see more than code and git history: logs, a read-only
-   database replica, the running app? *[code and history only]*
-6. **Claude billing.** An API key (exact cost per ticket) or your subscription? *[API key]*
-7. **Patches.** Should the agent ever prepare a patch, in a scratch copy, for you to apply?
-   *[no; it can show a diff in the conversation]*
-8. **Language.** Which languages are tickets written in? *[the agent talks to you in the
-   language you write in; reply drafts follow the ticket's language]*
-9. **Sync.** Is every 10 minutes enough, or should Jira webhooks come later? *[10 minutes]*
-10. **Infrastructure.** May the worker containers go into `compose.yml` and
-    `Dockerfile.deploy` as described in §12? *[yes, once you say go]*
-11. **Personal data.** What stays on minas and what Anthropic does with the rest is in §11.
-    Is that acceptable to the customers and the employer? *[must be yes before real tickets
-    go in]*
+1. **Jira.** Service spaces and plain ones both. The type comes from Jira and can be
+   overridden in the space's settings. A service space offers both a public reply and an
+   internal note, and the Jira account must be an agent in it (§9).
+2. **Users.** One person per instance. Someone else runs an instance of their own, never a
+   shared one, so the app has no accounts (§12).
+3. **Systems.** Folders on minas that you push into (§4). Ticket Worker never reaches GitLab.
+4. **Contexts.** In the tool (§5).
+5. **Beyond code.** Normally code and history only. Systems with an API or a read-only
+   database get data tools in step 6, with the secrets kept by the tool (§11).
+6. **Claude billing.** An API key.
+7. **Patches.** Yes: written in a scratch copy, downloaded as a file for `git am`, applied,
+   tested and pushed by you (§8).
+8. **Language.** Tickets are mostly English, some Dutch, French and Danish. The agent talks
+   to you in English; the reply draft follows the ticket unless you pick another language
+   before *Analyse* (§7).
+9. **Sync.** Every 10 minutes, and every minute in hyper mode (§6).
+10. **Infrastructure.** The worker containers, built (§12).
+11. **Personal data.** Acceptable with an API key: no training, kept 30 days (§11).
+
+### Still open
+
+The value in brackets is what the design assumes until then.
+
+- **A. Pushing to minas.** From the machine that has the GitLab VPN, can you reach minas over
+  SSH as `kermmeer@minas`? The Systems page builds its `git push` commands from that address
+  (`SYSTEMS_PUSH_BASE`). *[yes]*
+- **B. Data tools.** Can minas reach those APIs and databases, or are they behind the same VPN
+  as GitLab? If they are, the data tools need another way in. *[unknown; step 6 waits for it]*
+- **C. Other people's instances.** Should the repository carry a generic Docker setup, so
+  someone can run an instance without the minas toolbox? *[yes, before anyone needs it]*
+- **D. A gate of its own.** An instance without Authentik in front asks for one password from
+  `.env`. *[yes, together with C]*
