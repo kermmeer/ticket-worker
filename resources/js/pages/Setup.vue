@@ -30,7 +30,7 @@ const marks = {
     <Head title="Setup" />
 
     <p class="eyebrow">Setup</p>
-    <h1 class="mt-3 font-serif text-5xl leading-none sm:text-6xl">{{ done }} of {{ checks.length }} in place.</h1>
+    <h1 class="display mt-3 text-5xl leading-[1.05] sm:text-6xl">{{ done }} of {{ checks.length }} in place.</h1>
     <p class="mt-5 max-w-2xl text-lg text-muted">
         What Ticket Worker needs before it can read tickets and run agents. Secrets show as set or not set, never as
         their value.

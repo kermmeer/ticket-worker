@@ -21,8 +21,9 @@ const env = computed(() => page.props.app?.env);
     <div class="min-h-screen">
         <header class="sticky top-0 z-10 border-b border-line bg-page/90 backdrop-blur">
             <div class="mx-auto flex max-w-6xl flex-wrap items-end gap-x-10 px-4 pt-4 sm:px-6">
-                <Link href="/" class="flex items-baseline gap-2 pb-3">
-                    <span class="font-serif text-[1.65rem] leading-none tracking-tight">Ticket Worker</span>
+                <Link href="/" class="flex items-center gap-2 pb-3">
+                    <span class="size-3 rounded-[3px] bg-signal" aria-hidden="true"></span>
+                    <span class="display text-xl leading-none">Ticket Worker</span>
                     <span v-if="env && env !== 'production'" class="eyebrow">{{ env }}</span>
                 </Link>
                 <div class="ml-auto pb-2.5 sm:order-last">

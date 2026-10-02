@@ -11,9 +11,14 @@ export default defineConfig({
             refresh: true,
             // Fetched once, at build time, and served from /build: no font CDN at runtime.
             fonts: [
-                bunny('Instrument Sans', { weights: [400, 500, 600] }),
-                bunny('Instrument Serif', { weights: [400], styles: ['normal', 'italic'] }),
-                bunny('JetBrains Mono', { weights: [400, 500] }),
+                // Italics are real ones, not slanted by the browser; only the upright text
+                // weights are preloaded, the rest load when a page uses them.
+                bunny('Geist', {
+                    weights: [400, 500, 600, 700],
+                    styles: ['normal', 'italic'],
+                    preload: [{ weight: 400 }, { weight: 600 }],
+                }),
+                bunny('Geist Mono', { weights: [400, 500], preload: [{ weight: 400 }] }),
             ],
         }),
         vue({

@@ -503,9 +503,10 @@ one exception: Day `signal` on `sunken` only reaches 4.1:1, so signal-coloured t
 paper or cards, never on the sunken shade. Labels on a signal-coloured button use the `page`
 colour (4.6:1 in Day, 7.2:1 in Night).
 
-**Type.** Instrument Sans for the interface. Instrument Serif only for large headings, which
-gives the case-file feel. JetBrains Mono for anything you would copy or match: ticket keys,
-paths, commits, code. The fonts are self-hosted, with no font CDN.
+**Type.** Geist for everything you read, with headings in the same face set heavier and
+tighter, and Geist Mono for anything you would copy or match: ticket keys, paths, commits,
+code. The fonts are self-hosted, with no font CDN. (Until 2026-10-02 the headings were
+Instrument Serif; it read as editorial rather than modern.)
 
 **Signature pieces**
 

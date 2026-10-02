@@ -61,7 +61,7 @@ const states = {
     <Head title="Systems" />
 
     <p class="eyebrow">Systems</p>
-    <h1 class="mt-3 font-serif text-5xl leading-none sm:text-6xl">The code the agents read.</h1>
+    <h1 class="display mt-3 text-5xl leading-[1.05] sm:text-6xl">The code the agents read.</h1>
     <p class="mt-5 max-w-2xl text-lg text-muted">
         Ticket Worker cannot reach your Git server, so you push each system here from your own machine. A push to the
         system's branch updates its folder straight away; nothing here ever pulls.

@@ -52,7 +52,7 @@ const railAt = 2;
     <Head title="Design" />
 
     <p class="eyebrow">Design</p>
-    <h1 class="mt-3 font-serif text-5xl leading-none sm:text-6xl">A case file.</h1>
+    <h1 class="display mt-3 text-5xl leading-[1.05] sm:text-6xl">A case file.</h1>
     <p class="mt-5 max-w-2xl text-lg text-muted">
         Each ticket is a case, the agent's findings are evidence, and the conversation reads as a log. This page shows
         the look on sample data, in whichever theme you pick at the top. Nothing here is real.
@@ -78,18 +78,18 @@ const railAt = 2;
         <h2 class="eyebrow">Type</h2>
         <div class="card mt-4 divide-y divide-line">
             <div class="grid gap-2 p-5 sm:grid-cols-[10rem_1fr] sm:items-baseline">
-                <p class="font-mono text-xs text-muted">Instrument Serif</p>
-                <p class="font-serif text-4xl leading-tight">Invoices not sent after a credit note</p>
+                <p class="font-mono text-xs text-muted">Geist 600, tight</p>
+                <p class="display text-4xl leading-tight">Invoices not sent after a credit note</p>
             </div>
             <div class="grid gap-2 p-5 sm:grid-cols-[10rem_1fr] sm:items-baseline">
-                <p class="font-mono text-xs text-muted">Instrument Sans</p>
+                <p class="font-mono text-xs text-muted">Geist 400</p>
                 <p class="max-w-prose">
                     Since Monday, customers who received a credit note no longer get their next invoice by mail. The
                     invoice itself is created and visible in the portal.
                 </p>
             </div>
             <div class="grid gap-2 p-5 sm:grid-cols-[10rem_1fr] sm:items-baseline">
-                <p class="font-mono text-xs text-muted">JetBrains Mono</p>
+                <p class="font-mono text-xs text-muted">Geist Mono</p>
                 <p class="font-mono text-sm break-all">app/Services/CreditNoteService.php:212 · 9f3e1c2 · SUP-1234</p>
             </div>
         </div>
@@ -138,7 +138,7 @@ const railAt = 2;
                     <StateBadge state="needs-you" />
                     <span class="text-sm text-muted">System billing · In progress in Jira</span>
                 </div>
-                <p class="mt-3 font-serif text-3xl leading-tight sm:text-4xl">Invoices not sent after a credit note</p>
+                <p class="display mt-3 text-3xl leading-tight sm:text-4xl">Invoices not sent after a credit note</p>
                 <ol class="mt-5 grid grid-cols-5 gap-1.5" aria-label="Progress">
                     <li v-for="(step, index) in rail" :key="step">
                         <div class="h-1 rounded-full" :class="index < railAt ? 'bg-ink/60' : index === railAt ? 'bg-signal' : 'bg-line'"></div>

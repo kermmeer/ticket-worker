@@ -16,7 +16,7 @@ const groups = [
     <Head title="Overview" />
 
     <p class="eyebrow">Overview</p>
-    <h1 class="mt-3 font-serif text-5xl leading-none sm:text-6xl">No cases yet.</h1>
+    <h1 class="display mt-3 text-5xl leading-[1.05] sm:text-6xl">No cases yet.</h1>
     <p class="mt-5 max-w-2xl text-lg text-muted">
         Ticket Worker lists the open tickets of the Jira spaces you set up, grouped by what they need from you.
         Nothing is set up yet: the Jira connection and the first space come next.
