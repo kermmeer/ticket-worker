@@ -30,8 +30,13 @@ watchEffect(() => {
 
 onBeforeUnmount(() => clearInterval(timer));
 
+// One-time setup in your own clone; tools/push-systems.sh does the rest from then on.
 function commands(system) {
-    return `git remote add ticket-worker ${system.remote ?? system.path}\ngit push ticket-worker ${system.branch}`;
+    return [
+        `git remote add ticket-worker ${system.remote ?? system.path}`,
+        `git config ticket-worker.branch ${system.branch}`,
+        `git push ticket-worker +origin/${system.branch}:${system.branch}`,
+    ].join('\n');
 }
 
 const copied = ref(null);
@@ -65,6 +70,12 @@ const states = {
     <p class="mt-5 max-w-2xl text-lg text-muted">
         Ticket Worker cannot reach your Git server, so you push each system here from your own machine. A push to the
         system's branch updates its folder straight away; nothing here ever pulls.
+    </p>
+    <p class="mt-3 max-w-2xl text-sm text-muted">
+        To keep them all current, run <code class="font-mono text-xs text-ink">tools/push-systems.sh ~/code</code> from the
+        Ticket Worker repository on that machine: it fetches every clone set up below from GitLab and pushes it here.
+        If the VPN cuts you off from this server, run it with <code class="font-mono text-xs text-ink">fetch</code> while
+        connected and <code class="font-mono text-xs text-ink">push</code> after.
     </p>
 
     <form class="card mt-10 grid gap-4 p-5 sm:grid-cols-[1fr_12rem_auto] sm:items-start" @submit.prevent="add">
@@ -124,7 +135,7 @@ const states = {
 
                 <div class="mt-4">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-medium">Push from your machine</p>
+                        <p class="text-sm font-medium">Once, in your clone of it</p>
                         <button type="button" class="btn px-2.5 py-1 text-xs" @click="copy(system)">
                             {{ copied === system.id ? 'Copied' : 'Copy' }}
                         </button>
