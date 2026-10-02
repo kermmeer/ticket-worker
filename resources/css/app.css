@@ -1,0 +1,171 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../js/**/*.vue';
+
+/* Night is a class on <html>, set before first paint by the script in app.blade.php from
+   the saved choice or, by default, the device's own setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Colours by role, not by shade (CONCEPT.md §14). Day is warm paper and ink; Night is
+   blue-black with paper-white text, designed rather than inverted. Every text role passes
+   4.5:1 on page and surface in its own theme, with one exception: Day's signal on sunken
+   is 4.1:1, so signal-coloured text goes on paper or cards, never on the sunken shade. */
+:root {
+    color-scheme: light;
+    --page: #f4f1ea;
+    --surface: #fbf9f4;
+    --sunken: #eae5da;
+    --line: #d8d0c0;
+    --ink: #1d1b18;
+    --muted: #5f5a51;
+    --signal: #c2410c;
+    --working: #1d5fc9;
+    --waiting: #8a5a00;
+    --done: #2f6b4f;
+}
+
+.dark {
+    color-scheme: dark;
+    --page: #111318;
+    --surface: #181b22;
+    --sunken: #0b0d11;
+    --line: #2a2f3a;
+    --ink: #ece7dd;
+    --muted: #9c978c;
+    --signal: #ff7a3d;
+    --working: #6fa0ff;
+    --waiting: #e2b04a;
+    --done: #6fc39a;
+}
+
+@theme inline {
+    --color-page: var(--page);
+    --color-surface: var(--surface);
+    --color-sunken: var(--sunken);
+    --color-line: var(--line);
+    --color-ink: var(--ink);
+    --color-muted: var(--muted);
+    --color-signal: var(--signal);
+    --color-working: var(--working);
+    --color-waiting: var(--waiting);
+    --color-done: var(--done);
+}
+
+/* Instrument Sans for the interface, Instrument Serif only for large headings, and
+   JetBrains Mono for anything you would copy or match: keys, paths, commits, code. */
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-serif: 'Instrument Serif', ui-serif, Georgia, Cambria, 'Times New Roman', serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@layer base {
+    body {
+        @apply bg-page font-sans text-ink antialiased;
+    }
+
+    ::selection {
+        background: color-mix(in oklab, var(--signal) 25%, transparent);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--signal);
+        outline-offset: 2px;
+    }
+}
+
+@layer components {
+    /* The small label above a title or a group: the case file's index tab. */
+    .eyebrow {
+        @apply font-mono text-[0.68rem] font-medium tracking-[0.16em] text-muted uppercase;
+    }
+
+    .card {
+        @apply rounded-md border border-line bg-surface;
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-ink/40;
+    }
+
+    /* The page colour on signal: 4.6:1 in Day, 7.2:1 in Night. */
+    .btn-signal {
+        @apply border-signal bg-signal text-page hover:border-signal hover:opacity-90;
+    }
+
+    .kbd {
+        @apply inline-block min-w-[1.6em] rounded border border-line bg-sunken px-1.5 py-px text-center font-mono text-[0.72rem] text-ink;
+    }
+
+    /* Rendered Markdown: the docs pages. */
+    .doc {
+        @apply leading-relaxed;
+
+        & h1 { @apply mb-6 font-serif text-4xl leading-tight sm:text-5xl; }
+        & h2 { @apply mt-14 mb-4 font-serif text-3xl leading-tight; }
+        & hr + h2 { @apply mt-0; }
+        & h3 { @apply mt-8 mb-2 text-lg font-semibold; }
+        & p, & ul, & ol, & pre, & table, & blockquote { @apply my-4; }
+        & ul { @apply list-disc pl-6; }
+        & ol { @apply list-decimal pl-6; }
+        & li { @apply my-1.5; }
+        & li::marker { @apply text-muted; }
+        & a { @apply text-ink underline decoration-signal/60 underline-offset-2 hover:decoration-signal; }
+        & a.anchor { @apply ml-2 font-sans text-base text-muted no-underline opacity-50 hover:text-signal hover:opacity-100; }
+        & strong { @apply font-semibold; }
+        & em { @apply italic; }
+        & hr { @apply my-12 border-line; }
+        & code { @apply rounded-sm bg-sunken px-1 py-px font-mono text-[0.85em]; }
+        & pre { @apply overflow-x-auto rounded-md border border-line bg-sunken p-4 text-[0.8rem] leading-snug; }
+        & pre code { @apply bg-transparent p-0 text-[1em]; }
+        & blockquote { @apply border-l-2 border-signal bg-surface py-2 pr-4 pl-4; }
+        & table { @apply block w-full overflow-x-auto text-sm; }
+        & th { @apply border-b border-line px-3 py-2 text-left font-semibold whitespace-nowrap; }
+        & td { @apply border-b border-line px-3 py-2 align-top; }
+    }
+}
+
+/* Motion is only for "working": a slow scan along the left edge of whatever is busy. */
+.working-edge {
+    position: relative;
+}
+
+.working-edge::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(to bottom, transparent, var(--working) 35%, var(--working) 65%, transparent);
+    background-size: 100% 300%;
+}
+
+.activity-dot {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 9999px;
+    background: currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .working-edge::before {
+        animation: scan 2.4s ease-in-out infinite;
+    }
+
+    .activity-dot {
+        animation: breathe 1.6s ease-in-out infinite;
+    }
+}
+
+@keyframes scan {
+    from { background-position: 0 100%; }
+    to { background-position: 0 0; }
+}
+
+@keyframes breathe {
+    50% { opacity: 0.3; }
+}

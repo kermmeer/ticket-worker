@@ -1,0 +1,38 @@
+<?php
+
+/*
+| How Ticket Worker runs its Claude agents: CONCEPT.md §10.
+|
+| The folders sit next to the repository, in the environment's shared/ directory,
+| never inside it: ticket data must not end up in a checkout, and a clone of a
+| system must survive a rebuild of the containers.
+*/
+
+$shared = dirname(base_path()).'/shared';
+
+return [
+
+    'claude' => [
+        // The Claude Code CLI. It lives in the agent container, not in php-fpm's.
+        'bin' => env('CLAUDE_BIN', 'claude'),
+        'model' => env('CLAUDE_MODEL', 'claude-opus-5'),
+        'effort' => env('CLAUDE_EFFORT', 'high'),
+        // Passed to the CLI's environment when a turn runs. Never shown anywhere.
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        // The CLI keeps its sessions here, so this must outlive the container.
+        'config_dir' => env('CLAUDE_CONFIG_DIR', $shared.'/agent/claude'),
+    ],
+
+    'max_parallel' => (int) env('AGENT_MAX_PARALLEL', 2),
+
+    'turn_budget_usd' => (float) env('AGENT_TURN_BUDGET_USD', 3),
+
+    // One folder per ticket, where its agent works: ticket.md and attachments/.
+    'workspaces_path' => env('AGENT_WORKSPACES_PATH', $shared.'/agent/tickets'),
+
+    // The tool's own clones of the systems, one folder each.
+    'systems_path' => env('SYSTEMS_PATH', $shared.'/systems'),
+
+    'sync_every_minutes' => (int) env('SYNC_EVERY_MINUTES', 10),
+
+];

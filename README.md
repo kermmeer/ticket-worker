@@ -4,4 +4,5 @@ A workbench for last-line support tickets in Jira. Claude agents analyse a ticke
 the code of the system it is about, propose a fix, and stay on the ticket with you until it
 is solved.
 
-Nothing is built yet: start with [CONCEPT.md](CONCEPT.md).
+Start with [CONCEPT.md](CONCEPT.md). Only the skeleton is built so far; how it runs and how
+to work on it is in [AGENTS.md](AGENTS.md).
