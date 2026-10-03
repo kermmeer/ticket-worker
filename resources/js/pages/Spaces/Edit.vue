@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
@@ -48,7 +48,8 @@ function setSleeps(status, sleeps) {
 }
 
 function save() {
-    form.put(`/spaces/${props.space.id}`, { preserveScroll: true });
+    // The preview runs again after saving: rules that match nothing should be seen at once.
+    form.put(`/spaces/${props.space.id}`, { preserveScroll: true, onSuccess: () => runPreview() });
 }
 
 function post(action) {
@@ -70,10 +71,21 @@ const permissionNames = {
 };
 
 // Clicking one of the space's own words adds it to the rules, so nobody has to remember
-// how Jira spells a status.
+// how Jira spells a status. Several values of one field mean any of them: a ticket has one
+// status, so "status = A AND status = B" would match nothing (it did, on 2026-10-03).
 function add(field, value) {
-    const clause = `${field} = "${value.replaceAll('"', '\\"')}"`;
-    form.rules = form.rules.trim() === '' ? clause : `${form.rules.trim()} AND ${clause}`;
+    const quoted = `"${value.replaceAll('"', '\\"')}"`;
+    const rules = form.rules.trim();
+    const list = new RegExp(`\\b${field}\\s+in\\s*\\(([^)]*)\\)`, 'i');
+    const single = new RegExp(`\\b${field}\\s*=\\s*("(?:[^"\\\\]|\\\\.)*"|[^\\s)]+)`, 'i');
+
+    if (list.test(rules)) {
+        form.rules = rules.replace(list, (whole, inner) => (inner.includes(quoted) ? whole : `${field} in (${inner.trim()}, ${quoted})`));
+    } else if (single.test(rules)) {
+        form.rules = rules.replace(single, (whole, existing) => (existing === quoted ? whole : `${field} in (${existing}, ${quoted})`));
+    } else {
+        form.rules = rules === '' ? `${field} = ${quoted}` : `${rules} AND ${field} = ${quoted}`;
+    }
 }
 
 const preview = ref(null);
@@ -94,6 +106,8 @@ async function runPreview() {
         previewing.value = false;
     }
 }
+
+onMounted(runPreview);
 </script>
 
 <template>
@@ -207,6 +221,7 @@ async function runPreview() {
                     </button>
                 </p>
             </div>
+            <p v-if="vocabulary.data" class="mt-2 text-sm text-muted">Several of one kind mean any of them.</p>
             <p v-else-if="vocabulary.error" class="mt-3 text-sm text-signal">The space's own words did not load: {{ vocabulary.error }}</p>
 
             <label for="done" class="mt-6 block text-sm font-medium">Done when</label>
@@ -224,6 +239,9 @@ async function runPreview() {
             <div v-if="preview" class="mt-4 rounded-md border border-line bg-sunken/50 p-4 text-sm" aria-live="polite">
                 <p v-if="preview.error" class="text-signal">{{ preview.error }}</p>
                 <template v-else>
+                    <p v-if="preview.count === 0 || (preview.count == null && preview.tickets.length === 0)" class="mb-2 font-medium text-signal">
+                        These rules match no tickets. Saved on an active space, its overview empties at the next sync.
+                    </p>
                     <p class="font-medium">
                         <template v-if="preview.count !== null && preview.count !== undefined">{{ preview.count }} {{ preview.count === 1 ? 'ticket' : 'tickets' }}</template>
                         <template v-else>{{ preview.tickets.length }}{{ preview.more ? ' or more' : '' }} tickets</template>
