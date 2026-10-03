@@ -98,6 +98,44 @@ and accept that service name as a `Host` (`ALLOWED_HOSTS`). Ticket Worker then s
 - `visibility: internal` posts the `sd.public.comment` property; `public` does not.
 - `GET` follows a draft through scheduled and sent to the comment id.
 
+### 8. `GET /api/v1/scheduled`: what is waiting to go out, per ticket
+
+Ticket Worker's overview shows that a ticket has a message waiting in the outbox, and above
+all when sending it will change the ticket's status, and to what. It asks once per sync
+(every 10 minutes, every minute in hyper mode), for **every** message still to go out:
+not only its own drafts, also what you wrote in the outbox yourself.
+
+`GET /api/v1/scheduled` (same bearer token), optionally `?keys=SUP-1,SUP-2`:
+
+```json
+{
+  "messages": [
+    {
+      "id": "…",
+      "issueKey": "DEVBESUP-3123",
+      "state": "scheduled",
+      "sendAt": "2026-10-04T08:00:00+02:00",
+      "visibility": "public",
+      "preview": "First 120 characters of the text…",
+      "transition": { "toStatus": "Resolved", "toCategory": "done" },
+      "assignee": { "displayName": "Alex Moreau" },
+      "dueDate": null,
+      "source": "outbox",
+      "url": "https://jira.techfactory.dev/DEVBESUP-3123"
+    }
+  ]
+}
+```
+
+- Include states `draft`, `scheduled` and `failed` (a failed one is worth seeing); leave out
+  sent and discarded ones.
+- `transition`, `assignee` and `dueDate` are `null` when the message does not change them.
+- `source`: `outbox` for messages written there, `ticket-worker` for drafts from the API.
+- Order by `sendAt`, drafts (no `sendAt`) last. No paging needed at these numbers.
+
+Tests: a message with a status change shows `transition.toStatus`; a sent one is gone from
+the list; `?keys=` filters.
+
 ## Not needed now
 
 Mentions, files, status changes and assignees through the API: the person adds those in the
