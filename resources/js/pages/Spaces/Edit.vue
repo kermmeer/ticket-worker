@@ -11,6 +11,7 @@ const props = defineProps({
     colours: { type: Array, required: true },
     tones: { type: Array, required: true },
     vocabulary: { type: Object, required: true },
+    slas: { type: Object, required: true },
     permissions: { type: Object, required: true },
 });
 
@@ -24,7 +25,12 @@ const form = useForm({
     status_colours: { ...props.space.status_colours },
     // null: automatic, until a box is ticked or unticked.
     sleep_statuses: props.space.sleep_statuses,
+    hidden_slas: [...props.space.hidden_slas],
 });
+
+function setSlaShown(name, shown) {
+    form.hidden_slas = shown ? form.hidden_slas.filter((hidden) => hidden !== name) : [...form.hidden_slas, name];
+}
 
 const statuses = computed(() => props.vocabulary.data?.statuses ?? []);
 
@@ -302,6 +308,26 @@ onMounted(runPreview);
                     </tr>
                 </tbody>
             </table>
+        </section>
+
+        <!-- SLAs -->
+        <section v-if="space.type === 'service'" class="card p-5">
+            <h2 class="text-lg font-medium">SLAs</h2>
+            <p class="mt-1 max-w-3xl text-sm text-muted">
+                Which SLAs the overview shows for this space. All of them by default, a new one in Jira included, until you untick it.
+            </p>
+            <p v-if="slas.error" class="mt-3 text-sm text-signal">The SLAs did not load: {{ slas.error }}</p>
+            <div v-else class="mt-3 flex flex-wrap gap-2">
+                <label
+                    v-for="name in slas.data"
+                    :key="name"
+                    class="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm"
+                    :class="form.hidden_slas.includes(name) ? 'border-line text-muted' : 'border-ink'"
+                >
+                    <input type="checkbox" :checked="!form.hidden_slas.includes(name)" @change="setSlaShown(name, $event.target.checked)" />
+                    {{ name }}
+                </label>
+            </div>
         </section>
 
         <!-- Systems -->

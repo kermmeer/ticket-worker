@@ -112,4 +112,42 @@ class SlasTest extends TestCase
             ->where('tickets.0.created_at', '2026-09-30T08:00:00+00:00')
             ->where('tickets.0.slas.0.state', 'running'));
     }
+
+    public function test_a_space_shows_every_sla_until_one_is_hidden(): void
+    {
+        $space = SpacesTest::space(['state' => Space::ACTIVE]);
+        $sla = fn (string $name) => ['name' => $name, 'state' => 'running', 'paused' => false, 'remaining_ms' => 1000, 'goal_ms' => 2000, 'due_at' => null];
+        Ticket::create([
+            'space_id' => $space->id, 'jira_id' => '1', 'key' => 'SUP-1', 'summary' => 'Broken', 'status' => 'To Do',
+            'slas' => [$sla('Time to first response'), $sla('Time to resolution')],
+            'first_seen_at' => now(), 'last_seen_at' => now(),
+        ]);
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page->has('tickets.0.slas', 2));
+
+        $this->put("/spaces/{$space->id}", [
+            'label' => 'Support', 'colour' => 'teal', 'type' => Space::SERVICE, 'done_rule' => 'statusCategory = Done',
+            'hidden_slas' => ['Time to first response'],
+        ])->assertSessionHasNoErrors();
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page
+            ->has('tickets.0.slas', 1)
+            ->where('tickets.0.slas.0.name', 'Time to resolution'));
+    }
+
+    public function test_the_setup_page_offers_the_sites_slas(): void
+    {
+        $space = SpacesTest::space();
+        Http::fake([
+            '*/rest/api/3/field' => Http::response([
+                ['id' => self::RESOLUTION, 'name' => 'Time to resolution', 'schema' => ['custom' => 'com.atlassian.servicedesk:sd-sla-field']],
+                ['id' => self::FIRST_RESPONSE, 'name' => 'Time to first response', 'schema' => ['custom' => 'com.atlassian.servicedesk:sd-sla-field']],
+            ]),
+            '*' => Http::response([], 200),
+        ]);
+
+        $this->get("/spaces/{$space->id}/edit")->assertInertia(fn (Assert $page) => $page
+            ->where('slas.data', ['Time to resolution', 'Time to first response'])
+            ->where('space.hidden_slas', []));
+    }
 }

@@ -93,12 +93,17 @@ class SpaceController extends Controller
                 'status_colours' => (object) ($space->status_colours ?? []),
                 // Null until chosen: the page then shows what the automatic choice puts to sleep.
                 'sleep_statuses' => $space->sleep_statuses,
+                'hidden_slas' => $space->hidden_slas ?? [],
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
             'colours' => Space::COLOURS,
             'tones' => Space::TONES,
             // Both come from Jira; the page still works when it does not answer.
             'vocabulary' => $this->attempt(fn () => $this->withDefaults($jira->vocabulary($space->project_key))),
+            // Only a service space has SLAs; all of the site's are offered, all shown by default.
+            'slas' => $space->type === Space::SERVICE
+                ? $this->attempt(fn () => array_values(array_unique($jira->slaFields())))
+                : ['data' => [], 'error' => null],
             'permissions' => $this->attempt(fn () => $jira->permissions($space->project_key, $this->permissionKeys($space))),
         ]);
     }
@@ -117,6 +122,8 @@ class SpaceController extends Controller
             'status_colours.*' => [Rule::in(Space::TONES)],
             'sleep_statuses' => ['nullable', 'array'],
             'sleep_statuses.*' => ['string', 'max:255'],
+            'hidden_slas' => ['array'],
+            'hidden_slas.*' => ['string', 'max:255'],
         ], [
             'rules.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',
             'done_rule.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',

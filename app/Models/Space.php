@@ -32,7 +32,7 @@ class Space extends Model
 
     protected $fillable = [
         'project_key', 'project_id', 'name', 'label', 'colour', 'jira_type', 'type',
-        'rules', 'done_rule', 'status_colours', 'sleep_statuses',
+        'rules', 'done_rule', 'status_colours', 'sleep_statuses', 'hidden_slas',
         'state', 'sync_attempted_at', 'synced_at', 'sync_error',
     ];
 
@@ -43,6 +43,7 @@ class Space extends Model
             'synced_at' => 'datetime',
             'status_colours' => 'array',
             'sleep_statuses' => 'array',
+            'hidden_slas' => 'array',
         ];
     }
 
@@ -94,6 +95,14 @@ class Space extends Model
         return $this->sleep_statuses === null
             ? self::looksAsleep($status)
             : in_array($status, $this->sleep_statuses, true);
+    }
+
+    /** A ticket's SLAs minus the ones this space chose not to show. */
+    public function visibleSlas(?array $slas): array
+    {
+        $hidden = $this->hidden_slas ?? [];
+
+        return array_values(array_filter($slas ?? [], fn (array $sla) => ! in_array($sla['name'], $hidden, true)));
     }
 
     /** The automatic choice, until a space has its own list. */

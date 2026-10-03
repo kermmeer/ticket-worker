@@ -162,6 +162,7 @@ class SpacesTest extends TestCase
                 ['name' => 'Waiting for customer', 'statusCategory' => ['key' => 'undefined']],
             ]]]),
             '*/rest/api/3/project/SUP/components' => Http::response([['name' => 'Billing']]),
+            '*/rest/api/3/field' => Http::response([]),
             '*/rest/api/3/mypermissions*' => Http::response(['permissions' => [
                 'BROWSE_PROJECTS' => ['havePermission' => true],
                 'ADD_COMMENTS' => ['havePermission' => true],

@@ -177,7 +177,8 @@ to, its SLAs, the agent's state, and the cost so far.
 
 **SLAs** come from Jira Service Management with every sync: the time left or overdue, in the
 SLA's own calendar (working hours) as Jira counts it, and when it falls due. A running SLA
-shows first; paused, met and missed say so in words. The overview sorts by last update,
+shows first; paused, met and missed say so in words. Each service space chooses which SLAs it
+shows: all of them by default, a new one in Jira included, until you untick it. The overview sorts by last update,
 newest first, or the SLA closest to breaching (or furthest past it).
 Every status has a colour of its own: Jira's grouping (to do, in progress, done) first, the
 name second, so *Waiting for support* and *Waiting for customer* differ at a glance; the

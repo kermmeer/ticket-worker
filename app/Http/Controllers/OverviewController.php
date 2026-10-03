@@ -42,7 +42,7 @@ class OverviewController extends Controller
                 'priority' => $ticket->priority,
                 'reporter' => $ticket->reporter,
                 'assignee' => $ticket->assignee,
-                'slas' => $ticket->slas ?? [],
+                'slas' => $byId[$ticket->space_id]->visibleSlas($ticket->slas),
                 // A hint, not a verdict: the approved case this ticket looks most like.
                 'casebook' => $ticket->casebookEntry === null ? null : [
                     'id' => $ticket->casebookEntry->id,
