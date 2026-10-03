@@ -5,6 +5,7 @@ import SpaceLabel from '../components/SpaceLabel.vue';
 import StatusLabel from '../components/StatusLabel.vue';
 import TicketRow from '../components/TicketRow.vue';
 import { ago } from '../time.js';
+import { urgency } from '../sla.js';
 
 const props = defineProps({
     hasSpaces: { type: Boolean, required: true },
@@ -55,7 +56,48 @@ const shown = computed(() => {
     );
 });
 
-const inGroup = computed(() => Object.fromEntries(groups.map((group) => [group.key, shown.value.filter((ticket) => ticket.group === group.key)])));
+// Last update (as Jira sorts them), newest first, or the SLA closest to breaching first.
+const sorts = { updated: 'Last update', created: 'Newest', sla: 'SLA, most urgent' };
+
+function savedSort() {
+    try {
+        const value = localStorage.getItem('overview.sort');
+        return value in sorts ? value : 'updated';
+    } catch {
+        return 'updated';
+    }
+}
+
+const sort = ref(savedSort());
+
+function setSort(value) {
+    sort.value = value;
+    try {
+        localStorage.setItem('overview.sort', value);
+    } catch {
+        // Storage refused: it still works for this visit.
+    }
+}
+
+const sorted = computed(() => {
+    const list = [...shown.value];
+    if (sort.value === 'created') {
+        list.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+    } else if (sort.value === 'sla') {
+        list.sort((a, b) => urgency(a) - urgency(b) || (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+    }
+    return list;
+});
+
+const inGroup = computed(() => Object.fromEntries(groups.map((group) => [group.key, sorted.value.filter((ticket) => ticket.group === group.key)])));
+
+const perSpace = computed(() => {
+    const counts = {};
+    for (const ticket of props.tickets) {
+        counts[ticket.space_id] = (counts[ticket.space_id] ?? 0) + 1;
+    }
+    return counts;
+});
 
 const sleepingCount = computed(() => props.tickets.filter((ticket) => ticket.group === 'sleeping').length);
 const awakeCount = computed(() => props.tickets.length - sleepingCount.value);
@@ -132,7 +174,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
             <li v-for="space in spaces" :key="space.id">
                 <SpaceLabel :label="space.label" :colour="space.colour" class="text-ink" />
                 <span v-if="space.sync_error" class="text-signal"> · sync failed: {{ space.sync_error }}</span>
-                <span v-else-if="space.synced_at"> · synced {{ ago(space.synced_at) }}</span>
+                <template v-else-if="space.synced_at">
+                    <span> · synced {{ ago(space.synced_at) }}</span>
+                    <!-- A rules mistake empties a space at the next sync; say so where it shows. -->
+                    <Link v-if="!perSpace[space.id]" :href="`/spaces/${space.id}/edit`" class="text-signal underline"> · its rules match no tickets</Link>
+                </template>
                 <span v-else> · first sync on its way</span>
             </li>
         </ul>
@@ -170,7 +216,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
             >
                 <SpaceLabel :label="space.label" :colour="space.colour" />
             </button>
-            <label class="ml-auto flex w-full items-center gap-2 sm:w-80">
+            <label class="ml-auto flex items-center gap-2 text-sm">
+                <span class="text-muted">Sort</span>
+                <select :value="sort" class="rounded-md border border-line bg-surface px-2 py-1.5 text-sm" @change="setSort($event.target.value)">
+                    <option v-for="(label, value) in sorts" :key="value" :value="value">{{ label }}</option>
+                </select>
+            </label>
+            <label class="flex w-full items-center gap-2 sm:w-80">
                 <span class="sr-only">Search by key or summary</span>
                 <input
                     ref="searchBox"

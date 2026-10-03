@@ -40,6 +40,8 @@ class OverviewController extends Controller
                 'status_tone' => $byId[$ticket->space_id]->statusTone($ticket->status, $ticket->status_category),
                 'priority' => $ticket->priority,
                 'reporter' => $ticket->reporter,
+                'assignee' => $ticket->assignee,
+                'slas' => $ticket->slas ?? [],
                 'created_at' => $ticket->jira_created_at?->toIso8601String(),
                 'updated_at' => $ticket->jira_updated_at?->toIso8601String(),
                 // Until a ticket has a page here, it opens in Jira.

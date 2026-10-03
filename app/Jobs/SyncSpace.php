@@ -43,15 +43,23 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
         $space->update(['sync_attempted_at' => $now]);
         $seen = [];
 
+        // SLAs live in service spaces only. Not being able to read them is no reason to
+        // stop the sync: the tickets come in without.
+        try {
+            $slaFields = $space->type === Space::SERVICE ? array_keys($jira->slaFields()) : [];
+        } catch (JiraException) {
+            $slaFields = [];
+        }
+
         try {
             $next = null;
 
             do {
-                $page = $jira->search($space->jql(), JiraClient::TICKET_FIELDS, $next);
+                $page = $jira->search($space->jql(), [...JiraClient::TICKET_FIELDS, ...$slaFields], $next);
 
                 foreach ($page['issues'] as $issue) {
                     $seen[] = (string) $issue['id'];
-                    Ticket::record($space, $issue, $now);
+                    Ticket::record($space, $issue, $now, $slaFields);
                 }
 
                 $next = $page['next'];

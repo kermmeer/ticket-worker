@@ -27,3 +27,8 @@ export function ago(iso) {
 export function stamp(iso) {
     return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
 }
+
+/** "30 Sep, 10:00": a date and time short enough for a list row. */
+export function short(iso) {
+    return iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+}

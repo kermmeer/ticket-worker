@@ -5,6 +5,7 @@ namespace App\Jira;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -138,6 +139,20 @@ class JiraClient
             'issues' => $page['issues'] ?? [],
             'next' => ($page['isLast'] ?? true) ? null : ($page['nextPageToken'] ?? null),
         ];
+    }
+
+    /**
+     * The site's SLA fields (Jira Service Management): field id => name. They are custom
+     * fields like any other, so they are found by type; the list changes rarely.
+     *
+     * @return array<string, string>
+     */
+    public function slaFields(): array
+    {
+        return Cache::remember('jira.sla-fields.'.md5($this->base), 3600, fn () => collect($this->send('get', '/rest/api/3/field'))
+            ->filter(fn ($field) => ($field['schema']['custom'] ?? null) === 'com.atlassian.servicedesk:sd-sla-field')
+            ->mapWithKeys(fn ($field) => [$field['id'] => $field['name']])
+            ->all());
     }
 
     /** Jira's estimate of how many issues match, or null when it will not say. */

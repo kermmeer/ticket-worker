@@ -23,6 +23,9 @@ class SyncSpaceTest extends TestCase
             'services.jira.token' => 'secret-token',
         ]);
         $this->space = SpacesTest::space(['state' => Space::ACTIVE]);
+
+        // A service space asks which fields are SLAs first; none here (SlasTest covers them).
+        Http::fake(['*/rest/api/3/field' => Http::response([])]);
     }
 
     private function issue(string $id, string $summary = 'Something broke'): array
