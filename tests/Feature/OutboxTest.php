@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Space;
+use App\Models\Ticket;
 use App\Outbox\OutboxClient;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class OutboxTest extends TestCase
@@ -37,5 +40,32 @@ class OutboxTest extends TestCase
         $this->assertSame('The outbox refused the token.', (new OutboxClient('http://jira-outbox:5173', 'wrong'))->check());
 
         $this->assertStringContainsString('OUTBOX_URL', (new OutboxClient(null, null))->check());
+    }
+
+    public function test_the_overview_shows_what_is_waiting_and_the_status_it_will_set(): void
+    {
+        config(['services.outbox.url' => 'http://jira-outbox:5173', 'services.outbox.token' => 'outbox-token']);
+        $space = SpacesTest::space(['state' => Space::ACTIVE]);
+        Ticket::create(['space_id' => $space->id, 'jira_id' => '1', 'key' => 'SUP-1', 'summary' => 'Broken', 'first_seen_at' => now(), 'last_seen_at' => now()]);
+        Ticket::create(['space_id' => $space->id, 'jira_id' => '2', 'key' => 'SUP-2', 'summary' => 'Quiet', 'first_seen_at' => now(), 'last_seen_at' => now()]);
+        Http::fake(['jira-outbox:5173/api/v1/scheduled' => Http::response(['messages' => [[
+            'id' => 'm1', 'issueKey' => 'SUP-1', 'state' => 'scheduled', 'sendAt' => '2026-10-05T06:00:00.000Z', 'visibility' => 'public',
+            'transition' => ['toStatus' => 'Resolved', 'toCategory' => 'done'], 'assignee' => null, 'url' => 'https://jira.techfactory.dev/SUP-1',
+        ]]])]);
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page
+            ->where('tickets', fn ($tickets) => $tickets->firstWhere('key', 'SUP-1')['outbox'][0]['to_status'] === 'Resolved'
+                && $tickets->firstWhere('key', 'SUP-1')['outbox'][0]['to_tone'] === 'green'
+                && $tickets->firstWhere('key', 'SUP-2')['outbox'] === []));
+    }
+
+    public function test_the_overview_works_when_the_outbox_does_not_answer(): void
+    {
+        config(['services.outbox.url' => 'http://jira-outbox:5173', 'services.outbox.token' => 'outbox-token']);
+        $space = SpacesTest::space(['state' => Space::ACTIVE]);
+        Ticket::create(['space_id' => $space->id, 'jira_id' => '1', 'key' => 'SUP-1', 'summary' => 'Broken', 'first_seen_at' => now(), 'last_seen_at' => now()]);
+        Http::fake(['*' => Http::response('down', 502)]);
+
+        $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page->where('tickets.0.outbox', []));
     }
 }

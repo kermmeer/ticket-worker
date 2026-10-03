@@ -19,5 +19,8 @@ abstract class TestCase extends BaseTestCase
 
         // Tests never reach Jira: a request nobody faked fails the test instead.
         Http::preventStrayRequests();
+
+        // This machine's .env points at a real outbox; a test that wants one says so.
+        config(['services.outbox.url' => null, 'services.outbox.token' => null]);
     }
 }

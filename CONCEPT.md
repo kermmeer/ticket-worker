@@ -304,6 +304,9 @@ scheduling, status changes and assignees. Ticket Worker hands its reply over as 
 What jira-outbox needs for that is briefed in [docs/OUTBOX-API.md](/docs/outbox). Tickets
 already open there (`JIRA_OPEN_URL=https://jira.techfactory.dev/{key}`).
 
+The overview also shows, per ticket, what is waiting in the outbox (scheduled, a draft, or
+failed), when it goes, and the status sending it will set.
+
 What the outbox will do with a draft, when you press the button:
 
 - **Post a reply.** You edit the reply draft in place and post it as a comment. In a service

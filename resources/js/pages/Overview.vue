@@ -110,6 +110,7 @@ const perSpace = computed(() => {
 const count = (group) => props.tickets.filter((ticket) => ticket.group === group).length;
 const sleepingCount = computed(() => count('sleeping'));
 const hiddenCount = computed(() => count('hidden'));
+const outboxCount = computed(() => props.tickets.filter((ticket) => ticket.outbox?.length).length);
 const awakeCount = computed(() => props.tickets.length - sleepingCount.value - hiddenCount.value);
 
 // Folded unless you open them, or you are looking for something in particular.
@@ -182,6 +183,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         <ul class="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
             <li v-if="sleepingCount">and {{ sleepingCount }} sleeping, waiting on the requester</li>
             <li v-if="hiddenCount">{{ hiddenCount }} hidden by you</li>
+            <li v-if="outboxCount">{{ outboxCount }} with a message waiting in the outbox</li>
             <li v-for="space in spaces" :key="space.id">
                 <SpaceLabel :label="space.label" :colour="space.colour" class="text-ink" />
                 <span v-if="space.sync_error" class="text-signal"> · sync failed: {{ space.sync_error }}</span>

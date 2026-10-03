@@ -14,6 +14,11 @@ const props = defineProps({
 
 const openLabel = usePage().props.openLabel ?? 'Jira';
 
+// "Sun 5 Oct, 08:00": a send moment, close enough to need the weekday.
+function when(iso) {
+    return iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
 function toggleHidden() {
     const url = `/tickets/${props.ticket.id}/hide`;
     const options = { preserveScroll: true, preserveState: true };
@@ -37,6 +42,20 @@ function toggleHidden() {
                 <template v-if="ticket.reporter"> · {{ ticket.reporter }}</template>
                 <template v-if="ticket.created_at"> · created {{ short(ticket.created_at) }}</template>
                 · updated {{ ago(ticket.updated_at) }}
+            </p>
+            <!-- What is waiting in jira-outbox for this ticket, and what sending it will change. -->
+            <p v-for="(message, index) in ticket.outbox ?? []" :key="index" class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+                <a :href="message.url" target="_blank" rel="noopener" class="hover:underline" :class="message.state === 'failed' ? 'font-medium text-signal' : 'text-ink'">
+                    <template v-if="message.state === 'failed'">Failed to send from the outbox</template>
+                    <template v-else-if="message.state === 'draft'">Draft waiting in the outbox</template>
+                    <template v-else>Scheduled {{ when(message.send_at) }}</template>
+                </a>
+                <span v-if="message.visibility === 'internal'" class="text-muted">· internal note</span>
+                <template v-if="message.to_status">
+                    <span class="text-muted">· sets</span>
+                    <StatusLabel :status="message.to_status" :tone="message.to_tone" />
+                </template>
+                <span v-if="message.assignee" class="text-muted">· assigns {{ message.assignee }}</span>
             </p>
             <p v-if="ticket.casebook" class="mt-1.5 text-sm">
                 <Link :href="`/casebook/${ticket.casebook.id}/edit`" class="text-working hover:underline">

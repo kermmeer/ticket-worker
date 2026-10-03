@@ -41,6 +41,28 @@ class OutboxClient
         ]);
     }
 
+    /**
+     * Every message still to go out, by ticket key: drafts, scheduled and failed ones,
+     * whoever wrote them. Empty when the outbox is not set up or does not answer: the
+     * overview works without it.
+     *
+     * @return array<string, list<array>>
+     */
+    public function waiting(): array
+    {
+        if (! $this->configured()) {
+            return [];
+        }
+
+        try {
+            $messages = $this->send('get', '/api/v1/scheduled')['messages'] ?? [];
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return collect($messages)->groupBy('issueKey')->map->values()->map->all()->all();
+    }
+
     /** What became of a draft: draft, scheduled, sent, failed or discarded. */
     public function status(string $id): array
     {

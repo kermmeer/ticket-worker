@@ -66,6 +66,7 @@ const tickets = [
         id: 2, key: 'SUP-1241', summary: 'Export to accounting stops at 1,000 rows', status: 'In Progress', status_tone: 'blue',
         priority: 'Medium', reporter: 'Accounting', assignee: 'Sam Jansen', created_at: minutesAgo(1500), updated_at: minutesAgo(50),
         group: 'working', url: '#',
+        outbox: [{ state: 'scheduled', send_at: minutesAgo(-1300), visibility: 'public', to_status: 'Resolved', to_tone: 'green', assignee: null, url: '#' }],
         slas: [{ name: 'Time to resolution', state: 'running', paused: false, remaining_ms: 90 * 60000, goal_ms: 48 * hour, due_at: minutesAgo(-90) }],
     },
     {
