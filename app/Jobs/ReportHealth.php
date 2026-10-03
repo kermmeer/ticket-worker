@@ -18,6 +18,12 @@ class ReportHealth implements ShouldQueue
 {
     use Queueable;
 
+    /**
+     * Harmless to repeat, so a report cut off by a restart simply runs again: the agent
+     * queue's workers otherwise allow one attempt, which is right for agent turns only.
+     */
+    public int $tries = 3;
+
     public function __construct(public string $for)
     {
         $this->onQueue($for);
