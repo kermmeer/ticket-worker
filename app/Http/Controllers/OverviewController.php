@@ -17,6 +17,7 @@ class OverviewController extends Controller
         $byId = $spaces->keyBy('id');
 
         $tickets = Ticket::query()
+            ->with('casebookEntry:id,title')
             ->open()
             ->whereIn('space_id', $spaces->pluck('id'))
             ->orderByDesc('jira_updated_at')
@@ -42,6 +43,11 @@ class OverviewController extends Controller
                 'reporter' => $ticket->reporter,
                 'assignee' => $ticket->assignee,
                 'slas' => $ticket->slas ?? [],
+                // A hint, not a verdict: the approved case this ticket looks most like.
+                'casebook' => $ticket->casebookEntry === null ? null : [
+                    'id' => $ticket->casebookEntry->id,
+                    'title' => $ticket->casebookEntry->title,
+                ],
                 'created_at' => $ticket->jira_created_at?->toIso8601String(),
                 'updated_at' => $ticket->jira_updated_at?->toIso8601String(),
                 // Until a ticket has a page here, it opens in Jira.

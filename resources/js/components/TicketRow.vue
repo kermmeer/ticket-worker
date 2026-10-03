@@ -1,4 +1,5 @@
 <script setup>
+import { Link } from '@inertiajs/vue3';
 import SpaceLabel from './SpaceLabel.vue';
 import StateBadge from './StateBadge.vue';
 import StatusLabel from './StatusLabel.vue';
@@ -13,26 +14,26 @@ defineProps({
 </script>
 
 <template>
-    <!-- Until a ticket has a page here, it opens in Jira. -->
-    <a
-        :href="ticket.url"
-        target="_blank"
-        rel="noopener"
-        class="grid gap-x-6 gap-y-2 p-4 transition-colors hover:bg-sunken/50 lg:grid-cols-[12rem_minmax(0,1fr)_11rem_17rem_11rem] lg:items-start"
-    >
+    <div class="grid gap-x-6 gap-y-2 p-4 transition-colors hover:bg-sunken/50 lg:grid-cols-[12rem_minmax(0,1fr)_11rem_17rem_11rem] lg:items-start">
         <div class="flex flex-wrap items-start gap-1.5 lg:flex-col">
-            <TicketKey :value="ticket.key" />
+            <!-- Until a ticket has a page here, it opens in Jira. -->
+            <a :href="ticket.url" target="_blank" rel="noopener"><TicketKey :value="ticket.key" /></a>
             <StatusLabel :status="ticket.status" :tone="ticket.status_tone" />
         </div>
 
         <div class="min-w-0">
-            <p class="font-medium break-words">{{ ticket.summary }}</p>
+            <a :href="ticket.url" target="_blank" rel="noopener" class="font-medium break-words hover:underline">{{ ticket.summary }}</a>
             <p class="mt-0.5 text-sm text-muted">
                 <SpaceLabel v-if="space" :label="space.label" :colour="space.colour" />
                 <template v-if="ticket.priority"> · {{ ticket.priority }}</template>
                 <template v-if="ticket.reporter"> · {{ ticket.reporter }}</template>
                 <template v-if="ticket.created_at"> · created {{ short(ticket.created_at) }}</template>
                 · updated {{ ago(ticket.updated_at) }}
+            </p>
+            <p v-if="ticket.casebook" class="mt-1.5 text-sm">
+                <Link :href="`/casebook/${ticket.casebook.id}/edit`" class="text-working hover:underline">
+                    Looks like a known case: {{ ticket.casebook.title }}
+                </Link>
             </p>
         </div>
 
@@ -54,9 +55,12 @@ defineProps({
         </div>
 
         <!-- A fixed width, so the columns before it line up from row to row. -->
-        <div class="flex items-center gap-3 lg:justify-end lg:pt-0.5">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 lg:flex-col lg:items-end lg:pt-0.5">
             <StateBadge :state="ticket.group" />
-            <span class="text-sm whitespace-nowrap text-muted">Jira ↗</span>
+            <p class="flex gap-3 text-sm whitespace-nowrap text-muted">
+                <Link :href="`/casebook/create?ticket=${encodeURIComponent(ticket.key)}`" class="hover:text-ink hover:underline">Write it up</Link>
+                <a :href="ticket.url" target="_blank" rel="noopener" class="hover:text-ink">Jira ↗</a>
+            </p>
         </div>
-    </a>
+    </div>
 </template>

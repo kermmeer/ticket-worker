@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Casebook\Matcher;
 use App\Jira\JiraClient;
 use App\Jira\JiraException;
 use App\Models\Space;
@@ -42,6 +43,7 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
         $now = now();
         $space->update(['sync_attempted_at' => $now]);
         $seen = [];
+        $casebook = Matcher::forSpace($space);
 
         // SLAs live in service spaces only. Not being able to read them is no reason to
         // stop the sync: the tickets come in without.
@@ -59,7 +61,9 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
 
                 foreach ($page['issues'] as $issue) {
                     $seen[] = (string) $issue['id'];
-                    Ticket::record($space, $issue, $now, $slaFields);
+                    $ticket = Ticket::record($space, $issue, $now, $slaFields);
+                    $ticket->rememberMatch($casebook->best($ticket->matchText()));
+                    $ticket->save();
                 }
 
                 $next = $page['next'];

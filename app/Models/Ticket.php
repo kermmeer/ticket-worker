@@ -17,7 +17,7 @@ class Ticket extends Model
 {
     protected $fillable = [
         'space_id', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
-        'issue_type', 'reporter', 'assignee', 'slas', 'jira_created_at', 'jira_updated_at',
+        'issue_type', 'reporter', 'assignee', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
         'first_seen_at', 'last_seen_at', 'left_at',
     ];
 
@@ -36,6 +36,23 @@ class Ticket extends Model
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);
+    }
+
+    public function casebookEntry(): BelongsTo
+    {
+        return $this->belongsTo(CasebookEntry::class);
+    }
+
+    /** What the casebook is matched against; the description joins it once it is synced. */
+    public function matchText(): string
+    {
+        return (string) $this->summary;
+    }
+
+    public function rememberMatch(?array $match): void
+    {
+        $this->casebook_entry_id = $match['id'] ?? null;
+        $this->casebook_score = $match['score'] ?? null;
     }
 
     /** Still matching its space's rules at the last sync. */

@@ -8,6 +8,7 @@ const page = usePage();
 const nav = [
     { href: '/', label: 'Overview', active: (url) => url === '/' },
     { href: '/spaces', label: 'Spaces', active: (url) => url.startsWith('/spaces') },
+    { href: '/casebook', label: 'Casebook', active: (url) => url.startsWith('/casebook') },
     { href: '/systems', label: 'Systems', active: (url) => url.startsWith('/systems') },
     { href: '/setup', label: 'Setup', active: (url) => url.startsWith('/setup') },
     { href: '/docs/concept', label: 'Concept', active: (url) => url.startsWith('/docs') },

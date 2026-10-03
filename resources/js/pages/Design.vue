@@ -56,7 +56,7 @@ const tickets = [
     {
         id: 1, key: 'SUP-1234', summary: 'Invoices not sent after a credit note', status: 'Waiting for support', status_tone: 'rose',
         priority: 'High', reporter: 'Finance team', assignee: 'Alex Moreau', created_at: minutesAgo(4300), updated_at: minutesAgo(4),
-        group: 'needs-you', url: '#',
+        group: 'needs-you', url: '#', casebook: { id: 0, title: 'Credit note stops the invoice mail' },
         slas: [
             { name: 'Time to first response', state: 'breached', paused: false, remaining_ms: -(3 * hour + 20 * 60000), goal_ms: 8 * hour, due_at: minutesAgo(200) },
             { name: 'Time to resolution', state: 'running', paused: false, remaining_ms: 46 * hour + 41 * 60000, goal_ms: 48 * hour, due_at: minutesAgo(-6000) },
