@@ -1,5 +1,5 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import SpaceLabel from './SpaceLabel.vue';
 import StateBadge from './StateBadge.vue';
 import StatusLabel from './StatusLabel.vue';
@@ -7,10 +7,16 @@ import TicketKey from './TicketKey.vue';
 import { ago, short } from '../time.js';
 import { phrase, shortName, tone } from '../sla.js';
 
-defineProps({
+const props = defineProps({
     ticket: { type: Object, required: true },
     space: { type: Object, default: null },
 });
+
+function toggleHidden() {
+    const url = `/tickets/${props.ticket.id}/hide`;
+    const options = { preserveScroll: true, preserveState: true };
+    props.ticket.group === 'hidden' ? router.delete(url, options) : router.post(url, {}, options);
+}
 </script>
 
 <template>
@@ -58,6 +64,7 @@ defineProps({
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 lg:flex-col lg:items-end lg:pt-0.5">
             <StateBadge :state="ticket.group" />
             <p class="flex gap-3 text-sm whitespace-nowrap text-muted">
+                <button type="button" class="hover:text-ink hover:underline" @click="toggleHidden">{{ ticket.group === 'hidden' ? 'Unhide' : 'Hide' }}</button>
                 <Link :href="`/casebook/create?ticket=${encodeURIComponent(ticket.key)}`" class="hover:text-ink hover:underline">Write it up</Link>
                 <a :href="ticket.url" target="_blank" rel="noopener" class="hover:text-ink">Jira ↗</a>
             </p>

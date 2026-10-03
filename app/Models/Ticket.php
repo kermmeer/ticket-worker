@@ -18,7 +18,7 @@ class Ticket extends Model
     protected $fillable = [
         'space_id', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
         'issue_type', 'reporter', 'assignee', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
-        'first_seen_at', 'last_seen_at', 'left_at',
+        'first_seen_at', 'last_seen_at', 'left_at', 'hidden_at',
     ];
 
     protected function casts(): array
@@ -29,6 +29,7 @@ class Ticket extends Model
             'first_seen_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'left_at' => 'datetime',
+            'hidden_at' => 'datetime',
             'slas' => 'array',
         ];
     }

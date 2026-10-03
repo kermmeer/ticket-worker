@@ -25,6 +25,12 @@ const groups = [
 ];
 const awake = groups.filter((group) => group.key !== 'sleeping');
 
+// Folded segments below the rest: tickets waiting on the requester, and tickets you hid.
+const folds = [
+    { key: 'sleeping', label: 'Sleeping', hint: 'Waiting on the requester' },
+    { key: 'hidden', label: 'Hidden', hint: 'Tickets you will not take on; they stay hidden until you unhide them' },
+];
+
 const spaceFilter = ref(null);
 const statusFilter = ref(null);
 const search = ref('');
@@ -89,7 +95,9 @@ const sorted = computed(() => {
     return list;
 });
 
-const inGroup = computed(() => Object.fromEntries(groups.map((group) => [group.key, sorted.value.filter((ticket) => ticket.group === group.key)])));
+const inGroup = computed(() =>
+    Object.fromEntries([...groups, folds[1]].map((group) => [group.key, sorted.value.filter((ticket) => ticket.group === group.key)])),
+);
 
 const perSpace = computed(() => {
     const counts = {};
@@ -99,25 +107,27 @@ const perSpace = computed(() => {
     return counts;
 });
 
-const sleepingCount = computed(() => props.tickets.filter((ticket) => ticket.group === 'sleeping').length);
-const awakeCount = computed(() => props.tickets.length - sleepingCount.value);
+const count = (group) => props.tickets.filter((ticket) => ticket.group === group).length;
+const sleepingCount = computed(() => count('sleeping'));
+const hiddenCount = computed(() => count('hidden'));
+const awakeCount = computed(() => props.tickets.length - sleepingCount.value - hiddenCount.value);
 
-// Folded unless you open it, or you are looking for something in particular.
-function savedFold() {
+// Folded unless you open them, or you are looking for something in particular.
+function savedFold(key) {
     try {
-        return localStorage.getItem('overview.sleeping') === 'open';
+        return localStorage.getItem(`overview.${key}`) === 'open';
     } catch {
         return false;
     }
 }
 
-const sleepingOpen = ref(savedFold());
-const showSleeping = computed(() => sleepingOpen.value || statusFilter.value !== null || search.value.trim() !== '');
+const foldOpen = ref({ sleeping: savedFold('sleeping'), hidden: savedFold('hidden') });
+const searching = computed(() => statusFilter.value !== null || search.value.trim() !== '');
 
-function toggleSleeping() {
-    sleepingOpen.value = !sleepingOpen.value;
+function toggleFold(key) {
+    foldOpen.value[key] = !foldOpen.value[key];
     try {
-        localStorage.setItem('overview.sleeping', sleepingOpen.value ? 'open' : 'closed');
+        localStorage.setItem(`overview.${key}`, foldOpen.value[key] ? 'open' : 'closed');
     } catch {
         // Storage refused: it still works for this visit.
     }
@@ -171,6 +181,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
         <ul class="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
             <li v-if="sleepingCount">and {{ sleepingCount }} sleeping, waiting on the requester</li>
+            <li v-if="hiddenCount">{{ hiddenCount }} hidden by you</li>
             <li v-for="space in spaces" :key="space.id">
                 <SpaceLabel :label="space.label" :colour="space.colour" class="text-ink" />
                 <span v-if="space.sync_error" class="text-signal"> · sync failed: {{ space.sync_error }}</span>
@@ -273,19 +284,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
             </section>
         </template>
 
-        <section v-if="inGroup.sleeping.length" class="mt-14 border-t border-line pt-8">
-            <button type="button" class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-left" :aria-expanded="showSleeping" @click="toggleSleeping">
-                <h2 class="eyebrow">Sleeping · {{ inGroup.sleeping.length }}</h2>
-                <span class="text-sm text-muted">
-                    Waiting on the requester ·
-                    <span class="underline decoration-line underline-offset-2">{{ showSleeping ? 'fold away' : 'show them' }}</span>
-                </span>
-            </button>
-            <ul v-if="showSleeping" class="card mt-3 divide-y divide-line">
-                <li v-for="ticket in inGroup.sleeping" :key="ticket.id">
-                    <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
-                </li>
-            </ul>
-        </section>
+        <template v-for="fold in folds" :key="fold.key">
+            <section v-if="inGroup[fold.key].length" class="mt-14 border-t border-line pt-8">
+                <button
+                    type="button"
+                    class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-left"
+                    :aria-expanded="foldOpen[fold.key] || searching"
+                    @click="toggleFold(fold.key)"
+                >
+                    <h2 class="eyebrow">{{ fold.label }} · {{ inGroup[fold.key].length }}</h2>
+                    <span class="text-sm text-muted">
+                        {{ fold.hint }} ·
+                        <span class="underline decoration-line underline-offset-2">{{ foldOpen[fold.key] || searching ? 'fold away' : 'show them' }}</span>
+                    </span>
+                </button>
+                <ul v-if="foldOpen[fold.key] || searching" class="card mt-3 divide-y divide-line">
+                    <li v-for="ticket in inGroup[fold.key]" :key="ticket.id">
+                        <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
+                    </li>
+                </ul>
+            </section>
+        </template>
     </template>
 </template>

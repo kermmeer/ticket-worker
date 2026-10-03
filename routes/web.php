@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CasebookController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\HiddenTicketController;
 use App\Http\Controllers\HyperModeController;
 use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\SetupController;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', OverviewController::class)->name('overview');
 Route::post('/hyper', HyperModeController::class)->name('hyper');
+Route::post('/tickets/{ticket}/hide', [HiddenTicketController::class, 'store'])->name('tickets.hide');
+Route::delete('/tickets/{ticket}/hide', [HiddenTicketController::class, 'destroy'])->name('tickets.unhide');
 
 Route::controller(SpaceController::class)->prefix('spaces')->name('spaces.')->group(function () {
     Route::get('/', 'index')->name('index');

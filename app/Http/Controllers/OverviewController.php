@@ -54,7 +54,12 @@ class OverviewController extends Controller
                 'url' => $jira->browseUrl($ticket->key),
                 // Waiting on the requester sleeps, whatever else is going on. Agents arrive
                 // with step 2; until then every other ticket waits for a first look.
-                'group' => $byId[$ticket->space_id]->sleeps($ticket->status) ? 'sleeping' : 'not-analysed',
+                // Hidden by you beats everything; then waiting on the requester sleeps.
+                'group' => match (true) {
+                    $ticket->hidden_at !== null => 'hidden',
+                    $byId[$ticket->space_id]->sleeps($ticket->status) => 'sleeping',
+                    default => 'not-analysed',
+                },
             ]),
         ]);
     }

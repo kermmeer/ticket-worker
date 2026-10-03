@@ -170,6 +170,7 @@ needs from you:
 | **Not analysed** | Synced, nothing started yet |
 | **Parked** | Session closed, but the ticket is still open in Jira |
 | **Sleeping** | Waiting on the requester: in a second segment below the rest, folded away |
+| **Hidden** | Tickets you will not take on. *Hide* on the row puts them in a folded segment of their own; syncs leave them hidden until you unhide them |
 
 Each row shows the key with the Jira status stamped below it, the summary, space label, system
 (once known), priority, reporter, when it was created and last updated, who it is assigned

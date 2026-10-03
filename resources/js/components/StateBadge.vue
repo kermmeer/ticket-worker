@@ -14,6 +14,7 @@ const states = {
     sleeping: { label: 'Sleeping', tone: 'text-waiting', shape: 'moon' },
     'not-analysed': { label: 'Not analysed', tone: 'text-muted', shape: 'ring' },
     parked: { label: 'Parked', tone: 'text-muted', shape: 'pause' },
+    hidden: { label: 'Hidden', tone: 'text-muted', shape: 'ring' },
     closed: { label: 'Closed', tone: 'text-done', shape: 'check' },
 };
 
