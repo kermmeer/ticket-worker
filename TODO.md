@@ -66,6 +66,10 @@ to it, including work you finish.
 
 ## Step 5: back to Jira, and learning
 
+- [x] Tickets open in jira-outbox (`JIRA_OPEN_URL`, `JIRA_OPEN_LABEL`) (2026-10-03)
+- [x] Brief for jira-outbox's draft API: `docs/OUTBOX-API.md`, also at `/docs/outbox` (2026-10-03)
+- [ ] Hand reply drafts to the outbox once its API exists; show what became of them
+
 - [ ] Reply to customer and internal note in service spaces; one comment kind in plain ones
 - [ ] Transitions, the dummy/real switch, closing notes into contexts, cost overview
 

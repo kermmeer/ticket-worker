@@ -297,8 +297,14 @@ as a case: the problem as tickets show it, the cause, and what fixed it.
 
 ## 9. Back to Jira
 
-Version 1 only reads from Jira. The next step adds writing, but only when you press the
-button:
+Version 1 only reads from Jira, and Ticket Worker will never post itself: replies go out
+through **jira-outbox**, the app that already posts comments with mentions, files,
+scheduling, status changes and assignees. Ticket Worker hands its reply over as a draft
+(`POST /api/v1/drafts`), the draft waits in the outbox, and you review, edit and send it there.
+What jira-outbox needs for that is briefed in [docs/OUTBOX-API.md](/docs/outbox). Tickets
+already open there (`JIRA_OPEN_URL=https://jira.techfactory.dev/{key}`).
+
+What the outbox will do with a draft, when you press the button:
 
 - **Post a reply.** You edit the reply draft in place and post it as a comment. In a service
   space both are offered, **Reply to customer** and **Add internal note**, through the service

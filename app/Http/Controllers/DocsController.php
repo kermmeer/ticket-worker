@@ -15,6 +15,7 @@ class DocsController extends Controller
     /** Served by slug, and only these: a slug never becomes a path. */
     private const DOCS = [
         'concept' => 'CONCEPT.md',
+        'outbox' => 'docs/OUTBOX-API.md',
     ];
 
     public function __invoke(string $doc): Response
