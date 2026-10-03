@@ -23,6 +23,11 @@ to it, including work you finish.
       status only; full-width frame (2026-10-02)
 - [x] Sleeping: statuses waiting on the requester, chosen per space (automatic until then),
       in a folded segment of their own (2026-10-02)
+- [x] Created time, assignee and SLAs (time left or overdue, due date) in every row; sort by
+      last update, newest or SLA (2026-10-03)
+- [x] Rule chips: several values of one field make `field in (…)`; the preview runs by itself
+      and warns when nothing matches; the overview flags a space whose rules match nothing
+      (2026-10-03, after `status = A AND status = B` emptied the first space)
 - [ ] Issue and comments, attachments, ADF to Markdown: needed for the analysis (step 3)
 - [ ] `j`/`k` to move through the overview, `Enter` to open
 

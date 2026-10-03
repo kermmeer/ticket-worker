@@ -89,8 +89,11 @@ is a short wizard. You can come back to any step later.
    `service_desk`) and can be overridden here; it decides how replies are posted (§9).
 2. **Ticket rules.** Build the filter from the space's own fields (issue types, statuses,
    labels, components, whatever field marks last line), or write the JQL yourself. The tool
-   always adds `project = KEY`. A live preview shows how many tickets match and the first
-   few, so you see what you are about to get. A second rule says when a ticket counts as
+   always adds `project = KEY`. Clicking several values of one field makes `status in (…)`:
+   a ticket has one status, so `status = A AND status = B` would match nothing (it did, on
+   3 October, and the overview emptied at the next sync). A live preview shows how many
+   tickets match and the first few, so you see what you are about to get; it runs by itself
+   when the page opens and after every save, and says so loudly when nothing matches. A second rule says when a ticket counts as
    done. The default is Jira's *Done* status category.
 3. **Systems.** Pick the systems this space's tickets can be about, from the Systems page.
    A system is a folder on minas, `shared/systems/<name>`, that you push its code into from
@@ -168,7 +171,13 @@ needs from you:
 | **Sleeping** | Waiting on the requester: in a second segment below the rest, folded away |
 
 Each row shows the key with the Jira status stamped below it, the summary, space label, system
-(once known), priority, reporter and last update, the agent's state, and the cost so far.
+(once known), priority, reporter, when it was created and last updated, who it is assigned
+to, its SLAs, the agent's state, and the cost so far.
+
+**SLAs** come from Jira Service Management with every sync: the time left or overdue, in the
+SLA's own calendar (working hours) as Jira counts it, and when it falls due. A running SLA
+shows first; paused, met and missed say so in words. The overview sorts by last update,
+newest first, or the SLA closest to breaching (or furthest past it).
 Every status has a colour of its own: Jira's grouping (to do, in progress, done) first, the
 name second, so *Waiting for support* and *Waiting for customer* differ at a glance; the
 space's setup can recolour any status. You can show one space or one status only, and search
@@ -406,6 +415,8 @@ own work.
 - **Live output by polling.** While a turn runs, the page asks once a second for the events
   after the last one it has. There is no websocket server to run. Reverb can come later if
   polling falls short.
+- **SLAs:** they are custom fields of the type `com.atlassian.servicedesk:sd-sla-field`, found
+  through `GET /rest/api/3/field` and asked for in the sync's search like any field.
 - **Jira:** `POST /rest/api/3/search/jql` paged with `nextPageToken` for the sync,
   `GET /rest/api/3/issue/{key}` and its comments for gathering, and
   `GET /rest/api/3/attachment/content/{id}` for downloads. Basic auth with an API token, as
