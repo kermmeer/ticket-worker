@@ -31,6 +31,17 @@ to it, including work you finish.
 - [ ] Issue and comments, attachments, ADF to Markdown: needed for the analysis (step 3)
 - [ ] `j`/`k` to move through the overview, `Enter` to open
 
+## The casebook
+
+- [x] Cases (problem, symptoms, cause, fix, keywords, source tickets), draft, approved or
+      retired; the Casebook page; *Write it up* from any ticket (2026-10-03)
+- [x] Word matching against every open ticket on each sync and after each change; the overview
+      shows the closest approved case (2026-10-03)
+- [ ] Match on the description too, once it is synced (step 3)
+- [ ] The agent: best matches in the first prompt, the approved cases as files to grep, the
+      proposal says which case it used (step 3); drafts a case when a ticket is done (step 4)
+- [ ] Use counts and "did not fit" feedback, to know which cases to retire (step 5)
+
 ## Step 2: agent runner and systems
 
 - [x] Worker containers `worker`, `scheduler` and `agent`, with health reports on Setup (2026-10-02)

@@ -55,6 +55,7 @@ decide, and you are the one who answers in Jira.
 | **System** | A codebase tickets can be about: a folder on minas that you push the code into, and the agent reads. One system can serve several spaces. |
 | **System context** | A short Markdown brief per system: what it is, where things are, what users call things. Written by an agent, reviewed by you. |
 | **Analysis** | The first scan of a ticket's problem. It ends in a proposal. |
+| **Casebook** | Solved cases: the problem as tickets show it, its cause, what fixed it. Written by you, or drafted by an agent and approved by you; matched against every open ticket (§8). |
 | **Proposal** | The structured result: which system, what went wrong, the evidence, the fix, a workaround, a reply draft. Versioned. |
 | **Session** | One Claude conversation tied to one ticket. It stays open until you close it. |
 | **Turn** | One round in a session: your message, the agent working, its answer. |
@@ -140,8 +141,8 @@ What a scan writes:
 - **Outside world:** integrations, queues, outgoing mail, files, external APIs.
 - **Where to look:** what usually explains a bug in this system: logs, audit tables, status
   fields.
-- **Known sharp edges:** problems that keep coming back. Empty at first; it grows from
-  solved tickets (§8).
+- **Known sharp edges:** the system's recurring problems in a line each, pointing to their
+  cases in the casebook (§8).
 
 If the folder already has a `CLAUDE.md` or a decent README, the scan starts from that.
 
@@ -206,14 +207,17 @@ that. The steps show as a checklist that ticks off as the agent works:
    linked issues. It converts Jira's rich text (ADF) to Markdown and downloads the
    attachments. Everything goes into the ticket's workspace folder, where the agent works:
    `ticket.md` and `attachments/`. The agent reads screenshots and PDFs like any other file.
-2. **Route.** Using the contexts of all the space's systems, the agent decides which system
+2. **Check the casebook.** The approved cases that match the ticket best come with the
+   first prompt (§8). If one fits, the agent checks it against the ticket and the code, and
+   the rest of the analysis is short: confirm, adapt, propose.
+3. **Route.** Using the contexts of all the space's systems, the agent decides which system
    the ticket is about and says why. If it cannot choose between two, it says so and checks
    both. A matching routing hint (a component tied to a system) counts as a strong hint, not
    a rule.
-3. **Dig.** In that system's code, it follows what happens in the situation the ticket
+4. **Dig.** In that system's code, it follows what happens in the situation the ticket
    describes, finds where it can go wrong, reads the config, and checks those files' git
    history for recent changes. Regressions are the most common cause at the last line.
-4. **Propose.** The analysis ends in a proposal with a fixed JSON schema, so the screen can
+5. **Propose.** The analysis ends in a proposal with a fixed JSON schema, so the screen can
    lay it out:
 
 | Part | Content |
@@ -226,6 +230,7 @@ that. The steps show as a checklist that ticks off as the agent works:
 | Workaround | What the reporter can do in the meantime, if anything |
 | Questions | What the ticket does not say, and who should answer |
 | Reply draft | An answer to the reporter, in the language picked; in a service space, marked as a public reply or an internal note |
+| Casebook | The case it used and whether it fit, or that this one is new |
 | Confidence | Low, medium or high, with a one-line reason |
 
 Evidence that points to code opens a read-only viewer at that line, so you can check the
@@ -252,12 +257,39 @@ makes a new version, and the earlier ones stay visible.
 - **Close.** Closing ends the session, and the conversation stays readable. *Reopen*
   continues the same conversation, memory included, even weeks later.
 - **Done.** When the ticket leaves the rules in Jira, the tool suggests closing the session.
-  First it asks the agent for a short closing note: what the cause was and what fixed it. The
-  note stays on the ticket and, if you approve, is added to the system context's *known sharp
-  edges*.
+  First the agent drafts a case for the casebook from what it learned: the problem, the
+  cause, what fixed it. You approve it, edit it or throw it away.
 
 An open session costs nothing while nobody types. An agent only runs while a turn is in
 progress (§10).
+
+### The casebook: solved cases for the next agent
+
+What one ticket taught should not have to be learned again on the next. The casebook keeps it
+as a case: the problem as tickets show it, the cause, and what fixed it.
+
+- **Where cases come from.** You write them on the Casebook page, from scratch or from a
+  ticket with *Write it up*. Once agents run, each solved ticket's agent drafts one from the
+  conversation it already has, and you approve, edit or discard it. An agent never approves
+  its own case.
+- **What makes a good one.** Symptoms in the words reporters use, in every language tickets
+  arrive in (the keywords count most); the cause with file and function, so the agent goes
+  straight there; the fix as steps, including what to tell the reporter. No customer names
+  or data: a case outlives the tickets it came from (§11).
+- **Matching, for free.** Every sync compares each open ticket with the approved cases on
+  shared words, weighted by where they appear and how rare they are. No model is asked, so it
+  costs nothing, and the overview shows the closest case as a hint. Until descriptions are
+  synced (step 3), only the summary is compared.
+- **How the agent uses it.** The first prompt of an analysis carries the few best matches, a
+  few hundred words, never the whole casebook. The approved cases also lie in the workspace
+  as files with an index, so the agent can search for more. A case that fits turns an
+  investigation into a check, which costs a fraction of the tokens and needs fewer questions
+  to you. The proposal says which case it used and whether it fit.
+- **Keeping it true.** Every use is counted. A case that keeps not fitting, or whose code has
+  moved on, is retired: still readable, no longer matched or offered.
+- **Considered and not chosen, for now:** embeddings (meaning-based search). Better with
+  paraphrases and other languages, but a second paid service and a store to run. Word
+  matching plus the agent's own reading goes first; embeddings come if the misses show.
 
 ---
 
@@ -326,6 +358,8 @@ Later turns pass `--resume <uuid>` instead of `--session-id`.
   It is recorded at the session's first turn and reused on every resume.
 - **Patch turns** add `Edit` and `Write`, which restricted mode confines to the workspace,
   where the scratch copy is. The systems themselves stay read-only mounts.
+- **The casebook** lies in the workspace as one Markdown file per approved case, plus an
+  index, read-only; the best matches for the ticket also go in the first prompt.
 - **Structured answers.** The analysis turn and *Update proposal* pass `--json-schema`, so
   their final answer is the proposal as validated JSON. Conversation turns stay plain prose.
 - **Limits.** Each turn has a budget ceiling (`--max-budget-usd`, default set per space). At
@@ -380,6 +414,8 @@ own work.
   - Claude Code's own usage metrics carry no prompts, code or file paths, and the agent
     container switches them off anyway (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`).
   - Accepted on 2026-10-02 on these terms: an API key, no training, 30 days.
+  - Cases in the casebook are kept as long as they are useful, so they hold no personal
+    data: the agent writes them general, and you read them before approving.
 - **Money.** There is a budget per turn, each ticket shows its cost, and the settings page
   shows the monthly total. In v1, only you start an agent.
 - **Separate from your own Claude.** The worker runs Claude Code under its own config
@@ -604,11 +640,11 @@ Each step ends in something usable.
 | Step | What | Done when |
 |---|---|---|
 | 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, design tokens, both themes; Overview, Setup, Concept and Design | the shell looks right in Day and Night, on desktop and phone. **Built 2026-10-02.** |
-| 1. Jira and spaces | Jira client, space wizard with the space type and a live preview, sync with hyper mode, overview | the overview lists exactly what the JQL lists in Jira. **Built 2026-10-02**; until step 3 a ticket opens in Jira |
+| 1. Jira and spaces | Jira client, space wizard with the space type and a live preview, sync with hyper mode, overview; the casebook and its matching | the overview lists exactly what the JQL lists in Jira. **Built 2026-10-02**, the casebook 2026-10-03; until step 3 a ticket opens in Jira |
 | 2. Agent runner and systems | worker containers and the Systems page (**built 2026-10-02**); turn runner, event trail on screen, context scans, review and edit | a scanned context is one you would hand to a new colleague |
-| 3. Analysis | ticket workspace, gather, route, dig, reply language, proposal screen, code viewer | the backtest (§16) gets most real tickets right |
-| 4. Conversation | resume, stop, close and reopen, passing on new activity, proposal versions, patches | a ticket can be worked in the tool from first look to closing note |
-| 5. Back to Jira, and learning | reply to customer and internal note, transitions, the dummy/real switch, closing notes into contexts, cost overview | a whole ticket handled without opening Jira |
+| 3. Analysis | ticket workspace, gather, the casebook in the prompt and as files, route, dig, reply language, proposal screen, code viewer | the backtest (§16) gets most real tickets right |
+| 4. Conversation | resume, stop, close and reopen, passing on new activity, proposal versions, patches, the agent's case drafts | a ticket can be worked in the tool from first look to closing note |
+| 5. Back to Jira, and learning | reply to customer and internal note, transitions, the dummy/real switch, use counts and retiring cases, cost overview | a whole ticket handled without opening Jira |
 | 6. Data tools | per system, read-only API calls and SELECT queries made by the tool, secrets kept by the tool | an analysis checks a claim against real data without ever seeing a token |
 
 ---|---|---|
@@ -630,6 +666,9 @@ so the answer is not sitting in the code. Then compare the proposal with what th
 was. Did it pick the right system? The right cause? Was the evidence useful? Record cost and
 time per analysis in the same table. Run it again after every change to the prompts or the
 contexts. It is the only honest way to tell whether a change helped.
+
+Run it with and without the casebook as well: the difference in tokens, time and questions
+asked is what the casebook is worth.
 
 ---
 
