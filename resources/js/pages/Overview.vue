@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import SpaceLabel from '../components/SpaceLabel.vue';
 import StatusLabel from '../components/StatusLabel.vue';
 import TicketRow from '../components/TicketRow.vue';
@@ -151,8 +151,36 @@ function onKey(event) {
     }
 }
 
-onMounted(() => window.addEventListener('keydown', onKey));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+// The page keeps itself current: every 30 seconds while it is in view, and at once when you
+// come back to the tab. A sync, a message scheduled in the outbox or a status changed in
+// Jira shows without reloading; filters, search and scroll stay as they are.
+const REFRESH_MS = 30000;
+let refresher = null;
+
+function refresh() {
+    if (document.visibilityState === 'visible') {
+        // Quietly: no progress bar, and rows are keyed, so only what changed is redrawn.
+        router.reload({ only: ['tickets', 'spaces', 'hasSpaces'], preserveScroll: true, preserveState: true, showProgress: false });
+    }
+}
+
+function onVisible() {
+    if (document.visibilityState === 'visible') {
+        refresh();
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('visibilitychange', onVisible);
+    refresher = setInterval(refresh, REFRESH_MS);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onKey);
+    document.removeEventListener('visibilitychange', onVisible);
+    clearInterval(refresher);
+});
 </script>
 
 <template>

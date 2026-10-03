@@ -72,6 +72,8 @@ to it, including work you finish.
       Setup checks the token without creating a draft (2026-10-03)
 - [x] The overview shows messages waiting in the outbox (scheduled, draft, failed), when they go,
       and the status they will set (`GET /api/v1/scheduled`, 30 s cache) (2026-10-03)
+- [x] The overview refreshes itself every 30 s and on returning to the tab, quietly: no progress
+      bar, filters and scroll kept (2026-10-03)
 - [ ] Send the proposal's reply draft from the ticket page (step 3); show what became of it
 
 - [ ] Reply to customer and internal note in service spaces; one comment kind in plain ones
