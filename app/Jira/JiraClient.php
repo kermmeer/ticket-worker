@@ -25,6 +25,7 @@ class JiraClient
         private readonly string $base,
         private readonly ?string $email,
         private readonly ?string $token,
+        private readonly ?string $openUrl = null,
     ) {}
 
     public function configured(): bool
@@ -37,9 +38,12 @@ class JiraClient
         return $this->base;
     }
 
+    /** Where clicking a ticket goes: JIRA_OPEN_URL with {key} filled in, or Jira itself. */
     public function browseUrl(string $key): string
     {
-        return $this->base.'/browse/'.$key;
+        return filled($this->openUrl)
+            ? str_replace('{key}', rawurlencode($key), $this->openUrl)
+            : $this->base.'/browse/'.$key;
     }
 
     /** @return array{accountId?: string, displayName?: string} */

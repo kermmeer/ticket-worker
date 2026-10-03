@@ -16,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
             (string) config('services.jira.base'),
             config('services.jira.email'),
             config('services.jira.token'),
+            config('services.jira.open_url'),
         ));
     }
 

@@ -20,7 +20,7 @@ class OverviewTest extends TestCase
 
     public function test_it_lists_the_open_tickets_of_active_spaces_only(): void
     {
-        config(['services.jira.base' => 'https://example.atlassian.net']);
+        config(['services.jira.base' => 'https://example.atlassian.net', 'services.jira.open_url' => null]);
         $active = SpacesTest::space(['project_key' => 'SUP', 'state' => Space::ACTIVE]);
         $paused = SpacesTest::space(['project_key' => 'OLD', 'state' => Space::PAUSED]);
         $this->ticket($active, 'SUP-1');

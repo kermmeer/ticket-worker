@@ -85,4 +85,12 @@ class JiraClientTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_a_ticket_opens_where_the_settings_say(): void
+    {
+        $this->assertSame('https://example.atlassian.net/browse/SUP-1', $this->client()->browseUrl('SUP-1'));
+
+        $outbox = new JiraClient('https://example.atlassian.net', 'me@example.com', 'secret-token', 'https://jira.techfactory.dev/{key}');
+        $this->assertSame('https://jira.techfactory.dev/SUP-1', $outbox->browseUrl('SUP-1'));
+    }
 }

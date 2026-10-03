@@ -1,5 +1,5 @@
 <script setup>
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import SpaceLabel from './SpaceLabel.vue';
 import StateBadge from './StateBadge.vue';
 import StatusLabel from './StatusLabel.vue';
@@ -12,6 +12,8 @@ const props = defineProps({
     space: { type: Object, default: null },
 });
 
+const openLabel = usePage().props.openLabel ?? 'Jira';
+
 function toggleHidden() {
     const url = `/tickets/${props.ticket.id}/hide`;
     const options = { preserveScroll: true, preserveState: true };
@@ -22,7 +24,7 @@ function toggleHidden() {
 <template>
     <div class="grid gap-x-6 gap-y-2 p-4 transition-colors hover:bg-sunken/50 lg:grid-cols-[12rem_minmax(0,1fr)_11rem_17rem_11rem] lg:items-start">
         <div class="flex flex-wrap items-start gap-1.5 lg:flex-col">
-            <!-- Until a ticket has a page here, it opens in Jira. -->
+            <!-- Until a ticket has a page here, it opens in Jira, or where JIRA_OPEN_URL says. -->
             <a :href="ticket.url" target="_blank" rel="noopener"><TicketKey :value="ticket.key" /></a>
             <StatusLabel :status="ticket.status" :tone="ticket.status_tone" />
         </div>
@@ -66,7 +68,7 @@ function toggleHidden() {
             <p class="flex gap-3 text-sm whitespace-nowrap text-muted">
                 <button type="button" class="hover:text-ink hover:underline" @click="toggleHidden">{{ ticket.group === 'hidden' ? 'Unhide' : 'Hide' }}</button>
                 <Link :href="`/casebook/create?ticket=${encodeURIComponent(ticket.key)}`" class="hover:text-ink hover:underline">Write it up</Link>
-                <a :href="ticket.url" target="_blank" rel="noopener" class="hover:text-ink">Jira ↗</a>
+                <a :href="ticket.url" target="_blank" rel="noopener" class="hover:text-ink">{{ openLabel }} ↗</a>
             </p>
         </div>
     </div>

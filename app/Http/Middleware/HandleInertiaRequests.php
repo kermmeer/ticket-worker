@@ -34,6 +34,8 @@ class HandleInertiaRequests extends Middleware
                 'env' => app()->environment(),
             ],
             'hyper' => fn () => Setting::hyper(),
+            // The name on the link that opens a ticket: Jira, or the app JIRA_OPEN_URL points to.
+            'openLabel' => config('services.jira.open_label'),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

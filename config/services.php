@@ -35,6 +35,10 @@ return [
         'token' => env('JIRA_TOKEN'),
         // dummy: nothing reaches Jira. Anything but "real" counts as dummy.
         'write' => env('JIRA_WRITE') === 'real' ? 'real' : 'dummy',
+        // Where a ticket opens when you click it: Jira itself by default, or another app
+        // that takes the key, e.g. https://jira.techfactory.dev/{key} for jira-outbox.
+        'open_url' => env('JIRA_OPEN_URL'),
+        'open_label' => env('JIRA_OPEN_LABEL', 'Jira'),
     ],
 
     'slack' => [
