@@ -68,7 +68,9 @@ to it, including work you finish.
 
 - [x] Tickets open in jira-outbox (`JIRA_OPEN_URL`, `JIRA_OPEN_LABEL`) (2026-10-03)
 - [x] Brief for jira-outbox's draft API: `docs/OUTBOX-API.md`, also at `/docs/outbox` (2026-10-03)
-- [ ] Hand reply drafts to the outbox once its API exists; show what became of them
+- [x] Connected to jira-outbox's draft API over `apps-internal` (`OUTBOX_URL`, `OUTBOX_API_TOKEN`);
+      Setup checks the token without creating a draft (2026-10-03)
+- [ ] Send the proposal's reply draft from the ticket page (step 3); show what became of it
 
 - [ ] Reply to customer and internal note in service spaces; one comment kind in plain ones
 - [ ] Transitions, the dummy/real switch, closing notes into contexts, cost overview

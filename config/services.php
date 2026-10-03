@@ -41,6 +41,12 @@ return [
         'open_label' => env('JIRA_OPEN_LABEL', 'Jira'),
     ],
 
+    // jira-outbox: reply drafts go there, and you send them from there (docs/OUTBOX-API.md).
+    'outbox' => [
+        'url' => env('OUTBOX_URL'),
+        'token' => env('OUTBOX_API_TOKEN'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -25,10 +26,14 @@ class SetupTest extends TestCase
             'services.jira.write' => 'dummy',
             'agent.claude.api_key' => 'sk-ant-key-that-must-not-leak',
             'queue.default' => 'database',
+            'services.outbox.url' => 'http://jira-outbox:5173',
+            'services.outbox.token' => 'outbox-token-that-must-not-leak',
         ]);
-        Http::fake(fn () => $this->jiraStatus === 200
+        Http::fake(fn (Request $request) => str_contains($request->url(), 'jira-outbox')
+            ? Http::response(['error' => 'No such draft'], 404)
+            : ($this->jiraStatus === 200
             ? Http::response(['displayName' => 'Support Bot'])
-            : Http::response(['errorMessages' => []], $this->jiraStatus));
+            : Http::response(['errorMessages' => []], $this->jiraStatus)));
     }
 
     public function test_secrets_show_as_set_never_as_their_value(): void
@@ -37,6 +42,8 @@ class SetupTest extends TestCase
 
         $response->assertDontSee('jira-token-that-must-not-leak', false);
         $response->assertDontSee('sk-ant-key-that-must-not-leak', false);
+        $response->assertDontSee('outbox-token-that-must-not-leak', false);
+        $this->assertSame('ok', $this->check('outbox')['state']);
         $this->assertSame('ok', $this->check('jira')['state']);
         $this->assertSame('ok', $this->check('anthropic')['state']);
     }

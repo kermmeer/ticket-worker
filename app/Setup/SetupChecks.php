@@ -4,6 +4,7 @@ namespace App\Setup;
 
 use App\Jira\JiraClient;
 use App\Jira\JiraException;
+use App\Outbox\OutboxClient;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +28,10 @@ class SetupChecks
     /** The scheduler asks every minute; a report older than this means nobody answered. */
     private const FRESH_SECONDS = 180;
 
-    public function __construct(private readonly JiraClient $jira) {}
+    public function __construct(
+        private readonly JiraClient $jira,
+        private readonly OutboxClient $outbox,
+    ) {}
 
     /**
      * @return list<array{key: string, group: string, title: string, state: string, detail: string}>
@@ -39,6 +43,7 @@ class SetupChecks
             $this->queue(),
             $this->jira(),
             $this->jiraWrite(),
+            $this->outbox(),
             $this->anthropicKey(),
             $this->agentContainer(),
             $this->folder('systems', 'Systems', config('agent.systems_path'),
@@ -119,6 +124,15 @@ class SetupChecks
                 'JIRA_WRITE=real: the post and transition buttons reach Jira.')
             : $this->item('jira-write', 'Jira', 'Writing to Jira', self::OK,
                 'JIRA_WRITE=dummy: nothing is ever posted to Jira.');
+    }
+
+    private function outbox(): array
+    {
+        $problem = Cache::remember('setup.outbox', 60, fn () => $this->outbox->check() ?? '');
+
+        return $problem === ''
+            ? $this->item('outbox', 'Jira', 'jira-outbox', self::OK, 'Connected: reply drafts go there, and you send them from there.')
+            : $this->item('outbox', 'Jira', 'jira-outbox', self::TODO, $problem);
     }
 
     private function anthropicKey(): array
