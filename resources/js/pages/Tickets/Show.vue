@@ -14,6 +14,7 @@ const props = defineProps({
     issue: { type: Object, default: null },
     issueError: { type: String, default: null },
     session: { type: Object, default: null },
+    history: { type: Array, default: () => [] },
     languages: { type: Array, required: true },
     agentReady: { type: Boolean, required: true },
     outboxReady: { type: Boolean, required: true },
@@ -177,6 +178,30 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         <button type="button" class="btn" @click="post('case')">Draft a case</button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Earlier sessions: the work, not the conversation -->
+            <div v-if="history.length" class="card p-5 text-sm">
+                <p class="eyebrow">Earlier sessions</p>
+                <ul class="mt-3 divide-y divide-line">
+                    <li v-for="past in history" :key="past.id" class="py-3 first:pt-0 last:pb-0">
+                        <p class="flex flex-wrap gap-x-3 gap-y-1">
+                            <span class="font-medium">{{ short(past.started_at) }} – {{ short(past.closed_at) }}</span>
+                            <span class="font-mono text-xs leading-5 text-muted">
+                                ${{ past.cost_usd.toFixed(2) }} · {{ tokens(past.tokens_in) }} in · {{ tokens(past.tokens_out) }} out
+                            </span>
+                        </p>
+                        <p class="mt-1 text-muted">
+                            {{ past.turns }} {{ past.turns === 1 ? 'turn' : 'turns' }}<template v-if="past.questions">, {{ past.questions }} of them your questions</template>
+                            · {{ past.steps }} steps<template v-if="past.minutes"> · {{ past.minutes }} min of agent time</template>
+                            <template v-if="past.case_drafted"> · drafted a case</template>
+                        </p>
+                        <p v-if="past.cause" class="mt-1">
+                            <span class="font-mono text-xs">{{ past.system }}</span>
+                            <span class="text-muted"> · {{ past.confidence }} confidence · </span>{{ past.cause }}
+                        </p>
+                    </li>
+                </ul>
             </div>
 
             <!-- The proposal -->

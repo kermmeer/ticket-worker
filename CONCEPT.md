@@ -260,7 +260,8 @@ makes a new version, and the earlier ones stay visible.
 - **New ticket activity.** If a comment arrives while the session is open, the ticket shows
   it and offers to pass it to the agent.
 - **Stop.** You can stop a turn while it runs. The session stays, and you carry on from there.
-- **Close.** Closing ends the session, and the conversation stays readable. *Reopen*
+- **Close.** Closing ends the session, and leaves a line under *Earlier sessions*: when, how
+  many turns and steps, cost, tokens, and the conclusion it reached. *Reopen*
   continues the same conversation, memory included, even weeks later.
 - **Done.** When the ticket leaves the rules in Jira, the tool suggests closing the session.
   First the agent drafts a case for the casebook from what it learned: the problem, the

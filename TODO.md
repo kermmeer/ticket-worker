@@ -66,6 +66,8 @@ to it, including work you finish.
       per system); analysis with a proposal by JSON schema; follow-ups, update proposal, stop,
       close; reply draft to the outbox (2026-10-04)
 - [x] Reply rules on the Setup page, sent with every turn that drafts a reply (2026-10-04)
+- [x] Tokens next to cost per step, ticket and scan; a closed session leaves a one-line log of
+      its work and price under Earlier sessions (2026-10-04)
 - [ ] Code viewer for evidence
 - [ ] Reply language picked next to *Analyse*: Auto (the ticket's), English, Nederlands, Français, Dansk, …
 

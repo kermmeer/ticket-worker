@@ -54,6 +54,8 @@ class TicketController extends Controller
             'issue' => $issue,
             'issueError' => $issueError,
             'session' => $session ? $this->sessionData($session) : null,
+            // Closed sessions: what each did and what it cost, newest first.
+            'history' => $ticket->sessions()->where('state', 'closed')->latest('id')->get()->map->summary(),
             'languages' => self::LANGUAGES,
             'agentReady' => Instructions::credentials() !== [],
             'outboxReady' => app(OutboxClient::class)->configured(),
@@ -117,7 +119,7 @@ class TicketController extends Controller
     {
         $session = $ticket->openSession();
         abort_if($session?->busy(), 409, 'Stop the agent first.');
-        $session?->update(['state' => 'closed']);
+        $session?->update(['state' => 'closed', 'closed_at' => now()]);
 
         return back()->with('success', 'Session closed. Analyse starts a new one.');
     }

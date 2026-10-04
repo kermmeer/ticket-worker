@@ -253,4 +253,26 @@ class AgentTest extends TestCase
             ->where('entry.system_id', $system->id)
             ->where('entry.source_tickets', 'SUP-1'));
     }
+
+    public function test_closing_keeps_a_short_log_of_the_work_and_its_price(): void
+    {
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000006', 'model' => 'claude-opus-5', 'cost_usd' => 2.5]);
+        $analysis = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'analysis', 'prompt' => 'Analyse.', 'state' => AgentTurn::DONE,
+            'proposal' => ['system' => 'billing', 'cause' => 'Early return', 'confidence' => 'high'], 'input_tokens' => 1000, 'cache_read_tokens' => 9000, 'output_tokens' => 500, 'duration_ms' => 180000]);
+        $analysis->events()->create(['type' => 'tool', 'summary' => 'reading billing/app/Credit.php']);
+        AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'message', 'prompt' => 'And?', 'state' => AgentTurn::DONE, 'input_tokens' => 200, 'output_tokens' => 100, 'duration_ms' => 60000]);
+
+        $this->post("/tickets/{$this->ticket->id}/close")->assertRedirect();
+
+        $this->get("/tickets/{$this->ticket->id}")->assertInertia(fn (Assert $page) => $page
+            ->where('session', null)
+            ->where('history.0.turns', 2)
+            ->where('history.0.questions', 1)
+            ->where('history.0.steps', 1)
+            ->where('history.0.minutes', 4)
+            ->where('history.0.tokens_in', 10200)
+            ->where('history.0.tokens_out', 600)
+            ->where('history.0.cause', 'Early return')
+            ->etc());
+    }
 }
