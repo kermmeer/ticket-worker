@@ -184,7 +184,13 @@ to, its SLAs, the agent's state, and the cost so far.
 SLA's own calendar (working hours) as Jira counts it, and when it falls due. A running SLA
 shows first; paused, met and missed say so in words. Each service space chooses which SLAs it
 shows: all of them by default, a new one in Jira included, until you untick it. The overview sorts by last update,
-newest first, or the SLA closest to breaching (or furthest past it).
+newest first, by *SLA, due next*, or by *SLA, most overdue*. Due next is the one for staying
+inside the SLA: tickets with a deadline still in time come first, closest on top; then paused
+ones, then tickets without a live SLA, and tickets that are only overdue last. A ticket whose
+first response is missed but whose resolution is still in time counts as in time, since that
+deadline can still be made. Above the groups, *Next to breach* names the five closest
+deadlines whatever group they are in, and only counts the overdue ones: once broken, an SLA
+stops being the reason to pick a ticket.
 Every status has a colour of its own: Jira's grouping (to do, in progress, done) first, the
 name second, so *Waiting for support* and *Waiting for customer* differ at a glance; the
 space's setup can recolour any status. You can show one space or one status only, and search

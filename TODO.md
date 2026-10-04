@@ -104,3 +104,5 @@ to it, including work you finish.
       status filter opens them all so no match stays folded away.
 - [x] An icon: a ticket stub with a tick on the signal square, as favicon (svg + ico),
       apple-touch icon, web manifest and the header mark.
+- [x] SLA, due next: a sort that puts deadlines still in time first and overdue-only tickets
+      last, and a "Next to breach" strip with the five closest across every group.

@@ -5,8 +5,9 @@ import FoldingSection from '../components/FoldingSection.vue';
 import SpaceLabel from '../components/SpaceLabel.vue';
 import StatusLabel from '../components/StatusLabel.vue';
 import TicketRow from '../components/TicketRow.vue';
-import { ago } from '../time.js';
-import { urgency } from '../sla.js';
+import TicketKey from '../components/TicketKey.vue';
+import { ago, short } from '../time.js';
+import { byDueNext, dueAt, phrase, shortName, tone, urgency } from '../sla.js';
 
 const props = defineProps({
     hasSpaces: { type: Boolean, required: true },
@@ -63,8 +64,9 @@ const shown = computed(() => {
     );
 });
 
-// Last update (as Jira sorts them), newest first, or the SLA closest to breaching first.
-const sorts = { updated: 'Last update', created: 'Newest', sla: 'SLA, most urgent' };
+// Last update (as Jira sorts them), newest first, the next SLA deadline you can still
+// make, or the furthest past one.
+const sorts = { updated: 'Last update', created: 'Newest', due: 'SLA, due next', sla: 'SLA, most overdue' };
 
 function savedSort() {
     try {
@@ -90,6 +92,9 @@ const sorted = computed(() => {
     const list = [...shown.value];
     if (sort.value === 'created') {
         list.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+    } else if (sort.value === 'due') {
+        const now = Date.now();
+        list.sort((a, b) => byDueNext(a, b, now) || (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
     } else if (sort.value === 'sla') {
         list.sort((a, b) => urgency(a) - urgency(b) || (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
     }
@@ -113,6 +118,18 @@ const sleepingCount = computed(() => count('sleeping'));
 const hiddenCount = computed(() => count('hidden'));
 const outboxCount = computed(() => props.tickets.filter((ticket) => ticket.outbox?.length).length);
 const awakeCount = computed(() => props.tickets.length - sleepingCount.value - hiddenCount.value);
+
+// The deadlines you can still make, closest first, whatever group the ticket is in.
+// Tickets only overdue are left out: they are counted, not chased.
+const dueSoon = computed(() => {
+    const now = Date.now();
+    const live = shown.value.filter((ticket) => ticket.group !== 'hidden');
+    return {
+        next: live.filter((ticket) => dueAt(ticket, now) !== null).sort((a, b) => byDueNext(a, b, now)).slice(0, 5),
+        overdue: live.filter((ticket) => dueAt(ticket, now) === null && ticket.slas?.some((sla) => sla.state === 'breached')).length,
+    };
+});
+const firstRunning = (ticket) => ticket.slas.filter((sla) => sla.state === 'running').sort((a, b) => Date.parse(a.due_at ?? 0) - Date.parse(b.due_at ?? 0))[0];
 
 // While you search or show one status, every section opens, so no match stays folded away.
 const searching = computed(() => statusFilter.value !== null || search.value.trim() !== '');
@@ -283,6 +300,23 @@ onBeforeUnmount(() => {
                 </StatusLabel>
             </button>
         </div>
+
+        <FoldingSection v-if="dueSoon.next.length" title="Next to breach" remember="overview.due-soon" class="mt-10" flush>
+            <template #hint>
+                SLAs still in time, closest first<template v-if="dueSoon.overdue"> · {{ dueSoon.overdue }} only overdue, left out</template>
+            </template>
+            <ol class="divide-y divide-line">
+                <li v-for="ticket in dueSoon.next" :key="ticket.id" class="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-5 py-2.5">
+                    <Link :href="ticket.page" class="shrink-0"><TicketKey :value="ticket.key" /></Link>
+                    <Link :href="ticket.page" class="min-w-0 flex-1 truncate hover:underline">{{ ticket.summary }}</Link>
+                    <span class="text-sm">
+                        <span class="text-muted">{{ shortName(firstRunning(ticket).name) }}</span>
+                        <span class="ml-1.5 font-medium" :style="{ color: `var(--tone-${tone(firstRunning(ticket))})` }">{{ phrase(firstRunning(ticket)) }}</span>
+                        <span v-if="firstRunning(ticket).due_at" class="ml-1.5 text-xs text-muted">due {{ short(firstRunning(ticket).due_at) }}</span>
+                    </span>
+                </li>
+            </ol>
+        </FoldingSection>
 
         <p v-if="shown.length === 0" class="mt-10 text-muted">Nothing matches.</p>
 
