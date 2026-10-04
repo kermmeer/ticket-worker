@@ -30,6 +30,8 @@ corepack npm@11 install && corepack npm@11 run build   # minas has no global npm
   `/data/apps/ticket-worker-dev/compose.yml` and `Dockerfile.deploy`.
 - Queue workers keep the code they started with. After changing a job:
   `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml restart worker scheduler agent`.
+  **First check no agent turn or scan is running** (`agent_turns` and `systems.scan_state`
+  queued or running): a restart cuts one off, and it was paid for.
 - Artisan in a container, as the tree's owner (tinker needs a writable `HOME`):
   `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml --project-directory /data/apps/ticket-worker-dev exec -T --user 1000:33 -e HOME=/tmp -w /app/work app php artisan …`
 - **Never `sed -i` `shared/.env`**, or anything else that replaces the file: the new file

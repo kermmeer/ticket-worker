@@ -40,7 +40,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Longer than the longest job: an agent turn or a scan runs for many minutes, and a
+            // job still running past this is handed to a second worker as if it had died.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 2700),
             'after_commit' => false,
         ],
 

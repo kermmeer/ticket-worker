@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Agent\ClaudeRun;
 use App\Agent\StreamReader;
 use App\Agent\Workspace;
 use App\Jobs\RunAgentTurn;
@@ -127,7 +128,7 @@ class AgentTest extends TestCase
             '*' => Process::result(''),
         ]);
 
-        (new RunAgentTurn($turn))->handle(app(Workspace::class));
+        (new RunAgentTurn($turn))->handle(app(Workspace::class), app(ClaudeRun::class));
 
         $turn->refresh();
         $this->assertSame(AgentTurn::DONE, $turn->state, (string) $turn->error);
@@ -162,7 +163,7 @@ class AgentTest extends TestCase
         $turn = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'message', 'prompt' => 'And the batch job?']);
         Process::fake(['*claude*' => Process::describe()->output(self::line(['type' => 'result', 'result' => 'The batch job is fine.']))->runsFor(iterations: 1), '*' => Process::result('')]);
 
-        (new RunAgentTurn($turn))->handle(app(Workspace::class));
+        (new RunAgentTurn($turn))->handle(app(Workspace::class), app(ClaudeRun::class));
 
         $this->assertSame('The batch job is fine.', $turn->fresh()->answer);
         Process::assertRan(fn ($process) => in_array('--resume', $process->command, true) && ! in_array('--json-schema', $process->command, true));
@@ -191,9 +192,21 @@ class AgentTest extends TestCase
         $turn = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'message', 'prompt' => 'Hi.']);
         Process::fake(['*claude*' => Process::describe()->output(self::line(['type' => 'result', 'result' => 'Hello.']))->runsFor(iterations: 1), '*' => Process::result('')]);
 
-        (new RunAgentTurn($turn))->handle(app(Workspace::class));
+        (new RunAgentTurn($turn))->handle(app(Workspace::class), app(ClaudeRun::class));
 
         Process::assertRan(fn ($process) => ($process->environment['CLAUDE_CODE_OAUTH_TOKEN'] ?? null) === 'sk-ant-oat-test'
             && ! isset($process->environment['ANTHROPIC_API_KEY']));
+    }
+
+    public function test_a_turn_the_queue_gave_up_on_does_not_keep_the_page_waiting(): void
+    {
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000004', 'model' => 'claude-opus-5']);
+        $running = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'analysis', 'prompt' => 'Analyse.', 'state' => AgentTurn::RUNNING]);
+
+        (new RunAgentTurn($running))->failed(null);
+
+        $this->assertSame(AgentTurn::FAILED, $running->fresh()->state);
+        $this->assertFalse($session->busy());
+        $this->assertSame(2700, config('queue.connections.database.retry_after'), 'Longer than any agent job runs.');
     }
 }

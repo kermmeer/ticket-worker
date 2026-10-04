@@ -2,14 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Agent\ClaudeRun;
 use App\Agent\Instructions;
-use App\Agent\StreamReader;
 use App\Agent\Workspace;
 use App\Models\AgentEvent;
 use App\Models\AgentTurn;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -33,7 +32,7 @@ class RunAgentTurn implements ShouldQueue
         $this->onQueue('agents');
     }
 
-    public function handle(Workspace $workspace): void
+    public function handle(Workspace $workspace, ClaudeRun $runner): void
     {
         $turn = $this->turn->fresh();
         if ($turn === null || $turn->state !== AgentTurn::QUEUED) {
@@ -57,16 +56,7 @@ class RunAgentTurn implements ShouldQueue
             $systems = $workspace->systems($ticket);
             $root = Workspace::path($ticket);
 
-            $command = [config('agent.claude.bin'), '-p',
-                '--output-format', 'stream-json', '--verbose',
-                '--model', config('agent.claude.model'), '--effort', config('agent.claude.effort'),
-                // Read-only: no shell, no network, no writing; nothing that would ask anyone.
-                '--restricted', '--strict-mcp-config',
-                '--tools', 'Read,Grep,Glob',
-                '--allowedTools', 'Read,Grep,Glob',
-                '--permission-prompts', 'none',
-                '--max-budget-usd', (string) config('agent.turn_budget_usd'),
-            ];
+            $command = ClaudeRun::command((float) config('agent.turn_budget_usd'));
             $command = $first
                 ? [...$command, '--session-id', $session->claude_session_id, '--append-system-prompt', Instructions::system($session, $systems)]
                 : [...$command, '--resume', $session->claude_session_id];
@@ -81,62 +71,19 @@ class RunAgentTurn implements ShouldQueue
             foreach ($systems as $system) {
                 $shorten[$system->path()] = $system->name.'/';
             }
-            $reader = new StreamReader($shorten);
 
-            // The prompt goes in on stdin: every option above takes a value, and a prompt
-            // left as the last argument could be read as one of them.
-            $process = Process::path($root)
-                ->command($command)
-                ->env(Instructions::credentials())
-                ->input($turn->prompt)
-                ->timeout($this->timeout)
-                ->start();
+            $run = $runner->run(
+                $command, $root, $turn->prompt, $shorten,
+                fn (string $type, string $summary) => $this->event($turn, $type, Str::limit($summary, 4000)),
+                fn () => (bool) $turn->fresh()->stop_requested,
+                $this->timeout,
+            );
 
-            $result = null;
-            $lastCheck = microtime(true);
-
-            while ($process->running()) {
-                $result = $this->record($turn, $reader->feed($process->latestOutput()), $result);
-
-                // Stop asked for on the page: ask the CLI to end, then insist.
-                if (microtime(true) - $lastCheck > 2) {
-                    $lastCheck = microtime(true);
-                    if ($turn->fresh()->stop_requested) {
-                        // SIGINT and SIGKILL by number: the image has no pcntl constants.
-                        $process->signal(2);
-                        usleep(1500000);
-                        if ($process->running()) {
-                            $process->signal(9);
-                        }
-                        break;
-                    }
-                }
-                usleep(300000);
-            }
-
-            $result = $this->record($turn, $reader->feed($process->latestOutput()), $result);
-            $finished = $process->wait();
-            $result = $this->record($turn, $reader->finish(), $result);
-
-            $this->finish($turn, $result, $finished->errorOutput());
+            $this->finish($turn, $run['result'], $run['errors']);
         } catch (Throwable $e) {
             $turn->update(['state' => AgentTurn::FAILED, 'error' => Str::limit($e->getMessage(), 2000), 'finished_at' => now()]);
             $this->event($turn, 'error', Str::limit($e->getMessage(), 500));
         }
-    }
-
-    /** Store the steps; hand back the result line when it came by. */
-    private function record(AgentTurn $turn, array $events, ?array $result): ?array
-    {
-        foreach ($events as $event) {
-            if ($event['type'] === 'result') {
-                $result = $event['result'];
-            } else {
-                $this->event($turn, $event['type'], Str::limit($event['summary'], 4000));
-            }
-        }
-
-        return $result;
     }
 
     private function finish(AgentTurn $turn, ?array $result, string $errors): void
@@ -172,6 +119,15 @@ class RunAgentTurn implements ShouldQueue
         }
         if ($state === AgentTurn::FAILED) {
             $this->event($turn, 'error', $turn->error);
+        }
+    }
+
+    /** The queue gave up on it (a worker died, say): the page must not wait forever. */
+    public function failed(?Throwable $e): void
+    {
+        $turn = $this->turn->fresh();
+        if ($turn !== null && in_array($turn->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true)) {
+            $turn->update(['state' => AgentTurn::FAILED, 'error' => 'Interrupted: the agent container stopped. Ask again.', 'finished_at' => now()]);
         }
     }
 
