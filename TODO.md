@@ -100,3 +100,7 @@ to it, including work you finish.
 
 - [ ] A generic Docker setup in the repository for someone else's instance, with `APP_PASSWORD`
       as the gate when there is no Authentik in front (open questions C and D)
+- [x] Every overview section folds (Needs you to Hidden), remembered per browser; a search or
+      status filter opens them all so no match stays folded away.
+- [x] An icon: a ticket stub with a tick on the signal square, as favicon (svg + ico),
+      apple-touch icon, web manifest and the header mark.

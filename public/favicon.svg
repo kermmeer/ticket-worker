@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Ticket Worker: a ticket stub on the signal square, torn along the perforation. -->
+  <rect width="64" height="64" rx="14" fill="#c2410c"/>
+  <path fill="#fff7ed" d="M12 20a4 4 0 0 1 4-4h32a4 4 0 0 1 4 4v6a6 6 0 0 0 0 12v6a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4v-6a6 6 0 0 0 0-12z"/>
+  <path stroke="#c2410c" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0.1 5.4" d="M40 20.5v23"/>
+  <path stroke="#c2410c" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" d="m20 32.5 4.5 4.5 8.5-9.5"/>
+</svg>

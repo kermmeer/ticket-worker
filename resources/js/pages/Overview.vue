@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import FoldingSection from '../components/FoldingSection.vue';
 import SpaceLabel from '../components/SpaceLabel.vue';
 import StatusLabel from '../components/StatusLabel.vue';
 import TicketRow from '../components/TicketRow.vue';
@@ -113,26 +114,8 @@ const hiddenCount = computed(() => count('hidden'));
 const outboxCount = computed(() => props.tickets.filter((ticket) => ticket.outbox?.length).length);
 const awakeCount = computed(() => props.tickets.length - sleepingCount.value - hiddenCount.value);
 
-// Folded unless you open them, or you are looking for something in particular.
-function savedFold(key) {
-    try {
-        return localStorage.getItem(`overview.${key}`) === 'open';
-    } catch {
-        return false;
-    }
-}
-
-const foldOpen = ref({ sleeping: savedFold('sleeping'), hidden: savedFold('hidden') });
+// While you search or show one status, every section opens, so no match stays folded away.
 const searching = computed(() => statusFilter.value !== null || search.value.trim() !== '');
-
-function toggleFold(key) {
-    foldOpen.value[key] = !foldOpen.value[key];
-    try {
-        localStorage.setItem(`overview.${key}`, foldOpen.value[key] ? 'open' : 'closed');
-    } catch {
-        // Storage refused: it still works for this visit.
-    }
-}
 
 function pickStatus(status) {
     statusFilter.value = statusFilter.value === status ? null : status;
@@ -303,37 +286,35 @@ onBeforeUnmount(() => {
 
         <p v-if="shown.length === 0" class="mt-10 text-muted">Nothing matches.</p>
 
-        <template v-for="group in awake" :key="group.key">
-            <section v-if="inGroup[group.key].length" class="mt-10">
-                <h2 class="eyebrow">{{ group.label }} · {{ inGroup[group.key].length }}</h2>
-                <ul class="card mt-3 divide-y divide-line">
-                    <li v-for="ticket in inGroup[group.key]" :key="ticket.id">
-                        <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
-                    </li>
-                </ul>
-            </section>
-        </template>
+        <div class="mt-10 space-y-6">
+            <template v-for="group in awake" :key="group.key">
+                <FoldingSection v-if="inGroup[group.key].length" :title="`${group.label} · ${inGroup[group.key].length}`" :remember="`overview.${group.key}`" :force-open="searching" flush>
+                    <ul class="divide-y divide-line">
+                        <li v-for="ticket in inGroup[group.key]" :key="ticket.id">
+                            <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
+                        </li>
+                    </ul>
+                </FoldingSection>
+            </template>
 
-        <template v-for="fold in folds" :key="fold.key">
-            <section v-if="inGroup[fold.key].length" class="mt-14 border-t border-line pt-8">
-                <button
-                    type="button"
-                    class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-left"
-                    :aria-expanded="foldOpen[fold.key] || searching"
-                    @click="toggleFold(fold.key)"
+            <!-- Waiting on the requester, or hidden by you: folded unless you open them. -->
+            <template v-for="fold in folds" :key="fold.key">
+                <FoldingSection
+                    v-if="inGroup[fold.key].length"
+                    :title="`${fold.label} · ${inGroup[fold.key].length}`"
+                    :remember="`overview.${fold.key}`"
+                    :open="false"
+                    :force-open="searching"
+                    flush
                 >
-                    <h2 class="eyebrow">{{ fold.label }} · {{ inGroup[fold.key].length }}</h2>
-                    <span class="text-sm text-muted">
-                        {{ fold.hint }} ·
-                        <span class="underline decoration-line underline-offset-2">{{ foldOpen[fold.key] || searching ? 'fold away' : 'show them' }}</span>
-                    </span>
-                </button>
-                <ul v-if="foldOpen[fold.key] || searching" class="card mt-3 divide-y divide-line">
-                    <li v-for="ticket in inGroup[fold.key]" :key="ticket.id">
-                        <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
-                    </li>
-                </ul>
-            </section>
-        </template>
+                    <template #hint>{{ fold.hint }}</template>
+                    <ul class="divide-y divide-line">
+                        <li v-for="ticket in inGroup[fold.key]" :key="ticket.id">
+                            <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
+                        </li>
+                    </ul>
+                </FoldingSection>
+            </template>
+        </div>
     </template>
 </template>
