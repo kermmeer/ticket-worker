@@ -137,10 +137,14 @@ class SetupChecks
 
     private function anthropicKey(): array
     {
-        return filled(config('agent.claude.api_key'))
-            ? $this->item('anthropic', 'Claude', 'API key', self::OK, 'Set.')
-            : $this->item('anthropic', 'Claude', 'API key', self::TODO,
-                'Not set. Agents need ANTHROPIC_API_KEY in shared/.env.');
+        return match (true) {
+            filled(config('agent.claude.api_key')) => $this->item('anthropic', 'Claude', 'Sign-in', self::OK,
+                'API key set: Commercial Terms, billed per use.'),
+            filled(config('agent.claude.oauth_token')) => $this->item('anthropic', 'Claude', 'Sign-in', self::NOTE,
+                "Subscription token set: analyses use your subscription's limits, and its privacy setting decides whether Anthropic may train on them."),
+            default => $this->item('anthropic', 'Claude', 'Sign-in', self::TODO,
+                'Not set. Agents need ANTHROPIC_API_KEY, or a subscription token as CLAUDE_CODE_OAUTH_TOKEN, in shared/.env.'),
+        };
     }
 
     private function agentContainer(): array

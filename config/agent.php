@@ -17,8 +17,12 @@ return [
         'bin' => env('CLAUDE_BIN', 'claude'),
         'model' => env('CLAUDE_MODEL', 'claude-opus-5'),
         'effort' => env('CLAUDE_EFFORT', 'high'),
-        // Passed to the CLI's environment when a turn runs. Never shown anywhere.
+        // How the CLI signs in, passed to its environment when a turn runs, never shown:
+        // an API key (Commercial Terms, billed per use), or a subscription token from
+        // `claude setup-token` (uses the subscription's limits; CONCEPT.md §13). The key
+        // wins when both are set.
         'api_key' => env('ANTHROPIC_API_KEY'),
+        'oauth_token' => env('CLAUDE_CODE_OAUTH_TOKEN'),
         // The CLI keeps its sessions here, so this must outlive the container.
         'config_dir' => env('CLAUDE_CONFIG_DIR', $shared.'/agent/claude'),
     ],

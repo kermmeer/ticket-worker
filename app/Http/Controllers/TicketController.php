@@ -55,7 +55,7 @@ class TicketController extends Controller
             'issueError' => $issueError,
             'session' => $session ? $this->sessionData($session) : null,
             'languages' => self::LANGUAGES,
-            'agentReady' => filled(config('agent.claude.api_key')),
+            'agentReady' => Instructions::credentials() !== [],
             'outboxReady' => app(OutboxClient::class)->configured(),
         ]);
     }
@@ -64,7 +64,7 @@ class TicketController extends Controller
     public function analyse(Request $request, Ticket $ticket): RedirectResponse
     {
         $data = $request->validate(['language' => ['required', Rule::in(self::LANGUAGES)]]);
-        abort_unless(filled(config('agent.claude.api_key')), 409, 'No ANTHROPIC_API_KEY yet: see Setup.');
+        abort_unless(Instructions::credentials() !== [], 409, 'No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN yet: see Setup.');
 
         $session = $ticket->openSession();
         if ($session?->busy()) {

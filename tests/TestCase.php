@@ -21,6 +21,6 @@ abstract class TestCase extends BaseTestCase
         Http::preventStrayRequests();
 
         // This machine's .env points at a real outbox; a test that wants one says so.
-        config(['services.outbox.url' => null, 'services.outbox.token' => null]);
+        config(['services.outbox.url' => null, 'services.outbox.token' => null, 'agent.claude.oauth_token' => null]);
     }
 }

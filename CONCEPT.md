@@ -424,7 +424,8 @@ own work.
     retention exists, but only for qualifying Enterprise organisations.
   - Claude Code's own usage metrics carry no prompts, code or file paths, and the agent
     container switches them off anyway (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`).
-  - Accepted on 2026-10-02 on these terms: an API key, no training, 30 days.
+  - Accepted on 2026-10-02 on these terms: an API key, no training, 30 days. A subscription
+    token is possible too (§13), on the condition that *Help improve Claude* is off.
   - Cases in the casebook are kept as long as they are useful, so they hold no personal
     data: the agent writes them general, and you read them before approving.
 - **Money.** There is a budget per turn, each ticket shows its cost, and the settings page
@@ -560,6 +561,23 @@ repository is on the list (§17).
 
 Calls with this key fall under Anthropic's Commercial Terms: no training on them, kept for
 30 days (§11).
+
+### Or a Claude subscription instead of a key
+
+The agent can also sign in with a Claude subscription (Pro or Max), through a token made for
+unattended use. Never by sharing the login of the Claude Code you use yourself: that would
+hand the ticket agents your settings, memory and every other project.
+
+1. On any machine where you are signed in to Claude Code with the subscription, run
+   `claude setup-token` and copy the token it prints.
+2. Add it to `shared/.env` as `CLAUDE_CODE_OAUTH_TOKEN=…` (leave `ANTHROPIC_API_KEY` empty: a
+   key wins when both are set), and restart the queue containers as above.
+
+What changes: analyses draw on the subscription's usage limits, the same ones your own Claude
+use draws on, so a busy day of tickets can run you into a limit, and the reverse. Costs on the
+page are then what the work *would* have cost on the API. And the Consumer Terms apply: turn
+off *Help improve Claude* in the claude.ai privacy settings, or Anthropic may train on ticket
+contents and keep them for five years (§11).
 
 Everything per space (rules, type, statuses, systems, budgets, model) lives in the database
 and is edited in the app. Nothing outside `.env` may assume minas: another person's instance runs on

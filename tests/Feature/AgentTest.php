@@ -182,4 +182,18 @@ class AgentTest extends TestCase
         $this->post("/tickets/{$this->ticket->id}/draft", ['body' => 'Beste, we hebben het gevonden.', 'visibility' => 'internal'])->assertSessionHas('success');
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/api/v1/drafts') && $request['visibility'] === 'internal' && $request['issueKey'] === 'SUP-1');
     }
+
+    public function test_a_subscription_token_signs_in_when_there_is_no_key(): void
+    {
+        config(['agent.claude.api_key' => null, 'agent.claude.oauth_token' => 'sk-ant-oat-test']);
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000003', 'model' => 'claude-opus-5']);
+        AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'analysis', 'prompt' => 'Analyse.', 'state' => AgentTurn::DONE]);
+        $turn = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'message', 'prompt' => 'Hi.']);
+        Process::fake(['*claude*' => Process::describe()->output(self::line(['type' => 'result', 'result' => 'Hello.']))->runsFor(iterations: 1), '*' => Process::result('')]);
+
+        (new RunAgentTurn($turn))->handle(app(Workspace::class));
+
+        Process::assertRan(fn ($process) => ($process->environment['CLAUDE_CODE_OAUTH_TOKEN'] ?? null) === 'sk-ant-oat-test'
+            && ! isset($process->environment['ANTHROPIC_API_KEY']));
+    }
 }

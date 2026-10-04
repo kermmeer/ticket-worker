@@ -87,7 +87,7 @@ class RunAgentTurn implements ShouldQueue
             // left as the last argument could be read as one of them.
             $process = Process::path($root)
                 ->command($command)
-                ->env(['ANTHROPIC_API_KEY' => config('agent.claude.api_key')])
+                ->env(Instructions::credentials())
                 ->input($turn->prompt)
                 ->timeout($this->timeout)
                 ->start();

@@ -117,7 +117,8 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             <div class="card p-5">
                 <p class="eyebrow">Agent</p>
                 <p v-if="!agentReady" class="mt-3 text-sm text-signal">
-                    No Anthropic API key yet, so no agent can run. <Link href="/docs/concept#getting-an-anthropic-api-key" class="underline">How to get one</Link>.
+                    No Anthropic sign-in yet (an API key or a subscription token), so no agent can run.
+                    <Link href="/docs/concept#getting-an-anthropic-api-key" class="underline">How to get one</Link>.
                 </p>
                 <div v-else class="mt-3 flex flex-wrap items-center gap-3">
                     <label class="flex items-center gap-2 text-sm">

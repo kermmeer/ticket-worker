@@ -10,6 +10,16 @@ use App\Models\Ticket;
 /** What the agent is told: its role and rules once, then each turn's request (CONCEPT.md §7, §10). */
 class Instructions
 {
+    /** The CLI's sign-in, as environment variables; empty when there is none. */
+    public static function credentials(): array
+    {
+        return match (true) {
+            filled(config('agent.claude.api_key')) => ['ANTHROPIC_API_KEY' => config('agent.claude.api_key')],
+            filled(config('agent.claude.oauth_token')) => ['CLAUDE_CODE_OAUTH_TOKEN' => config('agent.claude.oauth_token')],
+            default => [],
+        };
+    }
+
     /** The proposal's shape (CONCEPT.md §7), enforced with --json-schema. */
     public static function proposalSchema(): array
     {
