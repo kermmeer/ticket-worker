@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Agent\ClaudeRun;
+use App\Agent\Instructions;
 use App\Agent\StreamReader;
 use App\Agent\Workspace;
 use App\Jobs\RunAgentTurn;
@@ -208,5 +209,18 @@ class AgentTest extends TestCase
         $this->assertSame(AgentTurn::FAILED, $running->fresh()->state);
         $this->assertFalse($session->busy());
         $this->assertSame(2700, config('queue.connections.database.retry_after'), 'Longer than any agent job runs.');
+    }
+
+    public function test_reply_rules_go_with_every_draft_and_can_be_changed(): void
+    {
+        $this->assertStringContainsString('friendly line', Instructions::analysis($this->ticket));
+
+        $this->put('/setup/reply-rules', ['rules' => '- Two sentences at most.'])->assertSessionHas('success');
+
+        $this->assertStringContainsString('Two sentences at most.', Instructions::analysis($this->ticket));
+        $this->assertStringContainsString('Two sentences at most.', Instructions::restate());
+
+        $this->put('/setup/reply-rules', ['rules' => '']);
+        $this->assertStringContainsString('friendly line', Instructions::restate(), 'Empty means the default.');
     }
 }

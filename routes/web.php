@@ -53,5 +53,6 @@ Route::post('/systems/{system}/scan', [SystemController::class, 'scan'])->name('
 Route::post('/systems/{system}/scan/stop', [SystemController::class, 'stopScan'])->name('systems.scan.stop');
 Route::put('/systems/{system}/context', [SystemController::class, 'updateContext'])->name('systems.context');
 Route::get('/setup', SetupController::class)->name('setup');
+Route::put('/setup/reply-rules', [SetupController::class, 'replyRules'])->name('setup.reply-rules');
 Route::get('/docs/{doc}', DocsController::class)->name('docs');
 Route::inertia('/design', 'Design')->name('design');

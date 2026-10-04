@@ -5,6 +5,7 @@ namespace App\Agent;
 use App\Casebook\Matcher;
 use App\Models\AgentSession;
 use App\Models\CasebookEntry;
+use App\Models\Setting;
 use App\Models\System;
 use App\Models\Ticket;
 
@@ -46,7 +47,7 @@ class Instructions
                 'fix' => $text + ['description' => 'What to change and where: code, data or configuration.'],
                 'workaround' => $text,
                 'questions' => ['type' => 'array', 'items' => $text],
-                'reply_draft' => $text + ['description' => 'A reply to the reporter. No internal details they cannot use.'],
+                'reply_draft' => $text + ['description' => 'A reply to the reporter, written by the reply rules in the request.'],
                 'reply_language' => $text,
                 'confidence' => ['type' => 'string', 'enum' => ['low', 'medium', 'high']],
                 'confidence_reason' => $text,
@@ -143,16 +144,26 @@ The commits since, with the files they touched:
 
         $hint = $matches !== '' ? "Cases that look similar, read them first:\n{$matches}" : 'No case in the casebook looks similar.';
 
+        $rules = self::replyRules();
+
         return <<<TEXT
         Analyse ticket {$ticket->key}. Read ticket.md and the attachments, check the casebook, decide which
         system it is about, investigate the code and its history, and end with the proposal.
 
         {$hint}
+
+        {$rules}
         TEXT;
+    }
+
+    /** Sent with every turn that writes a reply draft, so a change applies at once. */
+    public static function replyRules(): string
+    {
+        return "Write the reply draft by these rules:\n".Setting::replyRules();
     }
 
     public static function restate(): string
     {
-        return 'Restate your current conclusion as the proposal, taking everything in this conversation into account.';
+        return "Restate your current conclusion as the proposal, taking everything in this conversation into account.\n\n".self::replyRules();
     }
 }

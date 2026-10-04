@@ -62,7 +62,8 @@ to it, including work you finish.
 - [x] Ticket page; workspace (ticket.md from API v2, attachments, casebook files, git history
       per system); analysis with a proposal by JSON schema; follow-ups, update proposal, stop,
       close; reply draft to the outbox (2026-10-04)
-- [ ] Code viewer for evidence; system contexts in the prompt (the context scan is step 2)
+- [x] Reply rules on the Setup page, sent with every turn that drafts a reply (2026-10-04)
+- [ ] Code viewer for evidence
 - [ ] Reply language picked next to *Analyse*: Auto (the ticket's), English, Nederlands, Français, Dansk, …
 
 ## Step 4: conversation

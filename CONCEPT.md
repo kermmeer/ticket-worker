@@ -235,7 +235,7 @@ that. The steps show as a checklist that ticks off as the agent works:
 | Fix | What to change and where: code, data or configuration |
 | Workaround | What the reporter can do in the meantime, if anything |
 | Questions | What the ticket does not say, and who should answer |
-| Reply draft | An answer to the reporter, in the language picked; in a service space, marked as a public reply or an internal note |
+| Reply draft | An answer to the reporter, in the language picked, written by the reply rules on the Setup page (short, to the point, a friendly ending, signed); in a service space, marked as a public reply or an internal note |
 | Casebook | The case it used and whether it fit, or that this one is new |
 | Confidence | Low, medium or high, with a one-line reason |
 
