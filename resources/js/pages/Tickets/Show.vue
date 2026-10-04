@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import ActivityLine from '../../components/ActivityLine.vue';
+import FoldingSection from '../../components/FoldingSection.vue';
 import LogEntry from '../../components/LogEntry.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
@@ -87,11 +88,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
 
     <div class="mt-10 grid gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <!-- The ticket, as Jira has it now -->
-        <section class="card min-w-0 self-start p-5">
-            <p class="eyebrow">Ticket</p>
-            <p v-if="issueError" class="mt-3 text-sm text-signal">Jira did not answer: {{ issueError }}</p>
+        <FoldingSection title="Ticket" remember="ticket.ticket" class="self-start">
+            <p v-if="issueError" class="text-sm text-signal">Jira did not answer: {{ issueError }}</p>
             <template v-else-if="issue">
-                <p class="mt-3 text-sm text-muted">{{ issue.reporter }} · {{ short(issue.created) }} · {{ issue.type }}</p>
+                <p class="text-sm text-muted">{{ issue.reporter }} · {{ short(issue.created) }} · {{ issue.type }}</p>
                 <div class="mt-4 text-sm leading-relaxed break-words whitespace-pre-wrap">{{ issue.description || 'No description.' }}</div>
 
                 <template v-if="issue.attachments.length">
@@ -111,17 +111,16 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </div>
                 </div>
             </template>
-        </section>
+        </FoldingSection>
 
         <!-- The agent -->
         <section class="min-w-0 space-y-6">
-            <div class="card p-5">
-                <p class="eyebrow">Agent</p>
-                <p v-if="!agentReady" class="mt-3 text-sm text-signal">
+            <FoldingSection title="Agent" remember="ticket.agent">
+                <p v-if="!agentReady" class="text-sm text-signal">
                     No Anthropic sign-in yet (an API key or a subscription token), so no agent can run.
                     <Link href="/docs/concept#getting-an-anthropic-api-key" class="underline">How to get one</Link>.
                 </p>
-                <div v-else class="mt-3 flex flex-wrap items-center gap-3">
+                <div v-else class="flex flex-wrap items-center gap-3">
                     <label class="flex items-center gap-2 text-sm">
                         <span class="text-muted">Reply in</span>
                         <select v-model="language" class="rounded-md border border-line bg-page px-2 py-1.5 text-sm" :disabled="busy">
@@ -138,11 +137,11 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         {{ tokens(session.tokens_in) }} tokens in<template v-if="session.tokens_cached"> ({{ tokens(session.tokens_cached) }} from cache)</template> · {{ tokens(session.tokens_out) }} out
                     </span>
                 </div>
-            </div>
+            </FoldingSection>
 
             <!-- The log -->
-            <div v-if="session" class="card space-y-6 p-5">
-                <p class="eyebrow">Log</p>
+            <FoldingSection v-if="session" title="Log" remember="ticket.log">
+                <div class="space-y-6">
                 <template v-for="turn in session.turns" :key="turn.id">
                     <LogEntry v-if="turn.prompt" :time="short(turn.started_at ?? turn.finished_at).split(', ').pop()" author="you">
                         <p class="whitespace-pre-wrap">{{ turn.prompt }}</p>
@@ -178,12 +177,12 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         <button type="button" class="btn" @click="post('case')">Draft a case</button>
                     </div>
                 </form>
-            </div>
+                </div>
+            </FoldingSection>
 
             <!-- Earlier sessions: the work, not the conversation -->
-            <div v-if="history.length" class="card p-5 text-sm">
-                <p class="eyebrow">Earlier sessions</p>
-                <ul class="mt-3 divide-y divide-line">
+            <FoldingSection v-if="history.length" title="Earlier sessions" remember="ticket.history" class="text-sm">
+                <ul class="divide-y divide-line">
                     <li v-for="past in history" :key="past.id" class="py-3 first:pt-0 last:pb-0">
                         <p class="flex flex-wrap gap-x-3 gap-y-1">
                             <span class="font-medium">{{ short(past.started_at) }} – {{ short(past.closed_at) }}</span>
@@ -202,14 +201,14 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         </p>
                     </li>
                 </ul>
-            </div>
+            </FoldingSection>
 
             <!-- The proposal -->
-            <div v-if="proposal" class="card space-y-5 p-5 text-sm">
-                <div class="flex flex-wrap items-baseline justify-between gap-3">
-                    <p class="eyebrow">Proposal</p>
+            <FoldingSection v-if="proposal" title="Proposal" remember="ticket.proposal" class="text-sm">
+                <template #aside>
                     <p class="font-mono text-xs" :class="confidenceTone[proposal.confidence]">{{ proposal.confidence }} confidence</p>
-                </div>
+                </template>
+                <div class="space-y-5">
                 <p class="text-muted">{{ proposal.confidence_reason }}</p>
                 <div><p class="font-medium">Problem</p><p class="mt-1">{{ proposal.problem }}</p></div>
                 <div><p class="font-medium">System</p><p class="mt-1 font-mono">{{ proposal.system }}</p></div>
@@ -251,7 +250,8 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </div>
                     <p class="mt-2 text-muted">Nothing goes to Jira from here: the draft waits in the outbox until you send it there.</p>
                 </form>
-            </div>
+                </div>
+            </FoldingSection>
         </section>
     </div>
 </template>
