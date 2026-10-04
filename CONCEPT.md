@@ -532,7 +532,7 @@ repository is on the list (§17).
 | `AGENT_MAX_PARALLEL` | `2` | turns running at once |
 | `AGENT_TURN_BUDGET_USD` | `3` | default ceiling per turn; a space can override it |
 | `SYSTEMS_PATH` | `shared/systems` | the folders you push the systems into |
-| `SYSTEMS_PUSH_BASE` | — | the same folder as your machine sees it, for the push command, e.g. `kermmeer@minas:/data/apps/ticket-worker-dev/shared/systems` |
+| `SYSTEMS_PUSH_BASE` | — | the same folder as your machine sees it, for the push command, e.g. `kermmeer@192.168.3.89:/data/apps/ticket-worker-dev/shared/systems` |
 | `AGENT_WORKSPACES_PATH` | `shared/agent/tickets` | one folder per ticket |
 | `CLAUDE_CONFIG_DIR` | `shared/agent/claude` | the CLI's sessions; must outlive the container |
 | `SYNC_EVERY_MINUTES` | `10` | |
@@ -710,9 +710,9 @@ asked is what the casebook is worth.
 
 The value in brackets is what the design assumes until then.
 
-- **A. Pushing to minas.** From the machine that has the GitLab VPN, can you reach minas over
-  SSH as `kermmeer@minas`? The Systems page builds its `git push` commands from that address
-  (`SYSTEMS_PUSH_BASE`). *[yes]*
+- **A. Pushing to minas.** *Answered 2026-10-04:* yes, by IP; the name `minas` does not resolve
+  on the PC, so `SYSTEMS_PUSH_BASE` uses `kermmeer@192.168.3.89`. The web address cannot take a
+  push: it serves the site, behind Authentik.
 - **B. Data tools.** Can minas reach those APIs and databases, or are they behind the same VPN
   as GitLab? If they are, the data tools need another way in. *[unknown; step 6 waits for it]*
 - **C. Other people's instances.** Should the repository carry a generic Docker setup, so
