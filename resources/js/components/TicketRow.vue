@@ -29,13 +29,12 @@ function toggleHidden() {
 <template>
     <div class="grid gap-x-6 gap-y-2 p-4 transition-colors hover:bg-sunken/50 lg:grid-cols-[12rem_minmax(0,1fr)_11rem_17rem_11rem] lg:items-start">
         <div class="flex flex-wrap items-start gap-1.5 lg:flex-col">
-            <!-- Until a ticket has a page here, it opens in Jira, or where JIRA_OPEN_URL says. -->
-            <a :href="ticket.url" target="_blank" rel="noopener"><TicketKey :value="ticket.key" /></a>
+            <Link :href="ticket.page"><TicketKey :value="ticket.key" /></Link>
             <StatusLabel :status="ticket.status" :tone="ticket.status_tone" />
         </div>
 
         <div class="min-w-0">
-            <a :href="ticket.url" target="_blank" rel="noopener" class="font-medium break-words hover:underline">{{ ticket.summary }}</a>
+            <Link :href="ticket.page" class="font-medium break-words hover:underline">{{ ticket.summary }}</Link>
             <p class="mt-0.5 text-sm text-muted">
                 <SpaceLabel v-if="space" :label="space.label" :colour="space.colour" />
                 <template v-if="ticket.priority"> · {{ ticket.priority }}</template>

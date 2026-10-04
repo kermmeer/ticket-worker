@@ -56,7 +56,7 @@ const tickets = [
     {
         id: 1, key: 'SUP-1234', summary: 'Invoices not sent after a credit note', status: 'Waiting for support', status_tone: 'rose',
         priority: 'High', reporter: 'Finance team', assignee: 'Alex Moreau', created_at: minutesAgo(4300), updated_at: minutesAgo(4),
-        group: 'needs-you', url: '#', casebook: { id: 0, title: 'Credit note stops the invoice mail' },
+        group: 'needs-you', url: '#', page: '/design', casebook: { id: 0, title: 'Credit note stops the invoice mail' },
         slas: [
             { name: 'Time to first response', state: 'breached', paused: false, remaining_ms: -(3 * hour + 20 * 60000), goal_ms: 8 * hour, due_at: minutesAgo(200) },
             { name: 'Time to resolution', state: 'running', paused: false, remaining_ms: 46 * hour + 41 * 60000, goal_ms: 48 * hour, due_at: minutesAgo(-6000) },
@@ -65,20 +65,20 @@ const tickets = [
     {
         id: 2, key: 'SUP-1241', summary: 'Export to accounting stops at 1,000 rows', status: 'In Progress', status_tone: 'blue',
         priority: 'Medium', reporter: 'Accounting', assignee: 'Sam Jansen', created_at: minutesAgo(1500), updated_at: minutesAgo(50),
-        group: 'working', url: '#',
+        group: 'working', url: '#', page: '/design',
         outbox: [{ state: 'scheduled', send_at: minutesAgo(-1300), visibility: 'public', to_status: 'Resolved', to_tone: 'green', assignee: null, url: '#' }],
         slas: [{ name: 'Time to resolution', state: 'running', paused: false, remaining_ms: 90 * 60000, goal_ms: 48 * hour, due_at: minutesAgo(-90) }],
     },
     {
         id: 3, key: 'SUP-1198', summary: 'Password reset mail arrives twice', status: 'To Do', status_tone: 'grey',
         priority: 'Low', reporter: 'Helpdesk', assignee: null, created_at: minutesAgo(9000), updated_at: minutesAgo(600),
-        group: 'not-analysed', url: '#',
+        group: 'not-analysed', url: '#', page: '/design',
         slas: [{ name: 'Time to resolution', state: 'breached', paused: false, remaining_ms: -214 * hour, goal_ms: 48 * hour, due_at: minutesAgo(5000) }],
     },
     {
         id: 4, key: 'SUP-1236', summary: 'Delivery address reverts after saving', status: 'Waiting for customer', status_tone: 'amber',
         priority: 'Medium', reporter: 'Shop team', assignee: 'Alex Moreau', created_at: minutesAgo(5000), updated_at: minutesAgo(2900),
-        group: 'sleeping', url: '#',
+        group: 'sleeping', url: '#', page: '/design',
         slas: [{ name: 'Time to resolution', state: 'paused', paused: true, remaining_ms: 20 * hour, goal_ms: 48 * hour, due_at: null }],
     },
 ];

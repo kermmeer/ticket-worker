@@ -51,12 +51,16 @@ to it, including work you finish.
 - [x] `tools/push-systems.sh`: from your PC (VPN on) fetch every clone from GitLab and push it
       to the server, mirroring rewrites; `fetch` and `push` apart when the VPN is in the way (2026-10-02)
 - [ ] Remove a system (its row and its folder)
-- [ ] Turn runner: `claude -p` per turn, stream-json into `agent_events`, budget, stop
+- [x] Turn runner: `claude -p` per turn, stream-json into `agent_events`, budget, stop (2026-10-04)
+- [ ] Workspace and transcript clean-up 30 days after a session closes (CONCEPT.md §11)
 - [ ] Context scan per system; review, edit, versions; staleness against the last push
 
 ## Step 3: analysis
 
-- [ ] Ticket workspace, gather, route, dig, proposal screen, code viewer
+- [x] Ticket page; workspace (ticket.md from API v2, attachments, casebook files, git history
+      per system); analysis with a proposal by JSON schema; follow-ups, update proposal, stop,
+      close; reply draft to the outbox (2026-10-04)
+- [ ] Code viewer for evidence; system contexts in the prompt (the context scan is step 2)
 - [ ] Reply language picked next to *Analyse*: Auto (the ticket's), English, Nederlands, Français, Dansk, …
 
 ## Step 4: conversation

@@ -6,9 +6,9 @@ everything on it, works out which system it is about, searches that system's cod
 went wrong, and proposes a fix. You then keep talking to that agent on that ticket until it
 is solved or you close the session.
 
-> **Status:** 2 October 2026. Built: the skeleton, the worker containers, the Systems page,
-> and step 1: the Jira connection, space setup, sync and the overview (see the
-> [build order](#15-build-order)). The answers to the first round of questions are
+> **Status:** 4 October 2026. Built: steps 0 and 1, the casebook, the outbox connection, and
+> the first agent: a ticket page where **Analyse** runs Claude Code read-only on the ticket
+> and its systems and ends in a proposal (see the [build order](#15-build-order)). The answers to the first round of questions are
 > recorded in [§17](#17-decisions-and-open-questions); with them this file is the build brief,
 > the way jira-outbox's README is.
 

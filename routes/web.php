@@ -8,10 +8,20 @@ use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SpaceController;
 use App\Http\Controllers\SystemController;
+use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', OverviewController::class)->name('overview');
 Route::post('/hyper', HyperModeController::class)->name('hyper');
+Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('tickets.')->group(function () {
+    Route::get('/', 'show')->name('show');
+    Route::post('/analyse', 'analyse')->name('analyse');
+    Route::post('/messages', 'message')->name('message');
+    Route::post('/restate', 'restate')->name('restate');
+    Route::post('/stop', 'stop')->name('stop');
+    Route::post('/close', 'close')->name('close');
+    Route::post('/draft', 'draft')->name('draft');
+});
 Route::post('/tickets/{ticket}/hide', [HiddenTicketController::class, 'store'])->name('tickets.hide');
 Route::delete('/tickets/{ticket}/hide', [HiddenTicketController::class, 'destroy'])->name('tickets.unhide');
 

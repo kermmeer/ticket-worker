@@ -6,6 +6,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -37,6 +38,17 @@ class Ticket extends Model
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);
+    }
+
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(AgentSession::class);
+    }
+
+    /** The open conversation about this ticket, if there is one. */
+    public function openSession(): ?AgentSession
+    {
+        return $this->sessions()->where('state', 'open')->latest('id')->first();
     }
 
     public function casebookEntry(): BelongsTo

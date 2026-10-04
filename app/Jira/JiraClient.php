@@ -146,6 +146,80 @@ class JiraClient
     }
 
     /**
+     * One ticket in full, for the agent and the ticket page. API v2, so the description and
+     * comments come as text (wiki markup) rather than Atlassian's document format.
+     *
+     * @return array{key: string, summary: string, description: string, status: ?string, priority: ?string,
+     *     type: ?string, reporter: ?string, assignee: ?string, created: ?string, updated: ?string,
+     *     comments: list<array{author: ?string, created: ?string, body: string, public: bool}>,
+     *     attachments: list<array{id: string, filename: string, size: int, mime: ?string, url: string, created: ?string}>}
+     */
+    public function issue(string $key): array
+    {
+        $fields = $this->send('get', '/rest/api/2/issue/'.rawurlencode($key), [
+            'fields' => 'summary,description,status,priority,issuetype,reporter,assignee,created,updated,attachment',
+        ])['fields'] ?? [];
+
+        $comments = [];
+        $startAt = 0;
+        do {
+            $page = $this->send('get', '/rest/api/2/issue/'.rawurlencode($key).'/comment', [
+                'startAt' => $startAt, 'maxResults' => 100, 'orderBy' => 'created', 'expand' => 'properties',
+            ]);
+            foreach ($page['comments'] ?? [] as $comment) {
+                $internal = collect($comment['properties'] ?? [])->firstWhere('key', 'sd.public.comment')['value']['internal'] ?? false;
+                $comments[] = [
+                    'author' => $comment['author']['displayName'] ?? null,
+                    'created' => $comment['created'] ?? null,
+                    'body' => (string) ($comment['body'] ?? ''),
+                    'public' => ! $internal,
+                ];
+            }
+            $startAt += count($page['comments'] ?? []);
+        } while ($startAt < ($page['total'] ?? 0) && ($page['comments'] ?? []) !== []);
+
+        return [
+            'key' => $key,
+            'summary' => (string) ($fields['summary'] ?? ''),
+            'description' => (string) ($fields['description'] ?? ''),
+            'status' => $fields['status']['name'] ?? null,
+            'priority' => $fields['priority']['name'] ?? null,
+            'type' => $fields['issuetype']['name'] ?? null,
+            'reporter' => $fields['reporter']['displayName'] ?? null,
+            'assignee' => $fields['assignee']['displayName'] ?? null,
+            'created' => $fields['created'] ?? null,
+            'updated' => $fields['updated'] ?? null,
+            'comments' => $comments,
+            'attachments' => array_map(fn (array $file) => [
+                'id' => (string) $file['id'],
+                'filename' => (string) $file['filename'],
+                'size' => (int) ($file['size'] ?? 0),
+                'mime' => $file['mimeType'] ?? null,
+                'url' => (string) $file['content'],
+                'created' => $file['created'] ?? null,
+            ], $fields['attachment'] ?? []),
+        ];
+    }
+
+    /** Download an attachment to a file. Returns false when Jira refuses or it is too big. */
+    public function download(string $url, string $path, int $maxBytes): bool
+    {
+        if (! $this->configured()) {
+            return false;
+        }
+
+        $response = Http::withBasicAuth((string) $this->email, (string) $this->token)->timeout(60)->sink($path)->get($url);
+
+        if ($response->failed() || filesize($path) > $maxBytes) {
+            @unlink($path);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * The site's SLA fields (Jira Service Management): field id => name. They are custom
      * fields like any other, so they are found by type; the list changes rarely.
      *

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Jira\JiraClient;
+use App\Models\AgentSession;
+use App\Models\AgentTurn;
 use App\Models\Space;
 use App\Models\Ticket;
 use App\Outbox\OutboxClient;
@@ -28,6 +30,14 @@ class OverviewController extends Controller
             ->whereIn('space_id', $spaces->pluck('id'))
             ->orderByDesc('jira_updated_at')
             ->get();
+
+        // Where each ticket's conversation stands: its latest session and that session's last turn.
+        $sessions = AgentSession::query()
+            ->whereIn('ticket_id', $tickets->pluck('id'))
+            ->with(['turns' => fn ($query) => $query->select('id', 'agent_session_id', 'state')])
+            ->orderBy('id')
+            ->get()
+            ->keyBy('ticket_id');
 
         return Inertia::render('Overview', [
             'hasSpaces' => Space::query()->exists(),
@@ -68,17 +78,30 @@ class OverviewController extends Controller
                 ],
                 'created_at' => $ticket->jira_created_at?->toIso8601String(),
                 'updated_at' => $ticket->jira_updated_at?->toIso8601String(),
-                // Until a ticket has a page here, it opens in Jira.
                 'url' => $jira->browseUrl($ticket->key),
+                'page' => route('tickets.show', $ticket, false),
                 // Waiting on the requester sleeps, whatever else is going on. Agents arrive
                 // with step 2; until then every other ticket waits for a first look.
-                // Hidden by you beats everything; then waiting on the requester sleeps.
-                'group' => match (true) {
-                    $ticket->hidden_at !== null => 'hidden',
-                    $byId[$ticket->space_id]->sleeps($ticket->status) => 'sleeping',
-                    default => 'not-analysed',
-                },
+                'group' => $this->group($ticket, $sessions[$ticket->id] ?? null, $byId[$ticket->space_id]),
             ]),
         ]);
+    }
+
+    /**
+     * What a ticket needs from you (CONCEPT.md §6). Hidden by you beats everything; an
+     * agent at work or waiting for you comes next; then sleep, a closed session, or nothing yet.
+     */
+    private function group(Ticket $ticket, ?AgentSession $session, Space $space): string
+    {
+        $last = $session?->turns->last();
+
+        return match (true) {
+            $ticket->hidden_at !== null => 'hidden',
+            $session?->state === 'open' && in_array($last?->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true) => 'working',
+            $session?->state === 'open' && $last !== null => 'needs-you',
+            $space->sleeps($ticket->status) => 'sleeping',
+            $session?->state === 'closed' => 'parked',
+            default => 'not-analysed',
+        };
     }
 }
