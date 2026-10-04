@@ -32,6 +32,8 @@ class SystemController extends Controller
                 'scan_log' => $system->scan_log,
                 'scan_error' => $system->scan_error,
                 'scan_cost_usd' => $system->scan_cost_usd,
+                'scan_tokens_in' => $system->scan_input_tokens,
+                'scan_tokens_out' => $system->scan_output_tokens,
             ]),
             'agentReady' => Instructions::credentials() !== [],
         ]);

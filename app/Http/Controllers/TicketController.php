@@ -174,6 +174,9 @@ class TicketController extends Controller
             'id' => $session->id,
             'reply_language' => $session->reply_language,
             'cost_usd' => $session->cost_usd,
+            'tokens_in' => $turns->sum(fn (AgentTurn $turn) => (int) $turn->tokensIn()),
+            'tokens_cached' => $turns->sum(fn (AgentTurn $turn) => (int) $turn->cache_read_tokens),
+            'tokens_out' => $turns->sum(fn (AgentTurn $turn) => (int) $turn->output_tokens),
             'busy' => $turns->contains(fn ($turn) => in_array($turn->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true)),
             'proposal' => $turns->whereNotNull('proposal')->last()?->proposal,
             'turns' => $turns->map(fn (AgentTurn $turn) => [
@@ -186,6 +189,9 @@ class TicketController extends Controller
                 'error' => $turn->error,
                 'case_draft' => $turn->case_draft !== null,
                 'cost_usd' => $turn->cost_usd,
+                'tokens_in' => $turn->tokensIn(),
+                'tokens_cached' => $turn->cache_read_tokens,
+                'tokens_out' => $turn->output_tokens,
                 'started_at' => $turn->started_at?->toIso8601String(),
                 'finished_at' => $turn->finished_at?->toIso8601String(),
                 'events' => $turn->events->map(fn ($event) => [

@@ -7,7 +7,7 @@ import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
 import TicketKey from '../../components/TicketKey.vue';
 import { phrase, shortName, tone } from '../../sla.js';
-import { short } from '../../time.js';
+import { short, tokens } from '../../time.js';
 
 const props = defineProps({
     ticket: { type: Object, required: true },
@@ -132,7 +132,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </button>
                     <button v-if="busy" type="button" class="btn" @click="post('stop')">Stop</button>
                     <button v-if="session && !busy" type="button" class="btn" @click="post('close')">Close session</button>
-                    <span v-if="session" class="ml-auto font-mono text-xs text-muted">${{ session.cost_usd.toFixed(2) }} so far</span>
+                    <span v-if="session" class="ml-auto text-right font-mono text-xs text-muted">
+                        ${{ session.cost_usd.toFixed(2) }} so far<br />
+                        {{ tokens(session.tokens_in) }} tokens in<template v-if="session.tokens_cached"> ({{ tokens(session.tokens_cached) }} from cache)</template> · {{ tokens(session.tokens_out) }} out
+                    </span>
                 </div>
             </div>
 
@@ -146,6 +149,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     <LogEntry :time="turn.started_at ? short(turn.started_at).split(', ').pop() : '…'" author="agent">
                         <p class="text-xs font-medium tracking-wide uppercase" :class="stateTone[turn.state]">
                             {{ turnLabels[turn.kind] }} · {{ turn.state }}<template v-if="turn.cost_usd != null"> · ${{ turn.cost_usd.toFixed(2) }}</template>
+                            <template v-if="turn.tokens_in != null"> · {{ tokens(turn.tokens_in) }} in · {{ tokens(turn.tokens_out) }} out</template>
                         </p>
                         <template v-for="event in turn.events" :key="event.id">
                             <p v-if="event.type === 'text'" class="text-sm break-words whitespace-pre-wrap">{{ event.summary }}</p>

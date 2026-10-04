@@ -76,7 +76,14 @@ class ScanSystem implements ShouldQueue
                 $system->update(['scan_state' => 'failed', 'scan_error' => Str::limit($body ?: trim($run['errors']) ?: 'The scan ended without a context.', 2000)]);
             } else {
                 $system->writeContext($body, $head, 'agent');
-                $system->update(['scan_state' => 'idle', 'scan_cost_usd' => $result['total_cost_usd'] ?? null]);
+                $tokens = ClaudeRun::tokens($result);
+                $system->update([
+                    'scan_state' => 'idle',
+                    'scan_cost_usd' => $result['total_cost_usd'] ?? null,
+                    'scan_input_tokens' => $tokens['input_tokens'] === null ? null
+                        : $tokens['input_tokens'] + (int) $tokens['cache_read_tokens'] + (int) $tokens['cache_write_tokens'],
+                    'scan_output_tokens' => $tokens['output_tokens'],
+                ]);
             }
         } catch (Throwable $e) {
             $system->update(['scan_state' => 'failed', 'scan_error' => Str::limit($e->getMessage(), 2000)]);

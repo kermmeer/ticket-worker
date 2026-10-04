@@ -14,6 +14,25 @@ class ClaudeRun
      * The options every run gets: streamed output, the configured model, and read-only
      * tools only. No shell, no network, no writing; nothing that would ask anyone.
      */
+    /**
+     * The tokens a run used, from its result line: what it read (fresh, from the cache,
+     * into the cache) and what it wrote.
+     *
+     * @return array{input_tokens: ?int, cache_read_tokens: ?int, cache_write_tokens: ?int, output_tokens: ?int}
+     */
+    public static function tokens(?array $result): array
+    {
+        $usage = $result['usage'] ?? [];
+        $count = fn (string $key) => isset($usage[$key]) ? (int) $usage[$key] : null;
+
+        return [
+            'input_tokens' => $count('input_tokens'),
+            'cache_read_tokens' => $count('cache_read_input_tokens'),
+            'cache_write_tokens' => $count('cache_creation_input_tokens'),
+            'output_tokens' => $count('output_tokens'),
+        ];
+    }
+
     public static function command(float $budgetUsd): array
     {
         return [config('agent.claude.bin'), '-p',

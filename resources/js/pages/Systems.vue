@@ -1,6 +1,7 @@
 <script setup>
 import { onBeforeUnmount, ref, watchEffect } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
+import { tokens } from '../time.js';
 
 const props = defineProps({
     systems: { type: Array, required: true },
@@ -181,6 +182,7 @@ const states = {
                         <span v-if="system.context && !scanning(system)" class="text-sm text-muted">
                             written {{ system.context_written_at ? new Date(system.context_written_at).toLocaleDateString() : '' }}
                             <template v-if="system.scan_cost_usd"> · ${{ system.scan_cost_usd.toFixed(2) }}</template>
+                            <template v-if="system.scan_tokens_in != null"> · {{ tokens(system.scan_tokens_in) }} tokens in, {{ tokens(system.scan_tokens_out) }} out</template>
                         </span>
                         <span v-if="system.commits_behind" class="text-sm text-waiting">{{ system.commits_behind }} commits behind the code</span>
                         <span v-if="scanning(system)" class="text-sm text-working">{{ system.scan_state === 'queued' ? 'Waiting for a free agent…' : 'Scanning…' }}</span>

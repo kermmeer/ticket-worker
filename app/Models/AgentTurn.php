@@ -21,7 +21,8 @@ class AgentTurn extends Model
 
     protected $fillable = [
         'agent_session_id', 'kind', 'prompt', 'state', 'stop_requested', 'proposal', 'case_draft', 'answer',
-        'error', 'cost_usd', 'duration_ms', 'started_at', 'finished_at',
+        'error', 'cost_usd', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens',
+        'duration_ms', 'started_at', 'finished_at',
     ];
 
     protected function casts(): array
@@ -34,6 +35,13 @@ class AgentTurn extends Model
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];
+    }
+
+    /** Everything it read, fresh or from the cache. */
+    public function tokensIn(): ?int
+    {
+        return $this->input_tokens === null ? null
+            : $this->input_tokens + (int) $this->cache_read_tokens + (int) $this->cache_write_tokens;
     }
 
     public function session(): BelongsTo

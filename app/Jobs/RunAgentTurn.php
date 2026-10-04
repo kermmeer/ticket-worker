@@ -117,6 +117,7 @@ class RunAgentTurn implements ShouldQueue
             'answer' => $result['result'] ?? null,
             'error' => $state === AgentTurn::FAILED ? Str::limit(($result['result'] ?? '') ?: trim($errors) ?: 'The agent stopped without an answer.', 2000) : null,
             'cost_usd' => $cost,
+            ...ClaudeRun::tokens($result),
             'duration_ms' => $result['duration_ms'] ?? null,
             'finished_at' => now(),
         ]);

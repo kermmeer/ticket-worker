@@ -125,7 +125,8 @@ class AgentTest extends TestCase
         Process::fake([
             '*claude*' => Process::describe()
                 ->output(self::line(['type' => 'assistant', 'message' => ['content' => [['type' => 'text', 'text' => 'Checking the casebook first.']]]]))
-                ->output(self::line(['type' => 'result', 'total_cost_usd' => 0.81, 'duration_ms' => 42000, 'result' => '', 'structured_output' => $proposal]))
+                ->output(self::line(['type' => 'result', 'total_cost_usd' => 0.81, 'duration_ms' => 42000, 'result' => '', 'structured_output' => $proposal,
+                    'usage' => ['input_tokens' => 1200, 'cache_read_input_tokens' => 80000, 'cache_creation_input_tokens' => 3000, 'output_tokens' => 6400]]))
                 ->runsFor(iterations: 2),
             '*' => Process::result(''),
         ]);
@@ -136,6 +137,8 @@ class AgentTest extends TestCase
         $this->assertSame(AgentTurn::DONE, $turn->state, (string) $turn->error);
         $this->assertSame('Early return', $turn->proposal['cause']);
         $this->assertSame(0.81, $session->fresh()->cost_usd);
+        $this->assertSame(84200, $turn->tokensIn(), 'Fresh, from the cache and into it, together.');
+        $this->assertSame(6400, $turn->output_tokens);
         $this->assertContains('Checking the casebook first.', $turn->events()->pluck('summary')->all());
 
         $root = Workspace::path($this->ticket);

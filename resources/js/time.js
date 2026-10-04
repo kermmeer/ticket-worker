@@ -32,3 +32,14 @@ export function stamp(iso) {
 export function short(iso) {
     return iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 }
+
+/** "84.2k", "1.3M": token counts short enough for a line of text. */
+export function tokens(count) {
+    if (count == null) {
+        return '';
+    }
+    if (count >= 1e6) {
+        return `${(count / 1e6).toFixed(1)}M`;
+    }
+    return count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count);
+}
