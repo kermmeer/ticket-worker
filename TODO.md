@@ -40,8 +40,11 @@ to it, including work you finish.
 - [x] Word matching against every open ticket on each sync and after each change; the overview
       shows the closest approved case (2026-10-03)
 - [ ] Match on the description too, once it is synced (step 3)
-- [ ] The agent: best matches in the first prompt, the approved cases as files to grep, the
-      proposal says which case it used (step 3); drafts a case when a ticket is done (step 4)
+- [x] The agent: best matches in the first prompt, the approved cases as files to grep, the
+      proposal says which case it used (2026-10-04)
+- [x] *Draft a case* on the ticket page: the agent drafts, the casebook form opens filled in, you
+      review and write it down; nothing is saved before (2026-10-04)
+- [ ] Offer *Draft a case* by itself when a ticket is done (step 4)
 - [ ] Use counts and "did not fit" feedback, to know which cases to retire (step 5)
 
 ## Step 2: agent runner and systems

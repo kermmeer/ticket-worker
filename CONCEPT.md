@@ -275,9 +275,9 @@ What one ticket taught should not have to be learned again on the next. The case
 as a case: the problem as tickets show it, the cause, and what fixed it.
 
 - **Where cases come from.** You write them on the Casebook page, from scratch or from a
-  ticket with *Write it up*. Once agents run, each solved ticket's agent drafts one from the
-  conversation it already has, and you approve, edit or discard it. An agent never approves
-  its own case.
+  ticket with *Write it up*. *Draft a case* on a ticket page has its agent draft one from the
+  conversation it already has; the casebook form opens filled in, and nothing is saved until
+  you submit it. An agent never writes to the casebook itself.
 - **What makes a good one.** Symptoms in the words reporters use, in every language tickets
   arrive in (the keywords count most); the cause with file and function, so the agent goes
   straight there; the fix as steps, including what to tell the reporter. No customer names

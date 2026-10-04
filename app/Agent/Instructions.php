@@ -88,6 +88,36 @@ class Instructions
         TEXT;
     }
 
+    /** A casebook case's shape, as the form on the Casebook page has it. */
+    public static function caseSchema(): array
+    {
+        $text = ['type' => 'string'];
+
+        return [
+            'type' => 'object',
+            'required' => ['title', 'symptoms', 'cause', 'solution', 'keywords', 'system'],
+            'properties' => [
+                'title' => $text + ['description' => 'The problem in one line.'],
+                'symptoms' => $text + ['description' => 'How it shows up: what reporters write, error messages, which screen.'],
+                'cause' => $text + ['description' => 'Where in the system and why; file and function names welcome.'],
+                'solution' => $text + ['description' => 'What fixed it, as steps a colleague could follow; the workaround; what to tell the reporter.'],
+                'keywords' => $text + ['description' => 'Comma-separated words to match on, in English, Dutch, French and Danish.'],
+                'system' => $text + ['description' => 'The system it is about, by name, or empty.'],
+            ],
+        ];
+    }
+
+    /** Ask for a casebook case from what this conversation found. */
+    public static function caseRequest(): string
+    {
+        return <<<'TEXT'
+        Write this ticket up as a case for the casebook, from what this conversation found, so the next
+        agent that meets the same problem starts from it. Write it general: the problem, not the customer.
+        No names, e-mail addresses, customer numbers or other personal data. If the cause is not certain
+        yet, say so in the cause. The engineer reviews it before it is saved.
+        TEXT;
+    }
+
     /** The rules for a scan: read-only, and what the context is for. */
     public static function scanRules(): string
     {

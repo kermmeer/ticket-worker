@@ -20,7 +20,7 @@ class AgentTurn extends Model
     public const STOPPED = 'stopped';
 
     protected $fillable = [
-        'agent_session_id', 'kind', 'prompt', 'state', 'stop_requested', 'proposal', 'answer',
+        'agent_session_id', 'kind', 'prompt', 'state', 'stop_requested', 'proposal', 'case_draft', 'answer',
         'error', 'cost_usd', 'duration_ms', 'started_at', 'finished_at',
     ];
 
@@ -28,6 +28,7 @@ class AgentTurn extends Model
     {
         return [
             'proposal' => 'array',
+            'case_draft' => 'array',
             'stop_requested' => 'boolean',
             'cost_usd' => 'float',
             'started_at' => 'datetime',

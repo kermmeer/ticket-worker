@@ -96,6 +96,12 @@ class TicketController extends Controller
         return $this->follow($ticket, 'proposal', Instructions::restate());
     }
 
+    /** The agent drafts a casebook case; you review it in the form before it exists. */
+    public function draftCase(Ticket $ticket): RedirectResponse
+    {
+        return $this->follow($ticket, 'case', Instructions::caseRequest());
+    }
+
     public function stop(Ticket $ticket): RedirectResponse
     {
         $ticket->openSession()?->turns()->whereIn('state', [AgentTurn::QUEUED, AgentTurn::RUNNING])
@@ -178,6 +184,7 @@ class TicketController extends Controller
                 'state' => $turn->state,
                 'answer' => $turn->kind === 'message' ? $turn->answer : null,
                 'error' => $turn->error,
+                'case_draft' => $turn->case_draft !== null,
                 'cost_usd' => $turn->cost_usd,
                 'started_at' => $turn->started_at?->toIso8601String(),
                 'finished_at' => $turn->finished_at?->toIso8601String(),

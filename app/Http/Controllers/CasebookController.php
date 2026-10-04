@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jira\JiraClient;
 use App\Jobs\RematchCasebook;
+use App\Models\AgentTurn;
 use App\Models\CasebookEntry;
 use App\Models\System;
 use App\Models\Ticket;
@@ -41,9 +42,33 @@ class CasebookController extends Controller
         ]);
     }
 
-    /** A new case, started from a ticket when one is given: ?ticket=SUP-1234. */
+    /**
+     * A new case, started from a ticket (?ticket=SUP-1234) or from an agent's draft
+     * (?turn=12). Nothing is saved until you submit the form.
+     */
     public function create(Request $request): Response
     {
+        if ($request->filled('turn') && ($turn = AgentTurn::query()->with('session.ticket')->find($request->integer('turn')))?->case_draft) {
+            $draft = $turn->case_draft;
+
+            return Inertia::render('Casebook/Form', [
+                'entry' => [
+                    'id' => null,
+                    'title' => (string) ($draft['title'] ?? ''),
+                    'system_id' => System::query()->where('name', $draft['system'] ?? '')->value('id'),
+                    'symptoms' => (string) ($draft['symptoms'] ?? ''),
+                    'cause' => (string) ($draft['cause'] ?? ''),
+                    'solution' => (string) ($draft['solution'] ?? ''),
+                    'keywords' => (string) ($draft['keywords'] ?? ''),
+                    'source_tickets' => $turn->session->ticket->key,
+                    'state' => CasebookEntry::DRAFT,
+                ],
+                'systems' => System::query()->orderBy('name')->get(['id', 'name']),
+                'matches' => [],
+                'fromAgent' => true,
+            ]);
+        }
+
         $ticket = $request->filled('ticket')
             ? Ticket::query()->with('space.systems:id')->firstWhere('key', $request->string('ticket'))
             : null;

@@ -59,7 +59,7 @@ watch(
 );
 onBeforeUnmount(() => clearInterval(poll));
 
-const turnLabels = { analysis: 'Analysis', message: 'Your question', proposal: 'Proposal restated' };
+const turnLabels = { analysis: 'Analysis', message: 'Your question', proposal: 'Proposal restated', case: 'Casebook draft' };
 const stateTone = { queued: 'text-muted', running: 'text-working', done: 'text-done', failed: 'text-signal', stopped: 'text-waiting' };
 const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-signal' };
 </script>
@@ -154,6 +154,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         </template>
                         <ActivityLine v-if="turn.state === 'running'" :now="lastTool" :tally="`${turn.events.filter((e) => e.type === 'tool').length} steps`" />
                         <p v-if="turn.state === 'queued'" class="text-sm text-muted">Waiting for a free agent…</p>
+                        <Link v-if="turn.case_draft" :href="`/casebook/create?turn=${turn.id}`" class="btn btn-signal self-start">Review the case and write it down</Link>
                     </LogEntry>
                 </template>
 
@@ -169,6 +170,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     <div class="flex flex-col gap-2">
                         <button type="submit" class="btn btn-signal" :disabled="message.processing || !message.text.trim()">Send</button>
                         <button type="button" class="btn" @click="post('restate')">Update proposal</button>
+                        <button type="button" class="btn" @click="post('case')">Draft a case</button>
                     </div>
                 </form>
             </div>

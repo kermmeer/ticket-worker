@@ -6,6 +6,7 @@ const props = defineProps({
     entry: { type: Object, required: true },
     systems: { type: Array, required: true },
     matches: { type: Array, required: true },
+    fromAgent: { type: Boolean, default: false },
 });
 
 const form = useForm({
@@ -41,6 +42,10 @@ const fieldClass = 'mt-1 w-full rounded-md border border-line bg-page px-3 py-2 
 
     <p class="eyebrow"><Link href="/casebook" class="hover:text-ink">Casebook</Link> / {{ entry.id ? `#${entry.id}` : 'New' }}</p>
     <h1 class="display mt-3 text-4xl leading-[1.1] sm:text-5xl">{{ entry.id ? form.title || 'Untitled case' : 'Write a case' }}</h1>
+    <p v-if="fromAgent" class="mt-4 max-w-2xl rounded-md border border-working/40 bg-surface px-4 py-3 text-sm text-working">
+        Drafted by the agent from the ticket. Nothing is saved yet: read it, fix what is off, choose Draft or Approved,
+        and write it down.
+    </p>
     <p class="mt-4 max-w-2xl text-muted">
         Write it general: the problem, not the customer. A case outlives the tickets it came from, so no names, addresses
         or other personal data go in.

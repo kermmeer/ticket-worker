@@ -18,6 +18,7 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/analyse', 'analyse')->name('analyse');
     Route::post('/messages', 'message')->name('message');
     Route::post('/restate', 'restate')->name('restate');
+    Route::post('/case', 'draftCase')->name('case');
     Route::post('/stop', 'stop')->name('stop');
     Route::post('/close', 'close')->name('close');
     Route::post('/draft', 'draft')->name('draft');

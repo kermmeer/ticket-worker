@@ -62,6 +62,8 @@ class RunAgentTurn implements ShouldQueue
                 : [...$command, '--resume', $session->claude_session_id];
             if (in_array($turn->kind, ['analysis', 'proposal'], true)) {
                 $command = [...$command, '--json-schema', json_encode(Instructions::proposalSchema())];
+            } elseif ($turn->kind === 'case') {
+                $command = [...$command, '--json-schema', json_encode(Instructions::caseSchema())];
             }
             foreach ($systems as $system) {
                 $command = [...$command, '--add-dir', $system->path()];
@@ -104,9 +106,14 @@ class RunAgentTurn implements ShouldQueue
             $proposal = $result['structured_output'] ?? self::jsonFrom((string) ($result['result'] ?? ''));
         }
 
+        $caseDraft = $state === AgentTurn::DONE && $turn->kind === 'case'
+            ? ($result['structured_output'] ?? self::jsonFrom((string) ($result['result'] ?? '')))
+            : null;
+
         $turn->update([
             'state' => $state,
             'proposal' => $proposal,
+            'case_draft' => $caseDraft,
             'answer' => $result['result'] ?? null,
             'error' => $state === AgentTurn::FAILED ? Str::limit(($result['result'] ?? '') ?: trim($errors) ?: 'The agent stopped without an answer.', 2000) : null,
             'cost_usd' => $cost,

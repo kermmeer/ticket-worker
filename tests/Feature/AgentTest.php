@@ -11,6 +11,7 @@ use App\Models\AgentSession;
 use App\Models\AgentTurn;
 use App\Models\CasebookEntry;
 use App\Models\Space;
+use App\Models\System;
 use App\Models\Ticket;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
@@ -222,5 +223,31 @@ class AgentTest extends TestCase
 
         $this->put('/setup/reply-rules', ['rules' => '']);
         $this->assertStringContainsString('friendly line', Instructions::restate(), 'Empty means the default.');
+    }
+
+    public function test_the_agent_drafts_a_case_that_only_exists_once_you_submit_it(): void
+    {
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000005', 'model' => 'claude-opus-5']);
+        AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'analysis', 'prompt' => 'Analyse.', 'state' => AgentTurn::DONE]);
+        $system = System::create(['name' => 'billing', 'branch' => 'main', 'state' => System::READY]);
+        Queue::fake();
+
+        $this->post("/tickets/{$this->ticket->id}/case")->assertRedirect();
+        $turn = AgentTurn::where('kind', 'case')->sole();
+        Queue::assertPushed(RunAgentTurn::class);
+
+        $draft = ['title' => 'Invoice mail missing after a credit note', 'symptoms' => 'No invoice mail.', 'cause' => 'apply() returns early.', 'solution' => 'Resend; fix the return.', 'keywords' => 'factuur, facture', 'system' => 'billing'];
+        Process::fake(['*claude*' => Process::describe()->output(self::line(['type' => 'result', 'result' => '', 'structured_output' => $draft]))->runsFor(iterations: 1), '*' => Process::result('')]);
+        (new RunAgentTurn($turn))->handle(app(Workspace::class), app(ClaudeRun::class));
+
+        Process::assertRan(fn ($process) => in_array('--json-schema', $process->command, true) && str_contains($process->command[array_search('--json-schema', $process->command, true) + 1], '"symptoms"'));
+        $this->assertSame(0, CasebookEntry::count(), 'Nothing is in the casebook yet.');
+
+        $this->get("/casebook/create?turn={$turn->id}")->assertInertia(fn (Assert $page) => $page
+            ->component('Casebook/Form', true)
+            ->where('fromAgent', true)
+            ->where('entry.title', 'Invoice mail missing after a credit note')
+            ->where('entry.system_id', $system->id)
+            ->where('entry.source_tickets', 'SUP-1'));
     }
 }
