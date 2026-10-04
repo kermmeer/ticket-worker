@@ -8,7 +8,7 @@
 #   push-systems.sh [fetch|push|both] [folder ...]
 #
 # Every git clone in the folders given, or in the folders directly below them, takes
-# part when it has a "ticket-worker" remote. One-time setup per clone:
+# part when it has a "ticket-worker" (or "ticketworker") remote. One-time setup per clone:
 #
 #   git remote add ticket-worker kermmeer@minas:/data/apps/ticket-worker-dev/shared/systems/billing
 #   git config ticket-worker.branch main        # optional; main is the default
@@ -32,10 +32,18 @@ seen=0
 for root in "$@"; do
     for repo in "$root" "$root"/*/; do
         [ -e "$repo/.git" ] || continue
-        git -C "$repo" remote get-url ticket-worker >/dev/null 2>&1 || continue
+        # Either spelling of the remote, and of its branch setting.
+        remote=
+        for candidate in ticket-worker ticketworker; do
+            if git -C "$repo" remote get-url "$candidate" >/dev/null 2>&1; then
+                remote=$candidate
+                break
+            fi
+        done
+        [ -n "$remote" ] || continue
         seen=$((seen + 1))
         name=$(basename "$(cd "$repo" && pwd)")
-        branch=$(git -C "$repo" config --get ticket-worker.branch || echo main)
+        branch=$(git -C "$repo" config --get "$remote.branch" || echo main)
 
         if [ "$mode" != push ]; then
             if ! git -C "$repo" fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch"; then
@@ -46,8 +54,8 @@ for root in "$@"; do
         fi
 
         if [ "$mode" != fetch ]; then
-            if ! git -C "$repo" push --quiet ticket-worker "+refs/remotes/origin/$branch:refs/heads/$branch"; then
-                echo "$name: could not push $branch to ticket-worker. Can you reach the server?" >&2
+            if ! git -C "$repo" push --quiet "$remote" "+refs/remotes/origin/$branch:refs/heads/$branch"; then
+                echo "$name: could not push $branch to $remote. Can you reach the server?" >&2
                 failed=1
                 continue
             fi

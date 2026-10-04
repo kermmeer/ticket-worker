@@ -81,6 +81,18 @@ class PushSystemsScriptTest extends TestCase
         $this->assertFileDoesNotExist($this->root.'/server/README.md');
     }
 
+    public function test_the_remote_may_be_spelled_ticketworker_with_its_own_branch_setting(): void
+    {
+        $clone = $this->root.'/clones/billing';
+        $this->git($clone, 'remote', 'rename', 'ticket-worker', 'ticketworker');
+        $this->git($clone, 'config', 'ticketworker.branch', 'main');
+
+        $result = $this->script($this->root.'/clones');
+
+        $this->assertSame(0, $result->exitCode(), $result->errorOutput());
+        $this->assertFileExists($this->root.'/server/README.md');
+    }
+
     public function test_a_folder_without_set_up_clones_is_an_error_not_a_silent_success(): void
     {
         File::ensureDirectoryExists($this->root.'/empty');

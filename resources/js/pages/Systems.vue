@@ -35,7 +35,8 @@ function commands(system) {
     return [
         `git remote add ticket-worker ${system.remote ?? system.path}`,
         `git config ticket-worker.branch ${system.branch}`,
-        `git push ticket-worker +origin/${system.branch}:${system.branch}`,
+        // Full ref names: the first push lands in an empty folder, where "master" means nothing yet.
+        `git push ticket-worker +refs/remotes/origin/${system.branch}:refs/heads/${system.branch}`,
     ].join('\n');
 }
 
