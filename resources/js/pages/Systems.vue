@@ -4,7 +4,32 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     systems: { type: Array, required: true },
+    agentReady: { type: Boolean, default: false },
 });
+
+function scan(system) {
+    router.post(`/systems/${system.id}/scan`, {}, { preserveScroll: true });
+}
+
+function stopScan(system) {
+    router.post(`/systems/${system.id}/scan/stop`, {}, { preserveScroll: true });
+}
+
+// Each system's context, editable; what you save becomes a version of its own.
+const contexts = ref({});
+
+function contextOf(system) {
+    if (contexts.value[system.id] === undefined) {
+        contexts.value[system.id] = system.context ?? '';
+    }
+    return contexts.value[system.id];
+}
+
+function saveContext(system) {
+    router.put(`/systems/${system.id}/context`, { context: contexts.value[system.id] }, { preserveScroll: true });
+}
+
+const scanning = (system) => ['queued', 'running'].includes(system.scan_state);
 
 const form = useForm({ name: '', branch: 'main' });
 
@@ -15,13 +40,14 @@ function add() {
     });
 }
 
-// The worker prepares a new folder within seconds: look again until it has.
+// The worker prepares a new folder within seconds, and a scan runs for minutes: look again
+// until they are done, quietly.
 let timer = null;
 
 watchEffect(() => {
-    const waiting = props.systems.some((system) => system.state === 'preparing');
+    const waiting = props.systems.some((system) => system.state === 'preparing' || scanning(system));
     if (waiting && !timer) {
-        timer = setInterval(() => router.reload({ only: ['systems'] }), 2000);
+        timer = setInterval(() => router.reload({ only: ['systems'], showProgress: false, preserveScroll: true, preserveState: true }), 2000);
     } else if (!waiting && timer) {
         clearInterval(timer);
         timer = null;
@@ -146,6 +172,50 @@ const states = {
                         Set SYSTEMS_PUSH_BASE in shared/.env to show the address as your machine sees it; this is the
                         folder as the app sees it.
                     </p>
+                </div>
+
+                <!-- The context: the map every analysis of this system starts from (CONCEPT.md §5). -->
+                <div class="mt-5 border-t border-line pt-4">
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <p class="text-sm font-medium">Context</p>
+                        <span v-if="system.context && !scanning(system)" class="text-sm text-muted">
+                            written {{ system.context_written_at ? new Date(system.context_written_at).toLocaleDateString() : '' }}
+                            <template v-if="system.scan_cost_usd"> · ${{ system.scan_cost_usd.toFixed(2) }}</template>
+                        </span>
+                        <span v-if="system.commits_behind" class="text-sm text-waiting">{{ system.commits_behind }} commits behind the code</span>
+                        <span v-if="scanning(system)" class="text-sm text-working">{{ system.scan_state === 'queued' ? 'Waiting for a free agent…' : 'Scanning…' }}</span>
+                        <span class="ml-auto flex gap-2">
+                            <button v-if="scanning(system)" type="button" class="btn px-3 py-1.5" @click="stopScan(system)">Stop</button>
+                            <button
+                                v-else
+                                type="button"
+                                class="btn px-3 py-1.5"
+                                :class="{ 'btn-signal': !system.context }"
+                                :disabled="!system.head || !agentReady"
+                                @click="scan(system)"
+                            >
+                                {{ system.context ? 'Rescan' : 'Scan it' }}
+                            </button>
+                        </span>
+                    </div>
+                    <p v-if="!system.head" class="mt-1 text-sm text-muted">Push the code first; then an agent can read it.</p>
+                    <p v-else-if="!agentReady" class="mt-1 text-sm text-muted">Scanning needs an Anthropic sign-in: see Setup.</p>
+                    <p v-else-if="!system.context && !scanning(system)" class="mt-1 text-sm text-muted">
+                        An agent reads the system once and writes a short map of it: what it is, where things live, what users call
+                        things. Every analysis starts from it. A rescan later only updates what changed.
+                    </p>
+                    <p v-if="system.scan_error" class="mt-2 text-sm text-signal">{{ system.scan_error }}</p>
+                    <pre v-if="scanning(system) && system.scan_log" class="mt-3 max-h-48 overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-xs leading-relaxed">{{ system.scan_log }}</pre>
+                    <details v-if="system.context" class="mt-3">
+                        <summary class="cursor-pointer text-sm text-muted hover:text-ink">Read or edit it</summary>
+                        <textarea
+                            :value="contextOf(system)"
+                            rows="18"
+                            class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 font-mono text-xs leading-relaxed"
+                            @input="contexts[system.id] = $event.target.value"
+                        ></textarea>
+                        <button type="button" class="btn mt-2 px-3 py-1.5" @click="saveContext(system)">Save my edit</button>
+                    </details>
                 </div>
             </template>
         </li>

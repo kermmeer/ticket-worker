@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Agent\Instructions;
 use App\Jobs\PrepareSystemFolder;
+use App\Jobs\ScanSystem;
 use App\Models\System;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +25,15 @@ class SystemController extends Controller
                 'path' => $system->path(),
                 'remote' => $system->pushRemote(),
                 'head' => $system->state === System::READY ? $system->head() : null,
+                'context' => $system->context,
+                'context_written_at' => $system->context_written_at?->toIso8601String(),
+                'commits_behind' => $system->commitsBehind(),
+                'scan_state' => $system->scan_state,
+                'scan_log' => $system->scan_log,
+                'scan_error' => $system->scan_error,
+                'scan_cost_usd' => $system->scan_cost_usd,
             ]),
+            'agentReady' => Instructions::credentials() !== [],
         ]);
     }
 
@@ -42,5 +52,37 @@ class SystemController extends Controller
         PrepareSystemFolder::dispatch(System::create($data));
 
         return to_route('systems.index');
+    }
+
+    /** Write or refresh the system's context with an agent (CONCEPT.md §5). */
+    public function scan(System $system): RedirectResponse
+    {
+        abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        if (in_array($system->scan_state, ['queued', 'running'], true)) {
+            return back();
+        }
+
+        $system->update(['scan_state' => 'queued', 'scan_error' => null, 'scan_log' => null]);
+        ScanSystem::dispatch($system);
+
+        return back();
+    }
+
+    public function stopScan(System $system): RedirectResponse
+    {
+        $system->scan_state === 'queued'
+            ? $system->update(['scan_state' => 'idle', 'scan_error' => 'Stopped.'])
+            : $system->update(['scan_stop_requested' => true]);
+
+        return back();
+    }
+
+    /** Your own edit of the context: kept as a version like the agent's. */
+    public function updateContext(Request $request, System $system): RedirectResponse
+    {
+        $data = $request->validate(['context' => ['required', 'string', 'max:60000']]);
+        $system->writeContext($data['context'], $system->context_commit ?? $system->headCommit(), 'you');
+
+        return back()->with('success', "Saved the context of {$system->name}.");
     }
 }

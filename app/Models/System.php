@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Process;
 
 /**
@@ -19,7 +20,51 @@ class System extends Model
 
     public const FAILED = 'failed';
 
-    protected $fillable = ['name', 'branch', 'state', 'error'];
+    protected $fillable = [
+        'name', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
+        'scan_state', 'scan_stop_requested', 'scan_log', 'scan_error', 'scan_cost_usd',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'context_written_at' => 'datetime',
+            'scan_stop_requested' => 'boolean',
+            'scan_cost_usd' => 'float',
+        ];
+    }
+
+    public function contexts(): HasMany
+    {
+        return $this->hasMany(SystemContext::class)->orderByDesc('id');
+    }
+
+    /** Keep a new context, and the version it replaces. */
+    public function writeContext(string $body, ?string $commit, string $by): void
+    {
+        $this->update(['context' => $body, 'context_commit' => $commit, 'context_written_at' => now()]);
+        $this->contexts()->create(['body' => $body, 'commit' => $commit, 'written_by' => $by]);
+    }
+
+    /** The commit the folder is at now, full hash, or null before the first push. */
+    public function headCommit(): ?string
+    {
+        $result = Process::path($this->path())->run(['git', '-c', 'safe.directory=*', 'rev-parse', 'HEAD']);
+
+        return $result->successful() ? trim($result->output()) : null;
+    }
+
+    /** How many commits the code has moved since the context was written; null when unknown. */
+    public function commitsBehind(): ?int
+    {
+        if ($this->context_commit === null || ! is_dir($this->path().'/.git')) {
+            return null;
+        }
+
+        $result = Process::path($this->path())->run(['git', '-c', 'safe.directory=*', 'rev-list', '--count', $this->context_commit.'..HEAD']);
+
+        return $result->successful() ? (int) trim($result->output()) : null;
+    }
 
     public function spaces(): BelongsToMany
     {

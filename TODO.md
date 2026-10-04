@@ -53,7 +53,9 @@ to it, including work you finish.
 - [ ] Remove a system (its row and its folder)
 - [x] Turn runner: `claude -p` per turn, stream-json into `agent_events`, budget, stop (2026-10-04)
 - [ ] Workspace and transcript clean-up 30 days after a session closes (CONCEPT.md §11)
-- [ ] Context scan per system; review, edit, versions; staleness against the last push
+- [x] Context scan per system with an agent, read-only; rescan updates from the commits since;
+      read and edit on the Systems page, every version kept; contexts go into every analysis (2026-10-04)
+- [x] Queue retry window 2700 s: a long agent job was handed to a second worker at 90 s (2026-10-04); staleness against the last push
 
 ## Step 3: analysis
 

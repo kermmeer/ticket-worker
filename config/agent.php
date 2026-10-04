@@ -31,6 +31,9 @@ return [
 
     'turn_budget_usd' => (float) env('AGENT_TURN_BUDGET_USD', 3),
 
+    // A scan reads a whole system once; it may cost more than a turn.
+    'scan_budget_usd' => (float) env('AGENT_SCAN_BUDGET_USD', 6),
+
     // One folder per ticket, where its agent works: ticket.md and attachments/.
     'workspaces_path' => env('AGENT_WORKSPACES_PATH', $shared.'/agent/tickets'),
 

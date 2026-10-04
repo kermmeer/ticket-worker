@@ -151,6 +151,10 @@ moved since (*context is 214 commits behind*) and offers a refresh. A refresh gi
 the old context plus what changed since then, and asks it to update. Every version is kept,
 so an edit or a refresh can be undone.
 
+**Built 2026-10-04:** *Scan it* on the Systems page, once the code is pushed. The scan shows
+what it reads as it goes, costs a few dollars once, and every later analysis of a space with
+that system carries the context in its instructions.
+
 Contexts live in the tool's database, not in the folders. The folders hold exactly what you
 pushed, and the agent sees them read-only; a context file inside one would be overwritten or
 refused by your next push. The database keeps the versions besides.
