@@ -106,3 +106,5 @@ to it, including work you finish.
       apple-touch icon, web manifest and the header mark.
 - [x] SLA, due next: a sort that puts deadlines still in time first and overdue-only tickets
       last, and a "Next to breach" strip with the five closest across every group.
+- [x] "Draft and open in Outbox": hands the draft over and opens the outbox's link to it in a
+      new tab; plain web addresses only, the ticket's outbox page when the link is missing.

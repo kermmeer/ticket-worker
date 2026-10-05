@@ -39,6 +39,8 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                // Where a draft just handed to the outbox can be opened.
+                'outbox_url' => fn () => $request->session()->get('outbox_url'),
             ],
         ];
     }

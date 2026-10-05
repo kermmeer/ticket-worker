@@ -314,6 +314,10 @@ scheduling, status changes and assignees. Ticket Worker hands its reply over as 
 (`POST /api/v1/drafts`), the draft waits in the outbox, and you review, edit and send it there.
 What jira-outbox needs for that is briefed in [docs/OUTBOX-API.md](/docs/outbox). Tickets
 already open there (`JIRA_OPEN_URL=https://jira.techfactory.dev/{key}`).
+*Draft and open* does both at once: the draft goes over and a new tab opens on the link the
+outbox answers with (`?draft=<id>`), so you go straight on editing it there. The tab opens on
+the click itself, since a browser blocks one opened later, and closes again if the outbox
+refuses the draft.
 
 The overview also shows, per ticket, what is waiting in the outbox (scheduled, a draft, or
 failed), when it goes, and the status sending it will set.

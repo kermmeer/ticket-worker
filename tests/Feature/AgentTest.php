@@ -185,8 +185,22 @@ class AgentTest extends TestCase
             ->where('issue.comments.1.public', false)
             ->where('session', null));
 
-        $this->post("/tickets/{$this->ticket->id}/draft", ['body' => 'Beste, we hebben het gevonden.', 'visibility' => 'internal'])->assertSessionHas('success');
+        $this->post("/tickets/{$this->ticket->id}/draft", ['body' => 'Beste, we hebben het gevonden.', 'visibility' => 'internal'])
+            ->assertSessionHas('success')
+            ->assertSessionHas('outbox_url', 'https://jira.techfactory.dev/SUP-1?draft=d1');
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/api/v1/drafts') && $request['visibility'] === 'internal' && $request['issueKey'] === 'SUP-1');
+    }
+
+    public function test_a_draft_link_that_is_not_a_web_address_falls_back_to_the_ticket(): void
+    {
+        config([
+            'services.outbox.url' => 'http://jira-outbox:5173', 'services.outbox.token' => 'outbox-token',
+            'services.jira.open_url' => 'https://outbox.example/{key}',
+        ]);
+        Http::fake(['jira-outbox:5173/api/v1/drafts' => Http::response(['id' => 'd1', 'state' => 'draft', 'url' => 'javascript:alert(1)'], 201)]);
+
+        $this->post("/tickets/{$this->ticket->id}/draft", ['body' => 'Fixed.', 'visibility' => 'public'])
+            ->assertSessionHas('outbox_url', 'https://outbox.example/SUP-1');
     }
 
     public function test_a_subscription_token_signs_in_when_there_is_no_key(): void

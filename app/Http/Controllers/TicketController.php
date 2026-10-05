@@ -125,7 +125,7 @@ class TicketController extends Controller
     }
 
     /** Hand the reply draft to jira-outbox, where it waits for you to send it. */
-    public function draft(Request $request, Ticket $ticket, OutboxClient $outbox): RedirectResponse
+    public function draft(Request $request, Ticket $ticket, OutboxClient $outbox, JiraClient $jira): RedirectResponse
     {
         $data = $request->validate([
             'body' => ['required', 'string', 'max:32000'],
@@ -147,7 +147,11 @@ class TicketController extends Controller
 
         Cache::forget('overview.outbox');
 
-        return back()->with('success', 'The draft waits in the outbox: '.($draft['url'] ?? ''));
+        // The outbox's link to the draft, or its ticket page; only ever a web address.
+        $url = $draft['url'] ?? null;
+        $url = is_string($url) && preg_match('#^https?://#i', $url) ? $url : $jira->browseUrl($ticket->key);
+
+        return back()->with('success', 'The draft waits in the outbox.')->with('outbox_url', $url);
     }
 
     private function follow(Ticket $ticket, string $kind, string $prompt): RedirectResponse

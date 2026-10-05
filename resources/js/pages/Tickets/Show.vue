@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import ActivityLine from '../../components/ActivityLine.vue';
 import FoldingSection from '../../components/FoldingSection.vue';
 import LogEntry from '../../components/LogEntry.vue';
@@ -43,8 +43,36 @@ function send() {
 const draft = useForm({ body: '', visibility: 'public' });
 watch(proposal, (value) => (draft.body = value?.reply_draft ?? ''), { immediate: true });
 
-function toOutbox() {
-    draft.post(`/tickets/${props.ticket.id}/draft`, { preserveScroll: true });
+const openLabel = usePage().props.openLabel ?? 'Jira';
+
+// "and open it": the tab opens on the click itself, or the browser blocks it as a popup,
+// and is sent to the draft once the outbox has it. If the outbox refuses, it closes again.
+function toOutbox(open = false) {
+    let tab = null;
+    let sent = false;
+    if (open) {
+        tab = window.open('', '_blank');
+        if (tab) {
+            tab.opener = null;
+            tab.document.title = 'Waiting for the outbox…';
+        }
+    }
+    draft.post(`/tickets/${props.ticket.id}/draft`, {
+        preserveScroll: true,
+        onSuccess: (page) => {
+            const url = page.props.flash?.outbox_url;
+            if (tab && url) {
+                tab.location.href = url;
+                sent = true;
+            }
+        },
+        // A refusal comes back as an error flash rather than an error: close it either way.
+        onFinish: () => {
+            if (tab && !sent) {
+                tab.close();
+            }
+        },
+    });
 }
 
 // While the agent works, the page asks for its steps every two seconds, quietly.
@@ -238,7 +266,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     Casebook: <template v-if="proposal.casebook.case">case {{ proposal.casebook.case }}, {{ proposal.casebook.fit }}</template><template v-else>{{ proposal.casebook.fit || 'new' }}</template>
                 </p>
 
-                <form class="border-t border-line pt-5" @submit.prevent="toOutbox">
+                <form class="border-t border-line pt-5" @submit.prevent="toOutbox(false)">
                     <label for="reply" class="font-medium">Reply draft<span v-if="proposal.reply_language" class="font-normal text-muted"> · {{ proposal.reply_language }}</span></label>
                     <textarea id="reply" v-model="draft.body" rows="8" class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 text-sm"></textarea>
                     <div class="mt-3 flex flex-wrap items-center gap-3">
@@ -246,7 +274,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="public" /> Reply to customer</label>
                             <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="internal" /> Internal note</label>
                         </template>
-                        <button type="submit" class="btn btn-signal ml-auto" :disabled="!outboxReady || draft.processing || !draft.body.trim()">Send to the outbox as a draft</button>
+                        <button type="submit" class="btn ml-auto" :disabled="!outboxReady || draft.processing || !draft.body.trim()">Send to the outbox as a draft</button>
+                        <button type="button" class="btn btn-signal" :disabled="!outboxReady || draft.processing || !draft.body.trim()" @click="toOutbox(true)">
+                            Draft and open in {{ openLabel }} <span aria-hidden="true">↗</span>
+                        </button>
                     </div>
                     <p class="mt-2 text-muted">Nothing goes to Jira from here: the draft waits in the outbox until you send it there.</p>
                 </form>
