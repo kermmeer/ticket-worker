@@ -22,9 +22,11 @@ Two ways, both in `INSTALL.md`:
 Either way:
 
 - **Vue and CSS changes need a build** (`npm run build`, or a Docker rebuild).
-- Queue workers keep the code they started with: restart them after changing a job. **First
-  check no agent turn or scan is running** (`agent_turns` and `systems.scan_state` queued or
-  running): a restart cuts one off, and it was paid for.
+- Queue workers keep the code they started with. After changing a job, run
+  `php artisan queue:restart`: each worker finishes the job it has and then reloads. Restarting
+  the containers instead cuts off a running turn, which was paid for; a check that nothing
+  runs first is not enough, since an analysis can start in between. Turns and scans cut off
+  anyway are marked interrupted by the schedule (`StaleRuns`) once past their time limit.
 - `.env.example` documents every setting; keep it in step with `config/`, with no real values.
 - Tests: `php artisan test` (or `composer test`). They run on SQLite in memory and need no
   Jira, no Claude and no database server.
