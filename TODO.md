@@ -123,3 +123,5 @@ to it, including work you finish.
 - [x] Answer rules (Setup → Answers): short, answer first, exact commands instead of open
       suggestions; sent with every turn. Proposals list their `commands` (reads/changes, where,
       undo) with Copy buttons; code blocks in answers copy too (2026-10-06)
+- [x] Ticket comments newest first on the page (ticket.md keeps Jira's order); short dates
+      carry the year when it is not this one (2026-10-06)

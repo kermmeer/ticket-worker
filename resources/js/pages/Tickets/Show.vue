@@ -50,6 +50,9 @@ watch(proposal, (value) => (draft.body = value?.reply_draft ?? ''), { immediate:
 
 const openLabel = usePage().props.openLabel ?? 'Jira';
 
+// The latest word on top; the agent's ticket.md keeps Jira's order, oldest first.
+const newestFirst = computed(() => [...(props.issue?.comments ?? [])].reverse());
+
 // Attachments come through Ticket Worker, which holds the Jira token; images and PDFs open
 // in the browser, everything else downloads.
 const fileUrl = (file, download = false) => `/tickets/${props.ticket.id}/attachments/${file.id}${download ? '?download=1' : ''}`;
@@ -170,9 +173,9 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </ul>
                 </template>
 
-                <p class="mt-6 text-sm font-medium">Comments ({{ issue.comments.length }})</p>
+                <p class="mt-6 text-sm font-medium">Comments ({{ issue.comments.length }}<template v-if="issue.comments.length > 1">, newest first</template>)</p>
                 <div class="mt-2 space-y-4">
-                    <div v-for="(comment, index) in issue.comments" :key="index" class="border-l-2 pl-3 text-sm" :class="comment.public ? 'border-line' : 'border-waiting/60'">
+                    <div v-for="(comment, index) in newestFirst" :key="index" class="border-l-2 pl-3 text-sm" :class="comment.public ? 'border-line' : 'border-waiting/60'">
                         <p class="text-xs text-muted">
                             {{ comment.author }} · {{ short(comment.created) }}<span v-if="!comment.public" class="text-waiting"> · internal note</span>
                         </p>

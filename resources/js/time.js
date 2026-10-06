@@ -28,9 +28,15 @@ export function stamp(iso) {
     return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
 }
 
-/** "30 Sep, 10:00": a date and time short enough for a list row. */
+/** "30 Sep, 10:00", or "29 Oct 2025, 12:03" from another year: short enough for a list row. */
 export function short(iso) {
-    return iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    if (!iso) {
+        return '';
+    }
+    const date = new Date(iso);
+    // The year only when it is not this one: "29 Oct 2025, 12:03" next to "15 Sep, 01:55".
+    const year = date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {};
+    return date.toLocaleString(undefined, { day: 'numeric', month: 'short', ...year, hour: '2-digit', minute: '2-digit' });
 }
 
 /** "84.2k", "1.3M": token counts short enough for a line of text. */
