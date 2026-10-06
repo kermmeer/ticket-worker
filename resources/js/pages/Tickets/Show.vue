@@ -45,6 +45,22 @@ watch(proposal, (value) => (draft.body = value?.reply_draft ?? ''), { immediate:
 
 const openLabel = usePage().props.openLabel ?? 'Jira';
 
+// Without an outbox, the reply goes over by hand. The clipboard API needs https; on a
+// plain-http address the older copy command does it from the textarea itself.
+const copied = ref(false);
+async function copyReply() {
+    try {
+        await navigator.clipboard.writeText(draft.body);
+    } catch {
+        const box = document.getElementById('reply');
+        box.select();
+        document.execCommand('copy');
+        box.setSelectionRange(0, 0);
+    }
+    copied.value = true;
+    setTimeout(() => (copied.value = false), 2000);
+}
+
 // "and open it": the tab opens on the click itself, or the browser blocks it as a popup,
 // and is sent to the draft once the outbox has it. If the outbox refuses, it closes again.
 function toOutbox(open = false) {
@@ -104,7 +120,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         <SpaceLabel :label="ticket.space.label" :colour="ticket.space.colour" class="text-sm text-muted" />
         <span v-if="ticket.priority" class="text-sm text-muted">· {{ ticket.priority }}</span>
         <span class="text-sm text-muted">· {{ ticket.assignee ? `assigned to ${ticket.assignee}` : 'assigned to nobody' }}</span>
-        <a :href="ticket.url" target="_blank" rel="noopener" class="ml-auto text-sm text-muted hover:text-ink">Open in the outbox ↗</a>
+        <a :href="ticket.url" target="_blank" rel="noopener" class="ml-auto text-sm text-muted hover:text-ink">Open in {{ openLabel }} ↗</a>
     </div>
     <h1 class="display mt-3 text-3xl leading-tight sm:text-4xl">{{ ticket.summary }}</h1>
     <p v-if="ticket.slas.length" class="mt-2 flex flex-wrap gap-x-5 text-sm">
@@ -270,16 +286,25 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     <label for="reply" class="font-medium">Reply draft<span v-if="proposal.reply_language" class="font-normal text-muted"> · {{ proposal.reply_language }}</span></label>
                     <textarea id="reply" v-model="draft.body" rows="8" class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 text-sm"></textarea>
                     <div class="mt-3 flex flex-wrap items-center gap-3">
-                        <template v-if="ticket.space.type === 'service'">
+                        <template v-if="outboxReady && ticket.space.type === 'service'">
                             <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="public" /> Reply to customer</label>
                             <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="internal" /> Internal note</label>
                         </template>
-                        <button type="submit" class="btn ml-auto" :disabled="!outboxReady || draft.processing || !draft.body.trim()">Send to the outbox as a draft</button>
-                        <button type="button" class="btn btn-signal" :disabled="!outboxReady || draft.processing || !draft.body.trim()" @click="toOutbox(true)">
-                            Draft and open in {{ openLabel }} <span aria-hidden="true">↗</span>
+                        <button type="button" class="btn ml-auto" :class="{ 'btn-signal': !outboxReady }" :disabled="!draft.body.trim()" @click="copyReply">
+                            {{ copied ? 'Copied' : 'Copy reply' }}
                         </button>
+                        <template v-if="outboxReady">
+                            <button type="submit" class="btn" :disabled="draft.processing || !draft.body.trim()">Send to the outbox as a draft</button>
+                            <button type="button" class="btn btn-signal" :disabled="draft.processing || !draft.body.trim()" @click="toOutbox(true)">
+                                Draft and open in the outbox <span aria-hidden="true">↗</span>
+                            </button>
+                        </template>
                     </div>
-                    <p class="mt-2 text-muted">Nothing goes to Jira from here: the draft waits in the outbox until you send it there.</p>
+                    <p v-if="outboxReady" class="mt-2 text-muted">Nothing goes to Jira from here: the draft waits in the outbox until you send it there.</p>
+                    <p v-else class="mt-2 text-muted">
+                        Nothing goes to Jira from here: copy the reply and paste it into the ticket in
+                        <a :href="ticket.url" target="_blank" rel="noopener" class="underline hover:text-ink">{{ openLabel }} ↗</a>.
+                    </p>
                 </form>
                 </div>
             </FoldingSection>

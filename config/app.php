@@ -55,6 +55,13 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | One password for the whole app, asked once per browser session. Leave it empty
+    | when something in front of the app already asks who you are (INSTALL.md).
+    */
+
+    'password' => env('APP_PASSWORD'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

@@ -28,7 +28,7 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    // The one Jira site, read with an API token as in jira-outbox (CONCEPT.md §13).
+    // The one Jira site, read with an API token (CONCEPT.md §13).
     'jira' => [
         'base' => rtrim((string) env('JIRA_BASE', ''), '/'),
         'email' => env('JIRA_EMAIL'),
@@ -36,12 +36,12 @@ return [
         // dummy: nothing reaches Jira. Anything but "real" counts as dummy.
         'write' => env('JIRA_WRITE') === 'real' ? 'real' : 'dummy',
         // Where a ticket opens when you click it: Jira itself by default, or another app
-        // that takes the key, e.g. https://jira.techfactory.dev/{key} for jira-outbox.
+        // that takes the key, e.g. https://outbox.example.com/{key}.
         'open_url' => env('JIRA_OPEN_URL'),
         'open_label' => env('JIRA_OPEN_LABEL', 'Jira'),
     ],
 
-    // jira-outbox: reply drafts go there, and you send them from there (docs/OUTBOX-API.md).
+    // Optional. An outbox app: reply drafts go there, and you send them from there (docs/OUTBOX-API.md).
     'outbox' => [
         'url' => env('OUTBOX_URL'),
         'token' => env('OUTBOX_API_TOKEN'),

@@ -95,12 +95,12 @@ class SystemsTest extends TestCase
 
     public function test_the_page_shows_where_to_push(): void
     {
-        config(['agent.systems_push_base' => 'kermmeer@minas:/srv/systems/']);
+        config(['agent.systems_push_base' => 'you@server:/srv/systems/']);
         System::create(['name' => 'billing', 'branch' => 'release', 'state' => System::READY]);
 
         $this->get('/systems')->assertInertia(fn (Assert $page) => $page
             ->component('Systems', true)
-            ->where('systems.0.remote', 'kermmeer@minas:/srv/systems/billing')
+            ->where('systems.0.remote', 'you@server:/srv/systems/billing')
             ->where('systems.0.branch', 'release')
             ->where('systems.0.head', null));
     }

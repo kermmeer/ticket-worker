@@ -1,13 +1,16 @@
-# Brief for jira-outbox: reply drafts from Ticket Worker
+# The outbox API: reply drafts from Ticket Worker
 
-Paste this into a session working on jira-outbox.
+**Optional.** Without an outbox, Ticket Worker shows each reply draft with a *Copy reply*
+button and you paste it into Jira yourself. This document is the API an outbox app must
+offer for Ticket Worker to hand drafts over instead. It is written as a brief, so you can
+give it to whoever (or whichever agent) builds or adapts one.
 
 ## Why
 
-Ticket Worker is another app on minas (`/data/apps/ticket-worker-dev`). Its agents analyse
-last-line support tickets and draft a reply for each. It never posts to Jira itself, and it
-should not learn how: jira-outbox already posts comments, with mentions, files, scheduling,
-status changes and assignees, and it is where the person reviews what goes out.
+Ticket Worker's agents analyse last-line support tickets and draft a reply for each. It
+never posts to Jira itself, and it should not learn how: an outbox is an app that already
+posts comments, with mentions, files, scheduling, status changes and assignees, and it is
+where the person reviews what goes out.
 
 So Ticket Worker hands its reply to the outbox **as a draft**. The draft waits in the outbox
 until the person opens it, edits it if needed, and schedules or sends it like any message.
@@ -28,17 +31,17 @@ Nothing Ticket Worker sends ever reaches Jira without that click.
 ```json
 {
   "externalId": "ticket-worker:proposal:123",
-  "issueKey": "DEVBESUP-3123",
+  "issueKey": "SUP-3123",
   "body": "Plain text. Paragraphs are separated by blank lines.",
   "visibility": "public",
-  "source": { "name": "Ticket Worker", "url": "https://ticketworker.techfactory.dev/tickets/DEVBESUP-3123" }
+  "source": { "name": "Ticket Worker", "url": "https://ticket-worker.example.com/tickets/SUP-3123" }
 }
 ```
 
 - `visibility`: `public` (a reply the customer sees) or `internal` (an internal note). Only
   meaningful in a Jira Service Management space; elsewhere every comment is just a comment.
 - Answer `201` with
-  `{ "id", "state": "draft", "url": "https://jira.techfactory.dev/DEVBESUP-3123?draft=<id>" }`.
+  `{ "id", "state": "draft", "url": "https://outbox.example.com/SUP-3123?draft=<id>" }`.
 - **Idempotent by `externalId`.** The same `externalId` again replaces the body of that draft
   while it is still a draft (`200`, same shape). Once it is scheduled, sent or discarded,
   answer `409` with its current state and leave it alone.
@@ -59,7 +62,7 @@ Nothing Ticket Worker sends ever reaches Jira without that click.
 
 ```json
 {
-  "id": "…", "externalId": "ticket-worker:proposal:123", "issueKey": "DEVBESUP-3123",
+  "id": "…", "externalId": "ticket-worker:proposal:123", "issueKey": "SUP-3123",
   "state": "draft | scheduled | sent | failed | discarded",
   "sendAt": null, "sentAt": null, "commentId": null, "commentUrl": null
 }
@@ -83,12 +86,11 @@ reply is never sent by accident when an internal note was meant.
 
 ### 6. Reachable from Ticket Worker's containers
 
-Ticket Worker calls from its own Docker containers on minas. The public address
-(`jira.techfactory.dev`) sits behind Authentik, and the published port is bound to
-`127.0.0.1`, so neither works from another container. Make the API reachable on an internal
-Docker network shared by both projects (for example an external network `apps-internal`),
-and accept that service name as a `Host` (`ALLOWED_HOSTS`). Ticket Worker then sets
-`OUTBOX_URL` (for example `http://<service>:<port>`) and `OUTBOX_API_TOKEN`.
+Ticket Worker calls from its own containers (the `worker`, `scheduler` and `app` services).
+If the outbox's public address sits behind a login, or its port is bound to `127.0.0.1`,
+neither works from there. Make the API reachable another way, for example on a Docker
+network shared by both projects, and accept that service name as a `Host`. Ticket Worker
+then sets `OUTBOX_URL` (for example `http://<service>:<port>`) and `OUTBOX_API_TOKEN`.
 
 ### 7. Tests
 
@@ -112,7 +114,7 @@ not only its own drafts, also what you wrote in the outbox yourself.
   "messages": [
     {
       "id": "…",
-      "issueKey": "DEVBESUP-3123",
+      "issueKey": "SUP-3123",
       "state": "scheduled",
       "sendAt": "2026-10-04T08:00:00+02:00",
       "visibility": "public",
@@ -121,7 +123,7 @@ not only its own drafts, also what you wrote in the outbox yourself.
       "assignee": { "displayName": "Alex Moreau" },
       "dueDate": null,
       "source": "outbox",
-      "url": "https://jira.techfactory.dev/DEVBESUP-3123"
+      "url": "https://outbox.example.com/SUP-3123"
     }
   ]
 }

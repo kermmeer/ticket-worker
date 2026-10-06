@@ -124,7 +124,7 @@ class TicketController extends Controller
         return back()->with('success', 'Session closed. Analyse starts a new one.');
     }
 
-    /** Hand the reply draft to jira-outbox, where it waits for you to send it. */
+    /** Hand the reply draft to the outbox, where it waits for you to send it. */
     public function draft(Request $request, Ticket $ticket, OutboxClient $outbox, JiraClient $jira): RedirectResponse
     {
         $data = $request->validate([

@@ -170,7 +170,7 @@ const states = {
                     </div>
                     <pre class="mt-2 overflow-x-auto rounded-md border border-line bg-sunken p-3 font-mono text-xs leading-relaxed">{{ commands(system) }}</pre>
                     <p v-if="!system.remote" class="mt-2 text-sm text-muted">
-                        Set SYSTEMS_PUSH_BASE in shared/.env to show the address as your machine sees it; this is the
+                        Set SYSTEMS_PUSH_BASE in .env to show the address as your machine sees it; this is the
                         folder as the app sees it.
                     </p>
                 </div>

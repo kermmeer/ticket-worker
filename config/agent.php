@@ -42,7 +42,7 @@ return [
     'systems_path' => env('SYSTEMS_PATH', $shared.'/systems'),
 
     // Where that folder is as seen from your own machine, to show the push command:
-    // e.g. kermmeer@192.168.3.89:/data/apps/ticket-worker-dev/shared/systems
+    // e.g. you@server:/srv/ticket-worker/data/systems
     'systems_push_base' => env('SYSTEMS_PUSH_BASE'),
 
     'sync_every_minutes' => (int) env('SYNC_EVERY_MINUTES', 10),

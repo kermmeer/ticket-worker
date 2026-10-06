@@ -17,6 +17,9 @@ abstract class TestCase extends BaseTestCase
         // Pages render without a Vite build, so the suite never needs node.
         $this->withoutVite();
 
+        // The gate is this machine's choice; a test that wants it says so.
+        config(['app.password' => null]);
+
         // Tests never reach Jira: a request nobody faked fails the test instead.
         Http::preventStrayRequests();
 

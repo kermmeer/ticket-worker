@@ -8,8 +8,9 @@ use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * jira-outbox, where Ticket Worker's replies wait as drafts until you send them
- * (docs/OUTBOX-API.md). Ticket Worker never posts to Jira itself.
+ * The outbox, optional: a separate app where Ticket Worker's replies wait as drafts until
+ * you send them to Jira (docs/OUTBOX-API.md is the API it must offer). Ticket Worker never
+ * posts to Jira itself; without an outbox you copy the reply over by hand.
  */
 class OutboxClient
 {
@@ -76,7 +77,7 @@ class OutboxClient
     public function check(): ?string
     {
         if (! $this->configured()) {
-            return 'Not set up: OUTBOX_URL and OUTBOX_API_TOKEN in shared/.env.';
+            return 'Not set up: OUTBOX_URL and OUTBOX_API_TOKEN in .env.';
         }
 
         try {
@@ -95,7 +96,7 @@ class OutboxClient
     private function send(string $method, string $path, array $data = []): array
     {
         if (! $this->configured()) {
-            throw new RuntimeException('The outbox is not set up: OUTBOX_URL and OUTBOX_API_TOKEN in shared/.env.');
+            throw new RuntimeException('The outbox is not set up: OUTBOX_URL and OUTBOX_API_TOKEN in .env.');
         }
 
         $response = $this->request()->{$method}($path, $data);

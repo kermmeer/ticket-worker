@@ -3,6 +3,7 @@
 namespace App\Agent;
 
 use App\Casebook\Matcher;
+use App\Jira\JiraClient;
 use App\Models\AgentSession;
 use App\Models\CasebookEntry;
 use App\Models\Setting;
@@ -189,7 +190,7 @@ The commits since, with the files they touched:
     /** Sent with every turn that writes a reply draft, so a change applies at once. */
     public static function replyRules(): string
     {
-        return "Write the reply draft by these rules:\n".Setting::replyRules();
+        return "Write the reply draft by these rules:\n".Setting::replyRulesFor(app(JiraClient::class)->firstName());
     }
 
     public static function restate(): string

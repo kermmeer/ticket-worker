@@ -20,7 +20,7 @@ class Setting extends Model
     - Plain words. No file names, code, commits or internal system names unless the reporter is technical.
     - Start with a short greeting using their first name when the ticket shows it.
     - End on a friendly line, in the reply's language (for example "Fijne dag nog!" or "Have a great day!").
-    - Sign off as Karl.
+    - Sign off as {first_name}.
     TEXT;
 
     protected $primaryKey = 'key';
@@ -44,6 +44,15 @@ class Setting extends Model
     public static function replyRules(): string
     {
         return filled($rules = static::get(self::REPLY_RULES)) ? $rules : self::DEFAULT_REPLY_RULES;
+    }
+
+    /**
+     * The rules as the agent gets them: {first_name} becomes the first name of the Jira
+     * account the app reads with, so each instance signs with its own owner's name.
+     */
+    public static function replyRulesFor(?string $firstName): string
+    {
+        return str_replace('{first_name}', $firstName ?? 'the support team', static::replyRules());
     }
 
     /** Hyper mode: sync every minute instead of every SYNC_EVERY_MINUTES (CONCEPT.md §6). */

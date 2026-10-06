@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jira\JiraClient;
 use App\Models\Setting;
 use App\Setup\SetupChecks;
 use Illuminate\Http\RedirectResponse;
@@ -11,10 +12,11 @@ use Inertia\Response;
 
 class SetupController extends Controller
 {
-    public function __invoke(SetupChecks $checks): Response
+    public function __invoke(SetupChecks $checks, JiraClient $jira): Response
     {
         return Inertia::render('Setup', [
             'checks' => $checks->all(),
+            'firstName' => $jira->firstName(),
             'replyRules' => Setting::replyRules(),
             'defaultReplyRules' => Setting::DEFAULT_REPLY_RULES,
         ]);

@@ -6,6 +6,7 @@ const props = defineProps({
     checks: { type: Array, required: true },
     replyRules: { type: String, required: true },
     defaultReplyRules: { type: String, required: true },
+    firstName: { type: String, default: null },
 });
 
 const rules = useForm({ rules: props.replyRules });
@@ -66,6 +67,9 @@ const marks = {
             <p class="mt-1 max-w-3xl text-sm text-muted">
                 Every reply draft the agent writes follows these rules, in the reply's own language. A change applies to the
                 next draft, also in a conversation already going.
+                <code>{first_name}</code> becomes the first name of the Jira account this app reads with:
+                <strong v-if="firstName" class="font-medium text-ink">{{ firstName }}</strong>
+                <template v-else>not known until Jira answers, and until then "the support team"</template>.
             </p>
             <textarea id="rules" v-model="rules.rules" rows="8" class="mt-3 w-full rounded-md border border-line bg-page px-3 py-2 text-sm"></textarea>
             <p v-if="rules.errors.rules" class="mt-1 text-sm text-signal">{{ rules.errors.rules }}</p>

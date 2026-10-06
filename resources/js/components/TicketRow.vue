@@ -42,7 +42,7 @@ function toggleHidden() {
                 <template v-if="ticket.created_at"> · created {{ short(ticket.created_at) }}</template>
                 · updated {{ ago(ticket.updated_at) }}
             </p>
-            <!-- What is waiting in jira-outbox for this ticket, and what sending it will change. -->
+            <!-- What is waiting in the outbox for this ticket, and what sending it will change. -->
             <p v-for="(message, index) in ticket.outbox ?? []" :key="index" class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
                 <a :href="message.url" target="_blank" rel="noopener" class="hover:underline" :class="message.state === 'failed' ? 'font-medium text-signal' : 'text-ink'">
                     <template v-if="message.state === 'failed'">Failed to send from the outbox</template>

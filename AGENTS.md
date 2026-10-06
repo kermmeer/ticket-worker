@@ -9,34 +9,28 @@ This file is for whoever builds the tool, not for the agents the tool starts on 
 get their instructions from the code, and their workspace sits outside this repository
 (`shared/agent/`), so this file never loads into them. Keep it that way.
 
-## The environment (minas)
+## Running it
 
-A toolbox dev tree, `/data/apps/ticket-worker-dev/work`, served live by php-fpm in a container.
+Two ways, both in `INSTALL.md`:
 
-```bash
-sudo toolbox-dev ticket-worker-dev composer|migrate|test|up|status|patch
-corepack npm@11 install && corepack npm@11 run build   # minas has no global npm
-```
+- **Docker** (`compose.yml`, `docker/`): the code is baked into the images. After a change,
+  `docker compose up -d --build`. Artisan: `docker compose exec app php artisan …`.
+- **On a machine with PHP 8.3+, Composer and Node**: `composer install`, `npm ci && npm run build`,
+  `php artisan migrate`, then `php artisan serve` plus `php artisan queue:work --queue=default`,
+  `php artisan queue:work --queue=agents --tries=1 --timeout=1800` and `php artisan schedule:work`.
 
-- PHP changes apply on the next request. **Vue and CSS changes need `run build`**: php-fpm
-  serves `public/build`, and there is no Vite dev server here.
-- Never run `php artisan` on the host in `work/`. What it creates under `storage/` is not
-  writable by php-fpm, and every logged error then turns into a 500. Use the toolbox commands.
-- `shared/.env` (linked as `work/.env`) holds the real settings and secrets. `.env.example`
-  documents every setting; keep the two in step, with no real values in the example.
-- Work leaves as patches (`toolbox-dev … patch`). Nothing here can push.
-- Five containers: `app` (php-fpm), `web`, `worker`, `scheduler` and `agent`
-  (`CONCEPT.md` §12). Their definitions live outside the repository, in
-  `/data/apps/ticket-worker-dev/compose.yml` and `Dockerfile.deploy`.
-- Queue workers keep the code they started with. After changing a job:
-  `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml restart worker scheduler agent`.
-  **First check no agent turn or scan is running** (`agent_turns` and `systems.scan_state`
-  queued or running): a restart cuts one off, and it was paid for.
-- Artisan in a container, as the tree's owner (tinker needs a writable `HOME`):
-  `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml --project-directory /data/apps/ticket-worker-dev exec -T --user 1000:33 -e HOME=/tmp -w /app/work app php artisan …`
-- **Never `sed -i` `shared/.env`**, or anything else that replaces the file: the new file
-  loses the `www-data` group, php-fpm can no longer read it, and every page fails with a
-  missing APP_KEY. Append to it, or `sudo chgrp www-data` it afterwards.
+Either way:
+
+- **Vue and CSS changes need a build** (`npm run build`, or a Docker rebuild).
+- Queue workers keep the code they started with: restart them after changing a job. **First
+  check no agent turn or scan is running** (`agent_turns` and `systems.scan_state` queued or
+  running): a restart cuts one off, and it was paid for.
+- `.env.example` documents every setting; keep it in step with `config/`, with no real values.
+- Tests: `php artisan test` (or `composer test`). They run on SQLite in memory and need no
+  Jira, no Claude and no database server.
+
+A machine can add rules of its own in `CLAUDE.local.md` next to this file: Claude Code reads it
+after `CLAUDE.md`, and git ignores it. That is the place for one server's paths and commands.
 
 ## Rules the code does not tell you
 

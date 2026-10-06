@@ -78,9 +78,9 @@ to it, including work you finish.
 
 ## Step 5: back to Jira, and learning
 
-- [x] Tickets open in jira-outbox (`JIRA_OPEN_URL`, `JIRA_OPEN_LABEL`) (2026-10-03)
-- [x] Brief for jira-outbox's draft API: `docs/OUTBOX-API.md`, also at `/docs/outbox` (2026-10-03)
-- [x] Connected to jira-outbox's draft API over `apps-internal` (`OUTBOX_URL`, `OUTBOX_API_TOKEN`);
+- [x] Tickets open in the outbox (`JIRA_OPEN_URL`, `JIRA_OPEN_LABEL`) (2026-10-03)
+- [x] Brief for the outbox's draft API: `docs/OUTBOX-API.md`, also at `/docs/outbox` (2026-10-03)
+- [x] Connected to the outbox's draft API over a shared Docker network (`OUTBOX_URL`, `OUTBOX_API_TOKEN`);
       Setup checks the token without creating a draft (2026-10-03)
 - [x] The overview shows messages waiting in the outbox (scheduled, draft, failed), when they go,
       and the status they will set (`GET /api/v1/scheduled`, 30 s cache) (2026-10-03)
@@ -94,12 +94,14 @@ to it, including work you finish.
 ## Step 6: data tools
 
 - [ ] Per system: read-only API calls and SELECT queries made by the tool, secrets kept by the tool
-      (waits on open question B: can minas reach them?)
+      (waits on open question B: can the server reach them?)
 
 ## Other
 
-- [ ] A generic Docker setup in the repository for someone else's instance, with `APP_PASSWORD`
-      as the gate when there is no Authentik in front (open questions C and D)
+- [x] Shareable: `compose.yml` + `docker/` with a MySQL of its own, an optional `APP_PASSWORD`
+      gate, README and INSTALL.md, the server's own rules in an untracked `CLAUDE.local.md`,
+      replies signed with the Jira account's first name (`{first_name}`), no outbox needed
+      (Copy reply), no personal addresses left in the repository (2026-10-06)
 - [x] Every overview section folds (Needs you to Hidden), remembered per browser; a search or
       status filter opens them all so no match stays folded away.
 - [x] An icon: a ticket stub with a tick on the signal square, as favicon (svg + ico),

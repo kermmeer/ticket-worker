@@ -9,8 +9,8 @@ is solved or you close the session.
 > **Status:** 4 October 2026. Built: steps 0 and 1, the casebook, the outbox connection, and
 > the first agent: a ticket page where **Analyse** runs Claude Code read-only on the ticket
 > and its systems and ends in a proposal (see the [build order](#15-build-order)). The answers to the first round of questions are
-> recorded in [§17](#17-decisions-and-open-questions); with them this file is the build brief,
-> the way jira-outbox's README is.
+> recorded in [§17](#17-decisions-and-open-questions); with them this file is the build brief.
+> How to run it is in [INSTALL.md](INSTALL.md).
 
 ---
 
@@ -52,7 +52,7 @@ decide, and you are the one who answers in Jira.
 |---|---|
 | **Space** | A Jira space: a service space (Jira Service Management) or a plain one. Jira's REST API still calls these *projects*, so the code says `project` wherever it talks to Jira. One Jira site, set in `.env`, serves all spaces. |
 | **Ticket rules** | The JQL that picks which tickets of a space this tool looks at, for example only escalated ones. |
-| **System** | A codebase tickets can be about: a folder on minas that you push the code into, and the agent reads. One system can serve several spaces. |
+| **System** | A codebase tickets can be about: a folder on the server that you push the code into, and the agent reads. One system can serve several spaces. |
 | **System context** | A short Markdown brief per system: what it is, where things are, what users call things. Written by an agent, reviewed by you. |
 | **Analysis** | The first scan of a ticket's problem. It ends in a proposal. |
 | **Casebook** | Solved cases: the problem as tickets show it, its cause, what fixed it. Written by you, or drafted by an agent and approved by you; matched against every open ticket (§8). |
@@ -97,14 +97,14 @@ is a short wizard. You can come back to any step later.
    when the page opens and after every save, and says so loudly when nothing matches. A second rule says when a ticket counts as
    done. The default is Jira's *Done* status category.
 3. **Systems.** Pick the systems this space's tickets can be about, from the Systems page.
-   A system is a folder on minas, `shared/systems/<name>`, that you push its code into from
+   A system is a folder on the server, `data/systems/<name>` with Docker, that you push its code into from
    your own machine: Ticket Worker cannot reach your Git server (mostly GitLab, behind a VPN),
    so it never pulls. The folder is a checkout that accepts pushes to its branch
    (`receive.denyCurrentBranch=updateInstead`), so a push updates the files at once, history
    included, which is what the agent's `git log` and `git blame` need. Every context scan and
    analysis records the commit it read.
 
-   Your PC is the bridge: it has the VPN (GlobalProtect) and can reach the server, and the
+   Your PC is the bridge: it has the VPN and can reach the server, and the
    server never runs the VPN. Each clone on the PC gets a second remote, `ticket-worker`,
    once. From then on `tools/push-systems.sh` (in this repository) fetches every such clone
    from GitLab and pushes it to the server, mirroring GitLab, rewrites included. Run it by
@@ -309,11 +309,14 @@ as a case: the problem as tickets show it, the cause, and what fixed it.
 ## 9. Back to Jira
 
 Version 1 only reads from Jira, and Ticket Worker will never post itself: replies go out
-through **jira-outbox**, the app that already posts comments with mentions, files,
+an **outbox**, a separate app that already posts comments with mentions, files,
 scheduling, status changes and assignees. Ticket Worker hands its reply over as a draft
 (`POST /api/v1/drafts`), the draft waits in the outbox, and you review, edit and send it there.
-What jira-outbox needs for that is briefed in [docs/OUTBOX-API.md](/docs/outbox). Tickets
-already open there (`JIRA_OPEN_URL=https://jira.techfactory.dev/{key}`).
+The API an outbox must offer is in [docs/OUTBOX-API.md](/docs/outbox). Tickets can open there
+too (`JIRA_OPEN_URL=https://outbox.example.com/{key}`).
+
+The outbox is optional. Without one (`OUTBOX_URL` empty) the reply draft has a *Copy reply*
+button and a link to the ticket, and you paste it into Jira yourself.
 *Draft and open* does both at once: the draft goes over and a new tab opens on the link the
 outbox answers with (`?draft=<id>`), so you go straight on editing it there. The tab opens on
 the click itself, since a browser blocks one opened later, and closes again if the outbox
@@ -331,7 +334,7 @@ What the outbox will do with a draft, when you press the button:
   setup checks it. A plain space has one kind of comment, visible to everyone who can open
   the ticket.
 - **Transition and assign** from the ticket header.
-- **A dry-run switch** in `.env` (`JIRA_WRITE=dummy|real`), like jira-outbox's `SEND_MODE`.
+- **A dry-run switch** in `.env` (`JIRA_WRITE=dummy|real`).
   In dummy mode nothing reaches Jira. That is how the tool is developed and demonstrated.
 
 The agent itself never gets a way to write to Jira.
@@ -427,7 +430,7 @@ own work.
 - **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders, and the
   systems hold what you pushed, which is committed code, not a server's `.env`.
 - **Personal data.** Tickets carry names, email addresses and screenshots.
-  - *On minas* they sit in the database, in the ticket's workspace (`ticket.md`,
+  - *On the server* they sit in the database, in the ticket's workspace (`ticket.md`,
     `attachments/`) and in the CLI's session transcripts, which are plain text. A ticket's
     workspace and transcripts are deleted 30 days after its session closes; its proposals and
     closing note stay. The database backups hold ticket data too.
@@ -453,7 +456,7 @@ own work.
 ## 12. Architecture
 
 ```
- browser ── HTTPS, Authentik ──► nginx ──► php-fpm · Laravel 13 ◄── REST v3 ──► Jira Cloud
+ browser ── HTTPS, a gate ──► nginx ──► php-fpm · Laravel 13 ◄── REST v3 ──► Jira Cloud
                                                │         ▲
                                      queue jobs│         │events, polled by the page
                                                ▼         │
@@ -470,10 +473,11 @@ own work.
                                          calls  the Anthropic API
 ```
 
-- **Stack, same as palantir:** Laravel 13, Inertia with Vue 3, Tailwind 4.
+- **Stack:** Laravel 13, Inertia with Vue 3, Tailwind 4.
 - **No accounts.** One person per instance, so there is nothing to log in to inside the app.
-  The site sits behind a gate instead: Authentik on minas. An instance without one gets a
-  single password from `.env` (`APP_PASSWORD`, still to build).
+  The site sits behind a gate instead: either something in front that asks who you are
+  (an SSO proxy, a VPN), or one password from `.env` (`APP_PASSWORD`), asked once per
+  browser session. Built 2026-10-06.
 - **The worker containers**: see below.
 - **Live output by polling.** While a turn runs, the page asks once a second for the events
   after the last one it has. There is no websocket server to run. Reverb can come later if
@@ -482,8 +486,7 @@ own work.
   through `GET /rest/api/3/field` and asked for in the sync's search like any field.
 - **Jira:** `POST /rest/api/3/search/jql` paged with `nextPageToken` for the sync,
   `GET /rest/api/3/issue/{key}` and its comments for gathering, and
-  `GET /rest/api/3/attachment/content/{id}` for downloads. Basic auth with an API token, as
-  in jira-outbox.
+  `GET /rest/api/3/attachment/content/{id}` for downloads. Basic auth with an API token.
 
 ### The worker containers
 
@@ -496,16 +499,18 @@ image, so they run the same code:
 | `scheduler` | `schedule:work`: the sync, the health reports, the clean-ups | the whole app folder |
 | `agent` | `queue:work --queue=agents`, two replicas (`AGENT_MAX_PARALLEL`) | the code read-only, `shared/agent/` read-write, `shared/systems/` read-only, nothing else of `shared/` |
 
-- `agent` builds a second stage of `Dockerfile.deploy`: the PHP image plus the Claude Code
+- The repository's `compose.yml` and `docker/Dockerfile` define them, with a MySQL of
+  their own (built 2026-10-06); an instance can also bring its own containers, as long as
+  they split the same way.
+- `agent` builds a later stage of the Dockerfile: the PHP image plus the Claude Code
   binary (a pinned version that never updates itself) and ripgrep. `app` builds the first
   stage, so php-fpm never carries the CLI.
-- All three run as the tree's owner with the `www-data` group (`1000:33`), as the toolbox's
-  own commands do, so whatever they write stays editable from both sides, including by your
-  pushes.
-- Paths are the same in every container (`/app/shared/systems/billing`), so a path stored in
+- All of them run as one user, the owner of the data folder (`UID`, `GID`), so whatever
+  they write stays editable from both sides, including by your pushes.
+- Paths are the same in every container (`/data/systems/billing`), so a path stored in
   the database means the same thing everywhere.
 - Nothing here can reach a Git server, and nothing needs to: systems arrive by your push.
-- `agent` gets `CLAUDE_CONFIG_DIR=/app/shared/agent/claude` and
+- `agent` gets `CLAUDE_CONFIG_DIR=/data/agent/claude` and
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A deploy stops it with a grace period; a turn
   it interrupts is marked stopped, and the session carries on with your next message.
 - **Health.** php-fpm cannot look into the other containers, so every minute the scheduler
@@ -538,8 +543,10 @@ repository is on the list (§17).
 
 | Variable | Default | Notes |
 |---|---|---|
-| `JIRA_BASE` | — | `https://<site>.atlassian.net`, the one Jira site. Same names as jira-outbox |
+| `JIRA_BASE` | — | `https://<site>.atlassian.net`, the one Jira site |
 | `JIRA_EMAIL`, `JIRA_TOKEN` | — | API token of the account the tool reads as |
+| `APP_PASSWORD` | — | one password for the whole app; leave empty only behind another gate |
+| `OUTBOX_URL`, `OUTBOX_API_TOKEN` | — | optional: an outbox that takes reply drafts |
 | `JIRA_WRITE` | `dummy` | `real` lets the post and transition buttons reach Jira (later) |
 | `ANTHROPIC_API_KEY` | — | an API key, not a subscription token: see §11 for why |
 | `CLAUDE_BIN` | `claude` | path to the CLI inside the worker |
@@ -548,7 +555,7 @@ repository is on the list (§17).
 | `AGENT_MAX_PARALLEL` | `2` | turns running at once |
 | `AGENT_TURN_BUDGET_USD` | `3` | default ceiling per turn; a space can override it |
 | `SYSTEMS_PATH` | `shared/systems` | the folders you push the systems into |
-| `SYSTEMS_PUSH_BASE` | — | the same folder as your machine sees it, for the push command, e.g. `kermmeer@192.168.3.89:/data/apps/ticket-worker-dev/shared/systems` |
+| `SYSTEMS_PUSH_BASE` | — | the same folder as your machine sees it, for the push command, e.g. `you@server:/srv/ticket-worker/data/systems` |
 | `AGENT_WORKSPACES_PATH` | `shared/agent/tickets` | one folder per ticket |
 | `CLAUDE_CONFIG_DIR` | `shared/agent/claude` | the CLI's sessions; must outlive the container |
 | `SYNC_EVERY_MINUTES` | `10` | |
@@ -567,12 +574,9 @@ repository is on the list (§17).
    one others rely on), and scope it to the workspace from step 2.
 4. Copy the key. It starts with `sk-ant-` and is shown **only once**; lose it and you create
    a new one.
-5. Add it to `shared/.env` as `ANTHROPIC_API_KEY=sk-ant-…` with an editor. Afterwards the
-   file must still be group `www-data`: if pages fail with a missing APP_KEY, run
-   `sudo chgrp www-data /data/apps/ticket-worker-dev/shared/.env`.
-6. Restart the queue containers so they read it:
-   `sudo docker compose -f /data/apps/ticket-worker-dev/compose.yml restart worker scheduler agent`.
-   The Setup page then shows the key as set.
+5. Add it to `.env` as `ANTHROPIC_API_KEY=sk-ant-…`.
+6. Restart so the containers read it: `docker compose up -d`. The Setup page then shows the
+   key as set.
 
 Calls with this key fall under Anthropic's Commercial Terms: no training on them, kept for
 30 days (§11).
@@ -585,7 +589,7 @@ hand the ticket agents your settings, memory and every other project.
 
 1. On any machine where you are signed in to Claude Code with the subscription, run
    `claude setup-token` and copy the token it prints.
-2. Add it to `shared/.env` as `CLAUDE_CODE_OAUTH_TOKEN=…` (leave `ANTHROPIC_API_KEY` empty: a
+2. Add it to `.env` as `CLAUDE_CODE_OAUTH_TOKEN=…` (leave `ANTHROPIC_API_KEY` empty: a
    key wins when both are set), and restart the queue containers as above.
 
 What changes: analyses draw on the subscription's usage limits, the same ones your own Claude
@@ -595,7 +599,7 @@ off *Help improve Claude* in the claude.ai privacy settings, or Anthropic may tr
 contents and keep them for five years (§11).
 
 Everything per space (rules, type, statuses, systems, budgets, model) lives in the database
-and is edited in the app. Nothing outside `.env` may assume minas: another person's instance runs on
+and is edited in the app. Nothing outside `.env` may assume one particular server: another person's instance runs on
 their own machine with their own settings.
 
 ---
@@ -692,7 +696,7 @@ Each step ends in something usable.
 | 6. Data tools | per system, read-only API calls and SELECT queries made by the tool, secrets kept by the tool | an analysis checks a claim against real data without ever seeing a token |
 
 ---|---|---|
-| 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, Authentik login, design tokens, both themes, empty screens | the shell looks right in Day and Night, on desktop and phone. **Built 2026-10-02, except the login.** |
+| 0. Skeleton | Laravel 13, Inertia and Vue, Tailwind 4, the gate, design tokens, both themes, empty screens | the shell looks right in Day and Night, on desktop and phone. **Built 2026-10-02; the password gate 2026-10-06.** |
 | 1. Jira and spaces | Jira client, wizard steps 1–2 with live preview, sync, overview | the overview lists exactly what the JQL lists in Jira |
 | 2. Agent runner and systems | worker container, turn runner, event trail on screen, systems, context scans, review and edit | a scanned context is one you would hand to a new colleague |
 | 3. Analysis | ticket workspace, gather, route, dig, proposal screen, code viewer | the backtest (§16) gets most real tickets right |
@@ -725,7 +729,7 @@ asked is what the casebook is worth.
    internal note, and the Jira account must be an agent in it (§9).
 2. **Users.** One person per instance. Someone else runs an instance of their own, never a
    shared one, so the app has no accounts (§12).
-3. **Systems.** Folders on minas that you push into (§4). Ticket Worker never reaches GitLab.
+3. **Systems.** Folders on the server that you push into (§4). Ticket Worker never reaches GitLab.
 4. **Contexts.** In the tool (§5).
 5. **Beyond code.** Normally code and history only. Systems with an API or a read-only
    database get data tools in step 6, with the secrets kept by the tool (§11).
@@ -743,12 +747,12 @@ asked is what the casebook is worth.
 
 The value in brackets is what the design assumes until then.
 
-- **A. Pushing to minas.** *Answered 2026-10-04:* yes, by IP; the name `minas` does not resolve
-  on the PC, so `SYSTEMS_PUSH_BASE` uses `kermmeer@192.168.3.89`. The web address cannot take a
-  push: it serves the site, behind Authentik.
-- **B. Data tools.** Can minas reach those APIs and databases, or are they behind the same VPN
+- **A. Pushing to the server.** *Answered 2026-10-04:* yes, over SSH, by IP when the
+  server's name does not resolve on the PC (`SYSTEMS_PUSH_BASE`). The web address cannot
+  take a push: it serves the site.
+- **B. Data tools.** Can the server reach those APIs and databases, or are they behind the same VPN
   as GitLab? If they are, the data tools need another way in. *[unknown; step 6 waits for it]*
-- **C. Other people's instances.** Should the repository carry a generic Docker setup, so
-  someone can run an instance without the minas toolbox? *[yes, before anyone needs it]*
-- **D. A gate of its own.** An instance without Authentik in front asks for one password from
-  `.env`. *[yes, together with C]*
+- **C. Other people's instances.** *Answered 2026-10-06:* yes. The repository carries
+  `compose.yml` with its own MySQL (INSTALL.md); nothing in it assumes the first server.
+- **D. A gate of its own.** *Answered 2026-10-06:* `APP_PASSWORD`, asked once per browser
+  session; empty means something else in front guards it.

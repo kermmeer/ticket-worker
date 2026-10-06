@@ -60,7 +60,7 @@ class SetupChecks
         } catch (Throwable) {
             // The driver's message can name hosts and users; the page does not need them.
             return $this->item('database', 'Basics', 'Database', self::TODO,
-                'Cannot reach the database. Check the DB_ settings in shared/.env.');
+                'Cannot reach the database. Check the DB_ settings in .env.');
         }
 
         try {
@@ -103,7 +103,7 @@ class SetupChecks
 
         if ($missing !== []) {
             return $this->item('jira', 'Jira', 'Connection', self::TODO,
-                'Not connected. Set '.implode(', ', $missing).' in shared/.env.');
+                'Not connected. Set '.implode(', ', $missing).' in .env.');
         }
 
         try {
@@ -128,11 +128,17 @@ class SetupChecks
 
     private function outbox(): array
     {
+        // Optional: without one, replies are copied into Jira by hand.
+        if (! $this->outbox->configured()) {
+            return $this->item('outbox', 'Jira', 'Outbox', self::NOTE,
+                'None, which is fine: you copy a reply draft into Jira yourself. An outbox is a separate app that takes drafts (OUTBOX_URL, OUTBOX_API_TOKEN; docs/OUTBOX-API.md).');
+        }
+
         $problem = Cache::remember('setup.outbox', 60, fn () => $this->outbox->check() ?? '');
 
         return $problem === ''
-            ? $this->item('outbox', 'Jira', 'jira-outbox', self::OK, 'Connected: reply drafts go there, and you send them from there.')
-            : $this->item('outbox', 'Jira', 'jira-outbox', self::TODO, $problem);
+            ? $this->item('outbox', 'Jira', 'Outbox', self::OK, 'Connected: reply drafts go there, and you send them from there.')
+            : $this->item('outbox', 'Jira', 'Outbox', self::TODO, $problem);
     }
 
     private function anthropicKey(): array
@@ -143,7 +149,7 @@ class SetupChecks
             filled(config('agent.claude.oauth_token')) => $this->item('anthropic', 'Claude', 'Sign-in', self::NOTE,
                 "Subscription token set: analyses use your subscription's limits, and its privacy setting decides whether Anthropic may train on them."),
             default => $this->item('anthropic', 'Claude', 'Sign-in', self::TODO,
-                'Not set. Agents need ANTHROPIC_API_KEY, or a subscription token as CLAUDE_CODE_OAUTH_TOKEN, in shared/.env.'),
+                'Not set. Agents need ANTHROPIC_API_KEY, or a subscription token as CLAUDE_CODE_OAUTH_TOKEN, in .env.'),
         };
     }
 

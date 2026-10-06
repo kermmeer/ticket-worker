@@ -4,12 +4,17 @@ use App\Http\Controllers\CasebookController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\HiddenTicketController;
 use App\Http\Controllers\HyperModeController;
+use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SpaceController;
 use App\Http\Controllers\SystemController;
 use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/login', [LoginController::class, 'show'])->name('login');
+Route::post('/login', [LoginController::class, 'attempt'])->middleware('throttle:6,1')->name('login.attempt');
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::get('/', OverviewController::class)->name('overview');
 Route::post('/hyper', HyperModeController::class)->name('hyper');

@@ -10,7 +10,7 @@
 # Every git clone in the folders given, or in the folders directly below them, takes
 # part when it has a "ticket-worker" (or "ticketworker") remote. One-time setup per clone:
 #
-#   git remote add ticket-worker kermmeer@192.168.3.89:/data/apps/ticket-worker-dev/shared/systems/billing
+#   git remote add ticket-worker you@server:/srv/ticket-worker/data/systems/billing
 #   git config ticket-worker.branch main        # optional; main is the default
 #
 # If the VPN cuts you off from the server, run "fetch" while connected and "push"

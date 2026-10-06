@@ -33,6 +33,33 @@ class JiraClient
         return filled($this->base) && filled($this->email) && filled($this->token);
     }
 
+    /**
+     * The first name of the account the app reads Jira with: replies are signed with it
+     * ({first_name} in the reply rules). Asked once a day; null when Jira is not set up
+     * or does not answer, and then asked again next time.
+     */
+    public function firstName(): ?string
+    {
+        if (filled($name = Cache::get('jira.first_name'))) {
+            return $name;
+        }
+        if (! $this->configured()) {
+            return null;
+        }
+
+        try {
+            $name = strtok(trim((string) ($this->myself()['displayName'] ?? '')), ' ') ?: null;
+        } catch (Throwable) {
+            return null;
+        }
+
+        if ($name !== null) {
+            Cache::put('jira.first_name', $name, now()->addDay());
+        }
+
+        return $name;
+    }
+
     public function base(): string
     {
         return $this->base;
@@ -258,7 +285,7 @@ class JiraClient
     private function send(string $method, string $path, array $data = []): array
     {
         if (! $this->configured()) {
-            throw new JiraException('Jira is not set up: set JIRA_BASE, JIRA_EMAIL and JIRA_TOKEN in shared/.env.');
+            throw new JiraException('Jira is not set up: set JIRA_BASE, JIRA_EMAIL and JIRA_TOKEN in .env.');
         }
 
         try {

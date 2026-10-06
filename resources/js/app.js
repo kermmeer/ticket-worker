@@ -7,8 +7,10 @@ createInertiaApp({
     resolve: (name) => {
         const pages = import.meta.glob('./pages/**/*.vue', { eager: true });
         const page = pages[`./pages/${name}.vue`];
-        // Every page sits in the app's frame unless it names a layout of its own.
-        page.default.layout ??= AppLayout;
+        // Every page sits in the app's frame unless it names a layout of its own, or null.
+        if (page.default.layout === undefined) {
+            page.default.layout = AppLayout;
+        }
         return page;
     },
     setup({ el, App, props, plugin }) {

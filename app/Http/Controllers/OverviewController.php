@@ -59,7 +59,7 @@ class OverviewController extends Controller
                 'reporter' => $ticket->reporter,
                 'assignee' => $ticket->assignee,
                 'slas' => $byId[$ticket->space_id]->visibleSlas($ticket->slas),
-                // Messages waiting in jira-outbox for this ticket, and the status each will set.
+                // Messages waiting in the outbox for this ticket, and the status each will set.
                 'outbox' => collect($waiting[$ticket->key] ?? [])->map(fn (array $message) => [
                     'state' => $message['state'] ?? 'scheduled',
                     'send_at' => $message['sendAt'] ?? null,

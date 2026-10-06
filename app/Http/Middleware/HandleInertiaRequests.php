@@ -32,6 +32,8 @@ class HandleInertiaRequests extends Middleware
                 'name' => config('app.name'),
                 // Shown next to the name everywhere but production, so dev is never mistaken for it.
                 'env' => app()->environment(),
+                // APP_PASSWORD is set: the header offers to sign out.
+                'gate' => RequirePassword::enabled(),
             ],
             'hyper' => fn () => Setting::hyper(),
             // The name on the link that opens a ticket: Jira, or the app JIRA_OPEN_URL points to.

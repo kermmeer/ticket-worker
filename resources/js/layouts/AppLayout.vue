@@ -19,6 +19,7 @@ const url = computed(() => page.url.split(/[?#]/)[0]);
 const env = computed(() => page.props.app?.env);
 const hyper = computed(() => page.props.hyper);
 const flash = computed(() => page.props.flash ?? {});
+const gate = computed(() => page.props.app?.gate);
 
 function toggleHyper() {
     router.post('/hyper', {}, { preserveScroll: true, preserveState: true });
@@ -46,6 +47,9 @@ function toggleHyper() {
                         {{ hyper ? 'Hyper: every minute' : 'Hyper off' }}
                     </button>
                     <ThemeSwitch />
+                    <button v-if="gate" type="button" class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-muted hover:text-ink" @click="router.post('/logout')">
+                        Sign out
+                    </button>
                 </div>
                 <nav aria-label="Main" class="-mb-px flex w-full gap-6 overflow-x-auto text-sm sm:w-auto">
                     <Link

@@ -176,8 +176,8 @@ class AgentTest extends TestCase
 
     public function test_the_page_shows_the_ticket_and_hands_the_reply_to_the_outbox(): void
     {
-        config(['services.outbox.url' => 'http://jira-outbox:5173', 'services.outbox.token' => 'outbox-token']);
-        Http::fake(['jira-outbox:5173/api/v1/drafts' => Http::response(['id' => 'd1', 'state' => 'draft', 'url' => 'https://jira.techfactory.dev/SUP-1?draft=d1'], 201)]);
+        config(['services.outbox.url' => 'http://outbox.test', 'services.outbox.token' => 'outbox-token']);
+        Http::fake(['outbox.test/api/v1/drafts' => Http::response(['id' => 'd1', 'state' => 'draft', 'url' => 'https://outbox.example.com/SUP-1?draft=d1'], 201)]);
 
         $this->get("/tickets/{$this->ticket->id}")->assertInertia(fn (Assert $page) => $page
             ->component('Tickets/Show', true)
@@ -187,17 +187,17 @@ class AgentTest extends TestCase
 
         $this->post("/tickets/{$this->ticket->id}/draft", ['body' => 'Beste, we hebben het gevonden.', 'visibility' => 'internal'])
             ->assertSessionHas('success')
-            ->assertSessionHas('outbox_url', 'https://jira.techfactory.dev/SUP-1?draft=d1');
+            ->assertSessionHas('outbox_url', 'https://outbox.example.com/SUP-1?draft=d1');
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/api/v1/drafts') && $request['visibility'] === 'internal' && $request['issueKey'] === 'SUP-1');
     }
 
     public function test_a_draft_link_that_is_not_a_web_address_falls_back_to_the_ticket(): void
     {
         config([
-            'services.outbox.url' => 'http://jira-outbox:5173', 'services.outbox.token' => 'outbox-token',
+            'services.outbox.url' => 'http://outbox.test', 'services.outbox.token' => 'outbox-token',
             'services.jira.open_url' => 'https://outbox.example/{key}',
         ]);
-        Http::fake(['jira-outbox:5173/api/v1/drafts' => Http::response(['id' => 'd1', 'state' => 'draft', 'url' => 'javascript:alert(1)'], 201)]);
+        Http::fake(['outbox.test/api/v1/drafts' => Http::response(['id' => 'd1', 'state' => 'draft', 'url' => 'javascript:alert(1)'], 201)]);
 
         $this->post("/tickets/{$this->ticket->id}/draft", ['body' => 'Fixed.', 'visibility' => 'public'])
             ->assertSessionHas('outbox_url', 'https://outbox.example/SUP-1');

@@ -90,7 +90,7 @@ class JiraClientTest extends TestCase
     {
         $this->assertSame('https://example.atlassian.net/browse/SUP-1', $this->client()->browseUrl('SUP-1'));
 
-        $outbox = new JiraClient('https://example.atlassian.net', 'me@example.com', 'secret-token', 'https://jira.techfactory.dev/{key}');
-        $this->assertSame('https://jira.techfactory.dev/SUP-1', $outbox->browseUrl('SUP-1'));
+        $outbox = new JiraClient('https://example.atlassian.net', 'me@example.com', 'secret-token', 'https://outbox.example.com/{key}');
+        $this->assertSame('https://outbox.example.com/SUP-1', $outbox->browseUrl('SUP-1'));
     }
 }

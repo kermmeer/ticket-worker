@@ -26,10 +26,10 @@ class SetupTest extends TestCase
             'services.jira.write' => 'dummy',
             'agent.claude.api_key' => 'sk-ant-key-that-must-not-leak',
             'queue.default' => 'database',
-            'services.outbox.url' => 'http://jira-outbox:5173',
+            'services.outbox.url' => 'http://outbox.test',
             'services.outbox.token' => 'outbox-token-that-must-not-leak',
         ]);
-        Http::fake(fn (Request $request) => str_contains($request->url(), 'jira-outbox')
+        Http::fake(fn (Request $request) => str_contains($request->url(), 'outbox.test')
             ? Http::response(['error' => 'No such draft'], 404)
             : ($this->jiraStatus === 200
             ? Http::response(['displayName' => 'Support Bot'])
