@@ -19,7 +19,16 @@ class SetupController extends Controller
             'firstName' => $jira->firstName(),
             'replyRules' => Setting::replyRules(),
             'defaultReplyRules' => Setting::DEFAULT_REPLY_RULES,
+            'autoPatch' => Setting::autoPatch(),
         ]);
+    }
+
+    public function autoPatch(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['on' => ['required', 'boolean']]);
+        Setting::put(Setting::AUTO_PATCH, $data['on'] ? '1' : '0');
+
+        return back();
     }
 
     /** How replies to reporters are written: the agent follows these in every draft. */

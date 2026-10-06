@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Agent\Instructions;
+use App\Agent\Workspace;
 use App\Jira\JiraClient;
 use App\Jira\JiraException;
 use App\Jobs\RunAgentTurn;
@@ -12,6 +13,7 @@ use App\Models\Ticket;
 use App\Outbox\OutboxClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -58,6 +60,8 @@ class TicketController extends Controller
             'history' => $ticket->sessions()->where('state', 'closed')->latest('id')->get()->map->summary(),
             'languages' => self::LANGUAGES,
             'agentReady' => Instructions::credentials() !== [],
+            // What a patch can be for.
+            'systems' => app(Workspace::class)->systems($ticket)->map(fn ($system) => ['id' => $system->id, 'name' => $system->name])->values(),
             'outboxReady' => app(OutboxClient::class)->configured(),
         ]);
     }
@@ -102,6 +106,45 @@ class TicketController extends Controller
     public function draftCase(Ticket $ticket): RedirectResponse
     {
         return $this->follow($ticket, 'case', Instructions::caseRequest());
+    }
+
+    /** Have the agent write its fix as a patch (CONCEPT.md §8). */
+    public function patch(Request $request, Ticket $ticket, Workspace $workspace): RedirectResponse
+    {
+        $session = $ticket->openSession();
+        abort_if($session === null, 409, 'Analyse first.');
+        if ($session->busy()) {
+            return back()->with('error', 'The agent is still working; wait or stop it.');
+        }
+
+        $systems = $workspace->systems($ticket->load('space'));
+        $data = $request->validate(['system' => ['nullable', 'integer']]);
+        $system = isset($data['system'])
+            ? $systems->firstWhere('id', $data['system'])
+            : RunAgentTurn::systemFor($session->turns()->whereNotNull('proposal')->latest('id')->first()?->proposal, $systems);
+
+        if ($system === null) {
+            return back()->with('error', 'Which system should the patch be for? Pick one.');
+        }
+
+        RunAgentTurn::queuePatch($session, $system);
+
+        return back();
+    }
+
+    /** The patch file, for `git am`. */
+    public function patchFile(Ticket $ticket, AgentTurn $turn): HttpResponse
+    {
+        abort_unless($turn->session->ticket_id === $ticket->id && filled($turn->patch), 404);
+
+        $name = Str::slug($turn->patch_meta['subject'] ?? 'fix');
+        $name = Str::startsWith($name, Str::slug($ticket->key)) ? $name : Str::slug($ticket->key).'-'.$name;
+
+        return response($turn->patch, 200, [
+            'Content-Type' => 'text/x-patch; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="'.Str::limit($name, 80, '').'.patch"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function stop(Ticket $ticket): RedirectResponse
@@ -194,6 +237,11 @@ class TicketController extends Controller
                 'answer' => $turn->kind === 'message' ? $turn->answer : null,
                 'error' => $turn->error,
                 'case_draft' => $turn->case_draft !== null,
+                // A patch turn: what it changed, and the patch itself for the diff view.
+                'patch' => $turn->kind === 'patch' ? [
+                    'meta' => collect($turn->patch_meta ?? [])->except('system_id'),
+                    'text' => $turn->patch,
+                ] : null,
                 'cost_usd' => $turn->cost_usd,
                 'tokens_in' => $turn->tokensIn(),
                 'tokens_cached' => $turn->cache_read_tokens,

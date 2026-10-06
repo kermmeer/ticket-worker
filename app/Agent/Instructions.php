@@ -30,7 +30,7 @@ class Instructions
 
         return [
             'type' => 'object',
-            'required' => ['problem', 'system', 'cause', 'evidence', 'fix', 'reply_draft', 'confidence', 'confidence_reason'],
+            'required' => ['problem', 'system', 'cause', 'evidence', 'fix', 'fix_kind', 'reply_draft', 'confidence', 'confidence_reason'],
             'properties' => [
                 'problem' => $text + ['description' => 'The ticket in one or two sentences: what the reporter sees and expected.'],
                 'system' => $text + ['description' => 'Which system it is about, by name, or "unknown".'],
@@ -46,6 +46,8 @@ class Instructions
                     ],
                 ]],
                 'fix' => $text + ['description' => 'What to change and where: code, data or configuration.'],
+                'fix_kind' => ['type' => 'string', 'enum' => ['code', 'data', 'configuration', 'none'],
+                    'description' => 'code when the fix is a change to files in one of the systems: a patch is then prepared for it.'],
                 'workaround' => $text,
                 'questions' => ['type' => 'array', 'items' => $text],
                 'reply_draft' => $text + ['description' => 'A reply to the reporter, written by the reply rules in the request.'],
@@ -109,6 +111,46 @@ class Instructions
     }
 
     /** Ask for a casebook case from what this conversation found. */
+    /** What a patch turn answers with; the tool turns the copy's changes into the patch. */
+    public static function patchSchema(): array
+    {
+        $text = ['type' => 'string'];
+
+        return [
+            'type' => 'object',
+            'required' => ['commit_message', 'summary', 'how_to_test'],
+            'properties' => [
+                'commit_message' => $text + ['description' => 'A git commit message: a subject line under 72 characters, a blank line, then why. Start the subject with the ticket key.'],
+                'summary' => $text + ['description' => 'What the patch changes, in two or three sentences, for the engineer.'],
+                'how_to_test' => $text + ['description' => 'How to check the fix by hand or with a test, since you could not run it.'],
+                'risks' => $text + ['description' => 'What else this could affect, or what you were unsure of.'],
+            ],
+        ];
+    }
+
+    /** Make the proposed fix as a patch, in the copy the tool prepared. */
+    public static function patchRequest(string $ticketKey, string $systemName, string $copy, string $base): string
+    {
+        $short = substr($base, 0, 10);
+
+        return <<<TEXT
+        Make the fix you proposed for {$ticketKey} as a patch to {$systemName}.
+
+        A copy of {$systemName} at commit {$short} is in your workspace at {$copy}/. Edit files there and
+        only there; the system's own folder is read-only. The tool turns whatever you change in the copy
+        into one commit and a patch file for the engineer to apply with `git am`.
+
+        - The smallest change that fixes the cause. No refactoring, renaming or reformatting around it.
+        - Follow the code around it: its style, its naming, its error handling.
+        - Where the system has tests next to the code you change, add or adjust one for this case.
+        - You cannot run anything, so read carefully: imports, types, every caller of what you change.
+        - If the fix is not a code change after all, or you are not sure enough to write it, change
+          nothing and say why in the summary.
+
+        End with the JSON: the commit message, a summary, how to test it, and the risks.
+        TEXT;
+    }
+
     public static function caseRequest(): string
     {
         return <<<'TEXT'

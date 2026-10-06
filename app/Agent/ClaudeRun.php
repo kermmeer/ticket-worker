@@ -33,14 +33,18 @@ class ClaudeRun
         ];
     }
 
-    public static function command(float $budgetUsd): array
+    public static function command(float $budgetUsd, bool $write = false): array
     {
+        // Writing is for patch turns only. Restricted mode keeps it inside the workspace,
+        // and the systems are read-only mounts besides.
+        $tools = $write ? 'Read,Grep,Glob,Edit,Write' : 'Read,Grep,Glob';
+
         return [config('agent.claude.bin'), '-p',
             '--output-format', 'stream-json', '--verbose',
             '--model', config('agent.claude.model'), '--effort', config('agent.claude.effort'),
             '--restricted', '--strict-mcp-config',
-            '--tools', 'Read,Grep,Glob',
-            '--allowedTools', 'Read,Grep,Glob',
+            '--tools', $tools,
+            '--allowedTools', $tools,
             '--permission-prompts', 'none',
             '--max-budget-usd', (string) $budgetUsd,
         ];

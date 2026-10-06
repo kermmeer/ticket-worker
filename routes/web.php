@@ -25,6 +25,8 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/messages', 'message')->name('message');
     Route::post('/restate', 'restate')->name('restate');
     Route::post('/case', 'draftCase')->name('case');
+    Route::post('/patch', 'patch')->name('patch');
+    Route::get('/turns/{turn}/patch', 'patchFile')->name('patch.file');
     Route::post('/stop', 'stop')->name('stop');
     Route::post('/close', 'close')->name('close');
     Route::post('/draft', 'draft')->name('draft');
@@ -62,5 +64,6 @@ Route::post('/systems/{system}/scan/stop', [SystemController::class, 'stopScan']
 Route::put('/systems/{system}/context', [SystemController::class, 'updateContext'])->name('systems.context');
 Route::get('/setup', SetupController::class)->name('setup');
 Route::put('/setup/reply-rules', [SetupController::class, 'replyRules'])->name('setup.reply-rules');
+Route::put('/setup/auto-patch', [SetupController::class, 'autoPatch'])->name('setup.auto-patch');
 Route::get('/docs/{doc}', DocsController::class)->name('docs');
 Route::inertia('/design', 'Design')->name('design');

@@ -13,6 +13,9 @@ class Setting extends Model
 
     public const REPLY_RULES = 'reply_rules';
 
+    /** Prepare a patch by itself after an analysis whose fix is a code change. On unless set to 0. */
+    public const AUTO_PATCH = 'auto_patch';
+
     /** How replies to reporters are written, until you change it on the Setup page. */
     public const DEFAULT_REPLY_RULES = <<<'TEXT'
     - Short and to the point: a few sentences, no padding, no long apologies.
@@ -53,6 +56,11 @@ class Setting extends Model
     public static function replyRulesFor(?string $firstName): string
     {
         return str_replace('{first_name}', $firstName ?? 'the support team', static::replyRules());
+    }
+
+    public static function autoPatch(): bool
+    {
+        return static::get(self::AUTO_PATCH, '1') === '1';
     }
 
     /** Hyper mode: sync every minute instead of every SYNC_EVERY_MINUTES (CONCEPT.md §6). */

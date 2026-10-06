@@ -1,15 +1,20 @@
 <script setup>
 import { computed } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     checks: { type: Array, required: true },
     replyRules: { type: String, required: true },
     defaultReplyRules: { type: String, required: true },
     firstName: { type: String, default: null },
+    autoPatch: { type: Boolean, default: true },
 });
 
 const rules = useForm({ rules: props.replyRules });
+
+function setAutoPatch(on) {
+    router.put('/setup/auto-patch', { on }, { preserveScroll: true });
+}
 
 function saveRules() {
     rules.put('/setup/reply-rules', { preserveScroll: true });
@@ -78,5 +83,22 @@ const marks = {
                 <button type="button" class="btn" @click="rules.rules = defaultReplyRules">Back to the default</button>
             </div>
         </form>
+    </section>
+
+    <section class="mt-10">
+        <h2 class="eyebrow">Patches</h2>
+        <div class="card mt-3 p-5">
+            <label class="flex items-start gap-3">
+                <input type="checkbox" class="mt-1" :checked="autoPatch" @change="setAutoPatch($event.target.checked)" />
+                <span>
+                    <span class="font-medium">Prepare a patch by itself when the fix is a code change</span>
+                    <span class="mt-1 block max-w-3xl text-sm text-muted">
+                        After an analysis whose proposal changes code, the agent writes the change in a copy of the system and the
+                        ticket offers it as a file for <code>git am</code>. That is another turn, so it costs about as much as a
+                        question. Off: only when you press <em>Prepare a patch</em>.
+                    </span>
+                </span>
+            </label>
+        </div>
     </section>
 </template>

@@ -4,9 +4,14 @@ namespace App\Jobs;
 
 use App\Agent\ClaudeRun;
 use App\Agent\Instructions;
+use App\Agent\ScratchCopy;
 use App\Agent\Workspace;
 use App\Models\AgentEvent;
+use App\Models\AgentSession;
 use App\Models\AgentTurn;
+use App\Models\Setting;
+use App\Models\System;
+use Illuminate\Support\Collection;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
@@ -56,7 +61,20 @@ class RunAgentTurn implements ShouldQueue
             $systems = $workspace->systems($ticket);
             $root = Workspace::path($ticket);
 
-            $command = ClaudeRun::command((float) config('agent.turn_budget_usd'));
+            // A patch turn works on a copy of its system, made fresh at the system's commit now.
+            $copy = null;
+            if ($turn->kind === 'patch') {
+                $system = System::find($turn->patch_meta['system_id'] ?? null) ?? throw new \RuntimeException('The system for this patch is gone.');
+                $copy = ScratchCopy::path($ticket, $system);
+                $this->event($turn, 'tool', "copying {$system->name} to patch/{$system->name}");
+                $base = app(ScratchCopy::class)->prepare($system, $copy);
+                $turn->update([
+                    'prompt' => Instructions::patchRequest($ticket->key, $system->name, 'patch/'.$system->name, $base),
+                    'patch_meta' => ['system_id' => $system->id, 'system' => $system->name, 'base' => $base],
+                ]);
+            }
+
+            $command = ClaudeRun::command((float) config('agent.turn_budget_usd'), write: $turn->kind === 'patch');
             $command = $first
                 ? [...$command, '--session-id', $session->claude_session_id, '--append-system-prompt', Instructions::system($session, $systems)]
                 : [...$command, '--resume', $session->claude_session_id];
@@ -64,9 +82,16 @@ class RunAgentTurn implements ShouldQueue
                 $command = [...$command, '--json-schema', json_encode(Instructions::proposalSchema())];
             } elseif ($turn->kind === 'case') {
                 $command = [...$command, '--json-schema', json_encode(Instructions::caseSchema())];
+            } elseif ($turn->kind === 'patch') {
+                $command = [...$command, '--json-schema', json_encode(Instructions::patchSchema())];
             }
-            foreach ($systems as $system) {
-                $command = [...$command, '--add-dir', $system->path()];
+            // A patch turn may write, and restricted mode lets it write in every folder it is
+            // given: so it gets only the workspace, where its copy is. Without Docker's
+            // read-only mounts, that is what keeps the systems themselves untouched.
+            if ($turn->kind !== 'patch') {
+                foreach ($systems as $system) {
+                    $command = [...$command, '--add-dir', $system->path()];
+                }
             }
 
             $shorten = [$root.'/' => ''];
@@ -81,14 +106,14 @@ class RunAgentTurn implements ShouldQueue
                 $this->timeout,
             );
 
-            $this->finish($turn, $run['result'], $run['errors']);
+            $this->finish($turn, $run['result'], $run['errors'], $copy, $systems);
         } catch (Throwable $e) {
             $turn->update(['state' => AgentTurn::FAILED, 'error' => Str::limit($e->getMessage(), 2000), 'finished_at' => now()]);
             $this->event($turn, 'error', Str::limit($e->getMessage(), 500));
         }
     }
 
-    private function finish(AgentTurn $turn, ?array $result, string $errors): void
+    private function finish(AgentTurn $turn, ?array $result, string $errors, ?string $copy, Collection $systems): void
     {
         $turn->refresh();
         $cost = isset($result['total_cost_usd']) ? (float) $result['total_cost_usd'] : null;
@@ -110,10 +135,32 @@ class RunAgentTurn implements ShouldQueue
             ? ($result['structured_output'] ?? self::jsonFrom((string) ($result['result'] ?? '')))
             : null;
 
+        $patch = null;
+        $patchMeta = $turn->patch_meta;
+        if ($state === AgentTurn::DONE && $turn->kind === 'patch') {
+            $answer = $result['structured_output'] ?? self::jsonFrom((string) ($result['result'] ?? '')) ?? [];
+            $message = trim((string) ($answer['commit_message'] ?? '')) ?: "{$turn->session->ticket->key}: fix";
+            $built = app(ScratchCopy::class)->build($copy, $message);
+            $patch = $built['patch'] ?? null;
+            $patchMeta = [
+                ...($patchMeta ?? []),
+                'subject' => strtok($message, "\n"),
+                'summary' => $answer['summary'] ?? null,
+                'how_to_test' => $answer['how_to_test'] ?? null,
+                'risks' => $answer['risks'] ?? null,
+                'files' => $built['files'] ?? [],
+            ];
+            if ($built === null) {
+                $this->event($turn, 'text', 'No patch: the agent changed nothing. '.($answer['summary'] ?? ''));
+            }
+        }
+
         $turn->update([
             'state' => $state,
             'proposal' => $proposal,
             'case_draft' => $caseDraft,
+            'patch' => $patch,
+            'patch_meta' => $patchMeta,
             'answer' => $result['result'] ?? null,
             'error' => $state === AgentTurn::FAILED ? Str::limit(($result['result'] ?? '') ?: trim($errors) ?: 'The agent stopped without an answer.', 2000) : null,
             'cost_usd' => $cost,
@@ -128,6 +175,32 @@ class RunAgentTurn implements ShouldQueue
         if ($state === AgentTurn::FAILED) {
             $this->event($turn, 'error', $turn->error);
         }
+
+        // A code fix gets its patch without being asked, unless that is switched off.
+        if ($proposal !== null && ($proposal['fix_kind'] ?? null) === 'code' && Setting::autoPatch()
+            && ($system = self::systemFor($proposal, $systems)) !== null) {
+            self::queuePatch($turn->session, $system);
+        }
+    }
+
+    /** The system a proposal is about, by name; the only one when there is just one. */
+    public static function systemFor(?array $proposal, Collection $systems): ?System
+    {
+        $name = mb_strtolower(trim((string) ($proposal['system'] ?? '')));
+
+        return $systems->first(fn (System $system) => mb_strtolower($system->name) === $name)
+            ?? ($systems->count() === 1 ? $systems->first() : null);
+    }
+
+    public static function queuePatch(AgentSession $session, System $system): AgentTurn
+    {
+        $turn = AgentTurn::create([
+            'agent_session_id' => $session->id, 'kind' => 'patch', 'prompt' => '',
+            'patch_meta' => ['system_id' => $system->id, 'system' => $system->name],
+        ]);
+        self::dispatch($turn);
+
+        return $turn;
     }
 
     /** The queue gave up on it (a worker died, say): the page must not wait forever. */

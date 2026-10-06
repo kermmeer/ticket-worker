@@ -259,10 +259,14 @@ conclusion, **Update proposal** asks the agent to restate it in the proposal for
 makes a new version, and the earlier ones stay visible.
 
 - **Patch.** *Prepare a patch* has the agent make the change in a scratch copy of the system
-  inside the ticket's workspace, the one place it may write, starting from the commit it
-  analysed. The tool turns that into a `git format-patch` file with a commit message the
-  agent drafts: download it, `git am` it in your own checkout, test it, push it. The agent
-  cannot run the code, so a patch is untested until you test it, and the page says so.
+  inside the ticket's workspace (`patch/<system>`, a `git clone --shared` at the system's
+  current commit), the one place it may write. The tool turns that into a `git format-patch`
+  file with a commit message the agent drafts: download it, `git am` it in your own checkout,
+  test it, push it. The agent cannot run the code, so a patch is untested until you test it,
+  and the page says so, with the agent's *how to test* and *risks*. A proposal says what kind
+  of fix it is (`fix_kind`); when that is `code`, the patch is prepared without asking, unless
+  that is switched off on the Setup page. A patch turn is not given the systems' folders at
+  all, since restricted mode lets it write wherever it may read.
 - **New ticket activity.** If a comment arrives while the session is open, the ticket shows
   it and offers to pass it to the agent.
 - **Stop.** You can stop a turn while it runs. The session stays, and you carry on from there.

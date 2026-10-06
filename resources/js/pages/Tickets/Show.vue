@@ -20,6 +20,7 @@ const props = defineProps({
     languages: { type: Array, required: true },
     agentReady: { type: Boolean, required: true },
     outboxReady: { type: Boolean, required: true },
+    systems: { type: Array, default: () => [] },
 });
 
 const language = ref(props.session?.reply_language ?? 'auto');
@@ -111,7 +112,25 @@ watch(
 );
 onBeforeUnmount(() => clearInterval(poll));
 
-const turnLabels = { analysis: 'Analysis', message: 'Your question', proposal: 'Proposal restated', case: 'Casebook draft' };
+const turnLabels = { analysis: 'Analysis', message: 'Your question', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
+
+// A patch is for one system: the proposal's, unless you pick another.
+const patchSystem = ref(null);
+function preparePatch() {
+    post('patch', patchSystem.value ? { system: patchSystem.value } : {});
+}
+
+// The diff, line by line, with its kind for colour: + added, - removed, @ position, file headers.
+function diffLines(text) {
+    const start = text.indexOf('\ndiff --git ');
+    return (start === -1 ? text : text.slice(start + 1))
+        .split('\n')
+        .map((line) => ({
+            line,
+            kind: line.startsWith('diff --git') ? 'file' : line.startsWith('@@') ? 'at' : line.startsWith('+') && !line.startsWith('+++') ? 'add' : line.startsWith('-') && !line.startsWith('---') ? 'del' : 'ctx',
+        }));
+}
+const diffTone = { file: 'font-medium text-ink', at: 'text-working', add: 'bg-done/10 text-done', del: 'bg-signal/10 text-signal', ctx: 'text-muted' };
 const stateTone = { queued: 'text-muted', running: 'text-working', done: 'text-done', failed: 'text-signal', stopped: 'text-waiting' };
 const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-signal' };
 </script>
@@ -214,6 +233,29 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         <ActivityLine v-if="turn.state === 'running'" :now="lastTool" :tally="`${turn.events.filter((e) => e.type === 'tool').length} steps`" />
                         <p v-if="turn.state === 'queued'" class="text-sm text-muted">Waiting for a free agent…</p>
                         <Link v-if="turn.case_draft" :href="`/casebook/create?turn=${turn.id}`" class="btn btn-signal self-start">Review the case and write it down</Link>
+                        <div v-if="turn.patch?.text" class="space-y-3 text-sm">
+                            <p class="font-medium">{{ turn.patch.meta.subject }}</p>
+                            <p v-if="turn.patch.meta.summary" class="whitespace-pre-wrap">{{ turn.patch.meta.summary }}</p>
+                            <ul class="font-mono text-xs">
+                                <li v-for="file in turn.patch.meta.files" :key="file.path" class="break-all">
+                                    {{ turn.patch.meta.system }}/{{ file.path }}
+                                    <span class="text-done">+{{ file.added }}</span> <span class="text-signal">−{{ file.removed }}</span>
+                                </li>
+                            </ul>
+                            <p class="rounded-md border border-waiting/40 px-3 py-2 text-waiting">
+                                Untested: the agent cannot run code. Made against {{ turn.patch.meta.system }} at {{ turn.patch.meta.base?.slice(0, 10) }}.
+                            </p>
+                            <div v-if="turn.patch.meta.how_to_test"><p class="font-medium">How to test</p><p class="mt-1 whitespace-pre-wrap">{{ turn.patch.meta.how_to_test }}</p></div>
+                            <div v-if="turn.patch.meta.risks"><p class="font-medium">Risks</p><p class="mt-1 whitespace-pre-wrap">{{ turn.patch.meta.risks }}</p></div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <a :href="`/tickets/${ticket.id}/turns/${turn.id}/patch`" class="btn btn-signal">Download the patch</a>
+                                <span class="font-mono text-xs text-muted">then, in your {{ turn.patch.meta.system }} checkout: git am &lt;file&gt;</span>
+                            </div>
+                            <details class="rounded-md border border-line">
+                                <summary class="cursor-pointer px-3 py-2 text-sm">Show the diff</summary>
+                                <pre class="overflow-x-auto border-t border-line py-2 font-mono text-xs leading-5"><span v-for="(entry, index) in diffLines(turn.patch.text)" :key="index" class="block px-3" :class="diffTone[entry.kind]">{{ entry.line || ' ' }}</span></pre>
+                            </details>
+                        </div>
                     </LogEntry>
                 </template>
 
@@ -230,6 +272,13 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         <button type="submit" class="btn btn-signal" :disabled="message.processing || !message.text.trim()">Send</button>
                         <button type="button" class="btn" @click="post('restate')">Update proposal</button>
                         <button type="button" class="btn" @click="post('case')">Draft a case</button>
+                        <div class="flex gap-1">
+                            <select v-if="systems.length > 1" v-model="patchSystem" class="min-w-0 rounded-md border border-line bg-page px-1.5 text-sm" aria-label="System for the patch">
+                                <option :value="null">the proposal's system</option>
+                                <option v-for="system in systems" :key="system.id" :value="system.id">{{ system.name }}</option>
+                            </select>
+                            <button type="button" class="btn flex-1" @click="preparePatch">Prepare a patch</button>
+                        </div>
                     </div>
                 </form>
                 </div>

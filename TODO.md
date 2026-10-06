@@ -114,3 +114,6 @@ to it, including work you finish.
       label that is an address wins over a mail scanner's wrapper; `[^file]` and `!image!` link
       to the attachment. Attachments open or download through the app, which holds the token:
       images, PDF and text inline and sandboxed, everything else as a download (2026-10-06)
+- [x] Patches: a code fix gets a patch file for `git am`, made by the agent in a scratch copy
+      (`patch/<system>`), automatically after the analysis (Setup switch) or with *Prepare a
+      patch*; diff view, how to test, risks (2026-10-06)
