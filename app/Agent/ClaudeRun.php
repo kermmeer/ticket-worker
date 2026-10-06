@@ -33,18 +33,20 @@ class ClaudeRun
         ];
     }
 
-    public static function command(float $budgetUsd, bool $write = false): array
+    public static function command(float $budgetUsd, bool $write = false, array $mcpTools = []): array
     {
         // Writing is for patch turns only. Restricted mode keeps it inside the workspace,
         // and the systems are read-only mounts besides.
         $tools = $write ? 'Read,Grep,Glob,Edit,Write' : 'Read,Grep,Glob';
+        // The tool's own MCP tools (API calls) are allowed by name, the built-in ones by --tools.
+        $allowed = implode(',', [$tools, ...$mcpTools]);
 
         return [config('agent.claude.bin'), '-p',
             '--output-format', 'stream-json', '--verbose',
             '--model', config('agent.claude.model'), '--effort', config('agent.claude.effort'),
             '--restricted', '--strict-mcp-config',
             '--tools', $tools,
-            '--allowedTools', $tools,
+            '--allowedTools', $allowed,
             '--permission-prompts', 'none',
             '--max-budget-usd', (string) $budgetUsd,
         ];

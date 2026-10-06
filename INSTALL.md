@@ -150,6 +150,12 @@ and `push-systems.sh push` with it off.
 ## 7. Optional
 
 - **Reply rules**: Setup → Replies. `{first_name}` is the Jira account's first name.
+- **APIs** for a system (Systems → the system → *Add an API*): a base address and a login, so
+  the agent can check a ticket against real data. The secret is stored encrypted with
+  `APP_KEY` (keep that key: without it the secrets cannot be read) and is never shown again
+  or given to the agent; the app makes each call for it. *Try* checks the address and login.
+- **Patches**: a code fix comes with a patch file for `git am`, unless you switch that off on
+  the Setup page.
 - **An outbox** that takes reply drafts instead of copy and paste: `OUTBOX_URL` and
   `OUTBOX_API_TOKEN`, and the API it must offer in `docs/OUTBOX-API.md`.
 - **Open tickets elsewhere** than Jira: `JIRA_OPEN_URL=https://…/{key}` and `JIRA_OPEN_LABEL`.

@@ -62,6 +62,10 @@ Route::post('/systems', [SystemController::class, 'store'])->name('systems.store
 Route::post('/systems/{system}/scan', [SystemController::class, 'scan'])->name('systems.scan');
 Route::post('/systems/{system}/scan/stop', [SystemController::class, 'stopScan'])->name('systems.scan.stop');
 Route::put('/systems/{system}/context', [SystemController::class, 'updateContext'])->name('systems.context');
+Route::post('/systems/{system}/apis', [SystemController::class, 'storeApi'])->name('systems.apis.store');
+Route::put('/systems/{system}/apis/{api}', [SystemController::class, 'updateApi'])->name('systems.apis.update');
+Route::delete('/systems/{system}/apis/{api}', [SystemController::class, 'destroyApi'])->name('systems.apis.destroy');
+Route::post('/systems/{system}/apis/{api}/try', [SystemController::class, 'tryApi'])->name('systems.apis.try');
 Route::get('/setup', SetupController::class)->name('setup');
 Route::put('/setup/reply-rules', [SetupController::class, 'replyRules'])->name('setup.reply-rules');
 Route::put('/setup/auto-patch', [SetupController::class, 'autoPatch'])->name('setup.auto-patch');

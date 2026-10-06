@@ -426,10 +426,19 @@ own work.
   (next) only read. Keep it that way when adding features.
 - **Data, when a system offers it.** Normally the agent sees code and history only. Some
   systems come with API definitions and a token to fetch data, or a read-only database
-  account. For those the tool will offer data tools: GET requests to that system's configured
-  API, and SELECT queries on its read-only account, each with a time and row limit, every call
-  shown in the trail. The token or password stays in the tool: the agent asks the tool to make
-  the call and never sees the secret, so none ends up in a transcript or at Anthropic. Keep
+  account. **APIs are built (2026-10-06):** on the Systems page each system can have any
+  number, each with a base address, a sign-in (basic with a username and token, a bearer
+  token, a header or a query parameter of its own, or none) and notes for the agent. The
+  secret is stored encrypted with `APP_KEY`, and the page only knows whether one is set.
+  The agent gets two tools, `list_apis` and `call_api`, from an MCP server the tool runs for
+  the turn (`php artisan agent:tools <turn>`, started by Claude Code through `--mcp-config`):
+  the agent names an API and a path, and the tool signs in, makes the call and hands back the
+  status and the body. Only paths under the base address, no redirects followed, GET only
+  unless POST is allowed for that API, 40 calls a turn, answers cut at 60 kB, the secret
+  blanked out of whatever comes back, and every call shown in the log. So no token ends up in
+  a transcript or at Anthropic; what the API returns does, like the ticket itself, so the
+  agent is told to ask for one record rather than a list. Patch turns do not get the tools.
+  SELECT queries on a read-only database account are still to come, the same way. Keep
   tokens out of the code you push; put them in the system's settings instead.
 - **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders, and the
   systems hold what you pushed, which is committed code, not a server's `.env`.
@@ -754,8 +763,8 @@ The value in brackets is what the design assumes until then.
 - **A. Pushing to the server.** *Answered 2026-10-04:* yes, over SSH, by IP when the
   server's name does not resolve on the PC (`SYSTEMS_PUSH_BASE`). The web address cannot
   take a push: it serves the site.
-- **B. Data tools.** Can the server reach those APIs and databases, or are they behind the same VPN
-  as GitLab? If they are, the data tools need another way in. *[unknown; step 6 waits for it]*
+- **B. Data tools.** *Answered 2026-10-06 for boss:* the server reaches it over HTTPS, so its
+  API is called directly. Another system behind the VPN would need another way in.
 - **C. Other people's instances.** *Answered 2026-10-06:* yes. The repository carries
   `compose.yml` with its own MySQL (INSTALL.md); nothing in it assumes the first server.
 - **D. A gate of its own.** *Answered 2026-10-06:* `APP_PASSWORD`, asked once per browser

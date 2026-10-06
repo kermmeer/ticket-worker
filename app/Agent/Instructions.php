@@ -5,6 +5,7 @@ namespace App\Agent;
 use App\Casebook\Matcher;
 use App\Jira\JiraClient;
 use App\Models\AgentSession;
+use App\Models\ApiConnection;
 use App\Models\CasebookEntry;
 use App\Models\Setting;
 use App\Models\System;
@@ -218,14 +219,37 @@ The commits since, with the files they touched:
         $hint = $matches !== '' ? "Cases that look similar, read them first:\n{$matches}" : 'No case in the casebook looks similar.';
 
         $rules = self::replyRules();
+        $apis = self::apis($ticket);
 
         return <<<TEXT
         Analyse ticket {$ticket->key}. Read ticket.md and the attachments, check the casebook, decide which
         system it is about, investigate the code and its history, and end with the proposal.
 
         {$hint}
+        {$apis}
 
         {$rules}
+        TEXT;
+    }
+
+    /** The APIs the agent may check things against, when its systems have any. */
+    public static function apis(Ticket $ticket): string
+    {
+        $apis = ApiConnection::query()->with('system')
+            ->whereIn('system_id', app(Workspace::class)->systems($ticket)->pluck('id'))->orderBy('name')->get();
+        if ($apis->isEmpty()) {
+            return '';
+        }
+
+        $list = $apis->map(fn (ApiConnection $api) => "- {$api->system->name}/{$api->name}: {$api->base_url}".($api->notes ? ' ('.str_replace("\n", ' ', $api->notes).')' : ''))->implode("\n");
+
+        return <<<TEXT
+
+        You can check claims against real data with the call_api tool (list_apis shows the details):
+        {$list}
+        Ask only for what the ticket needs, one record rather than a list. The tool signs in for you: never
+        ask for a token and never write one down. What an API returns can hold customers' data: quote only
+        what proves the point, and none of it in the reply draft beyond what the reporter already knows.
         TEXT;
     }
 

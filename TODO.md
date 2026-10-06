@@ -93,8 +93,11 @@ to it, including work you finish.
 
 ## Step 6: data tools
 
-- [ ] Per system: read-only API calls and SELECT queries made by the tool, secrets kept by the tool
-      (waits on open question B: can the server reach them?)
+- [x] Per system: API connections (basic, bearer, header, query or none), secret encrypted and
+      never shown, called by the tool for the agent through its MCP server (`agent:tools`):
+      paths under the base only, GET unless POST allowed, 40 calls a turn, secret redacted,
+      every call in the log (2026-10-06)
+- [ ] SELECT queries on a read-only database account, the same way
 
 ## Other
 

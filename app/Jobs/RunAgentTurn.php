@@ -9,11 +9,12 @@ use App\Agent\Workspace;
 use App\Models\AgentEvent;
 use App\Models\AgentSession;
 use App\Models\AgentTurn;
+use App\Models\ApiConnection;
 use App\Models\Setting;
 use App\Models\System;
-use Illuminate\Support\Collection;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -74,7 +75,18 @@ class RunAgentTurn implements ShouldQueue
                 ]);
             }
 
-            $command = ClaudeRun::command((float) config('agent.turn_budget_usd'), write: $turn->kind === 'patch');
+            // The systems' APIs, through the tool's MCP server, which holds the secrets.
+            $hasApis = $turn->kind !== 'patch' && ApiConnection::whereIn('system_id', $systems->pluck('id'))->exists();
+            $command = ClaudeRun::command(
+                (float) config('agent.turn_budget_usd'),
+                write: $turn->kind === 'patch',
+                mcpTools: $hasApis ? ['mcp__ticket-worker__list_apis', 'mcp__ticket-worker__call_api'] : [],
+            );
+            if ($hasApis) {
+                $command = [...$command, '--mcp-config', json_encode(['mcpServers' => ['ticket-worker' => [
+                    'type' => 'stdio', 'command' => PHP_BINARY, 'args' => [base_path('artisan'), 'agent:tools', (string) $turn->id],
+                ]]], JSON_UNESCAPED_SLASHES)];
+            }
             $command = $first
                 ? [...$command, '--session-id', $session->claude_session_id, '--append-system-prompt', Instructions::system($session, $systems)]
                 : [...$command, '--resume', $session->claude_session_id];

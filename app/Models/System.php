@@ -67,6 +67,12 @@ class System extends Model
         return $result->successful() ? (int) trim($result->output()) : null;
     }
 
+    /** The APIs its tickets can be checked against. */
+    public function apis(): HasMany
+    {
+        return $this->hasMany(ApiConnection::class)->orderBy('name');
+    }
+
     public function spaces(): BelongsToMany
     {
         return $this->belongsToMany(Space::class);

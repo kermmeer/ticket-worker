@@ -1,11 +1,13 @@
 <script setup>
 import { onBeforeUnmount, ref, watchEffect } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
+import ApiConnections from '../components/ApiConnections.vue';
 import { tokens } from '../time.js';
 
 const props = defineProps({
     systems: { type: Array, required: true },
     agentReady: { type: Boolean, default: false },
+    authKinds: { type: Object, default: () => ({}) },
 });
 
 function scan(system) {
@@ -219,6 +221,8 @@ const states = {
                         <button type="button" class="btn mt-2 px-3 py-1.5" @click="saveContext(system)">Save my edit</button>
                     </details>
                 </div>
+
+                <ApiConnections :system="system" :auth-kinds="authKinds" />
             </template>
         </li>
     </ul>
