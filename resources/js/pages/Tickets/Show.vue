@@ -2,12 +2,15 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import ActivityLine from '../../components/ActivityLine.vue';
+import AgentText from '../../components/AgentText.vue';
+import CodeBlock from '../../components/CodeBlock.vue';
 import FoldingSection from '../../components/FoldingSection.vue';
 import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
 import TicketKey from '../../components/TicketKey.vue';
+import { copyText } from '../../copy.js';
 import { phrase, shortName, tone } from '../../sla.js';
 import { short, tokens } from '../../time.js';
 
@@ -52,18 +55,10 @@ const openLabel = usePage().props.openLabel ?? 'Jira';
 const fileUrl = (file, download = false) => `/tickets/${props.ticket.id}/attachments/${file.id}${download ? '?download=1' : ''}`;
 const size = (bytes) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} kB`);
 
-// Without an outbox, the reply goes over by hand. The clipboard API needs https; on a
-// plain-http address the older copy command does it from the textarea itself.
+// Without an outbox, the reply goes over by hand.
 const copied = ref(false);
 async function copyReply() {
-    try {
-        await navigator.clipboard.writeText(draft.body);
-    } catch {
-        const box = document.getElementById('reply');
-        box.select();
-        document.execCommand('copy');
-        box.setSelectionRange(0, 0);
-    }
+    await copyText(draft.body);
     copied.value = true;
     setTimeout(() => (copied.value = false), 2000);
 }
@@ -226,7 +221,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             <template v-if="turn.tokens_in != null"> · {{ tokens(turn.tokens_in) }} in · {{ tokens(turn.tokens_out) }} out</template>
                         </p>
                         <template v-for="event in turn.events" :key="event.id">
-                            <p v-if="event.type === 'text'" class="text-sm break-words whitespace-pre-wrap">{{ event.summary }}</p>
+                            <AgentText v-if="event.type === 'text'" :text="event.summary" />
                             <p v-else-if="event.type === 'tool'" class="font-mono text-xs break-all text-muted">{{ event.summary }}</p>
                             <p v-else class="text-sm text-signal">{{ event.summary }}</p>
                         </template>
@@ -332,7 +327,24 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         </li>
                     </ul>
                 </div>
-                <div><p class="font-medium">Fix</p><p class="mt-1 whitespace-pre-wrap">{{ proposal.fix }}</p></div>
+                <div><p class="font-medium">Fix</p><AgentText :text="proposal.fix" class="mt-1" /></div>
+                <div v-if="proposal.commands?.length">
+                    <p class="font-medium">Commands</p>
+                    <ol class="mt-2 space-y-4">
+                        <li v-for="(command, index) in proposal.commands" :key="index">
+                            <p class="flex flex-wrap items-baseline gap-x-2 text-sm">
+                                <span
+                                    class="rounded-[3px] border px-1.5 font-mono text-[0.66rem] leading-5 font-medium tracking-wide uppercase"
+                                    :class="command.kind === 'change' ? 'border-signal text-signal' : 'border-done text-done'"
+                                >{{ command.kind === 'change' ? 'changes' : 'reads' }}</span>
+                                <span>{{ command.purpose }}</span>
+                                <span class="text-muted">· {{ command.where }}</span>
+                            </p>
+                            <CodeBlock :code="command.command" class="mt-1.5" />
+                            <p v-if="command.undo" class="mt-1 text-xs text-muted">Undo: <code class="font-mono">{{ command.undo }}</code></p>
+                        </li>
+                    </ol>
+                </div>
                 <div v-if="proposal.workaround"><p class="font-medium">Workaround</p><p class="mt-1 whitespace-pre-wrap">{{ proposal.workaround }}</p></div>
                 <div v-if="proposal.questions?.length">
                     <p class="font-medium">Questions</p>

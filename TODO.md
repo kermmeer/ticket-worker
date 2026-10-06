@@ -120,3 +120,6 @@ to it, including work you finish.
 - [x] Patches: a code fix gets a patch file for `git am`, made by the agent in a scratch copy
       (`patch/<system>`), automatically after the analysis (Setup switch) or with *Prepare a
       patch*; diff view, how to test, risks (2026-10-06)
+- [x] Answer rules (Setup → Answers): short, answer first, exact commands instead of open
+      suggestions; sent with every turn. Proposals list their `commands` (reads/changes, where,
+      undo) with Copy buttons; code blocks in answers copy too (2026-10-06)

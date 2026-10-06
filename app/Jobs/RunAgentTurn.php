@@ -112,8 +112,11 @@ class RunAgentTurn implements ShouldQueue
             }
 
             $run = $runner->run(
-                $command, $root, $turn->prompt, $shorten,
-                fn (string $type, string $summary) => $this->event($turn, $type, Str::limit($summary, 4000)),
+                // The answer rules go along with every turn but the casebook draft, unsaved: the
+                // log shows what you asked, not the house rules.
+                $command, $root, $turn->kind === 'case' ? $turn->prompt : $turn->prompt.Instructions::answerRules(), $shorten,
+                // What the agent says is kept whole, commands and all; tool steps are one-liners.
+                fn (string $type, string $summary) => $this->event($turn, $type, Str::limit($summary, $type === 'text' ? 15000 : 4000)),
                 fn () => (bool) $turn->fresh()->stop_requested,
                 $this->timeout,
             );

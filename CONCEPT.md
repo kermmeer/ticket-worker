@@ -389,6 +389,12 @@ Later turns pass `--resume <uuid>` instead of `--session-id`.
   permissions.
 - **The system prompt** holds its role, its rules and the contexts of the space's systems.
   It is recorded at the session's first turn and reused on every resume.
+- **Answer rules** say how the agent talks to you: short, the answer first, and never an open
+  suggestion but the exact command, query, API call or code change, saying where it runs and
+  whether it changes anything. They are editable on the Setup page and go along with every turn
+  (not only in the system prompt, which is fixed per session), so a change applies at once. A
+  proposal carries its `commands` the same way: purpose, where, reads or changes, the command,
+  and how to undo it, each with a Copy button. Code blocks in the agent's answers get one too.
 - **Patch turns** add `Edit` and `Write`, which restricted mode confines to the workspace,
   where the scratch copy is. The systems themselves stay read-only mounts.
 - **The casebook** lies in the workspace as one Markdown file per approved case, plus an

@@ -20,7 +20,18 @@ class SetupController extends Controller
             'replyRules' => Setting::replyRules(),
             'defaultReplyRules' => Setting::DEFAULT_REPLY_RULES,
             'autoPatch' => Setting::autoPatch(),
+            'answerRules' => Setting::answerRules(),
+            'defaultAnswerRules' => Setting::DEFAULT_ANSWER_RULES,
         ]);
+    }
+
+    /** How the agent talks to you: applies from its next turn, also in open sessions. */
+    public function answerRules(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['rules' => ['nullable', 'string', 'max:4000']]);
+        Setting::put(Setting::ANSWER_RULES, $data['rules'] ?? null);
+
+        return back()->with('success', 'Saved. The agent answers by them from its next turn.');
     }
 
     public function autoPatch(Request $request): RedirectResponse

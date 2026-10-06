@@ -8,9 +8,17 @@ const props = defineProps({
     defaultReplyRules: { type: String, required: true },
     firstName: { type: String, default: null },
     autoPatch: { type: Boolean, default: true },
+    answerRules: { type: String, required: true },
+    defaultAnswerRules: { type: String, required: true },
 });
 
 const rules = useForm({ rules: props.replyRules });
+
+const answers = useForm({ rules: props.answerRules });
+
+function saveAnswers() {
+    answers.put('/setup/answer-rules', { preserveScroll: true });
+}
 
 function setAutoPatch(on) {
     router.put('/setup/auto-patch', { on }, { preserveScroll: true });
@@ -63,6 +71,23 @@ const marks = {
                 </div>
             </li>
         </ul>
+    </section>
+
+    <section class="mt-10">
+        <h2 class="eyebrow">Answers</h2>
+        <form class="card mt-3 p-5" @submit.prevent="saveAnswers">
+            <label for="answers" class="font-medium">How the agent answers you</label>
+            <p class="mt-1 max-w-3xl text-sm text-muted">
+                Sent with every question and analysis, so a change applies from the agent's next turn, also in sessions already
+                open. For replies to reporters, see below.
+            </p>
+            <textarea id="answers" v-model="answers.rules" rows="7" class="mt-3 w-full rounded-md border border-line bg-page px-3 py-2 text-sm"></textarea>
+            <p v-if="answers.errors.rules" class="mt-1 text-sm text-signal">{{ answers.errors.rules }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-signal" :disabled="answers.processing || !answers.isDirty">Save</button>
+                <button type="button" class="btn" @click="answers.rules = defaultAnswerRules">Back to the default</button>
+            </div>
+        </form>
     </section>
 
     <section class="mt-10">

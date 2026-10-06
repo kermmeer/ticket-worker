@@ -46,7 +46,18 @@ class Instructions
                         'note' => $text,
                     ],
                 ]],
-                'fix' => $text + ['description' => 'What to change and where: code, data or configuration.'],
+                'fix' => $text + ['description' => 'What to change and where: code, data or configuration. Short and concrete.'],
+                'commands' => ['type' => 'array', 'description' => 'The exact commands, SQL queries or API calls for the engineer to check or apply the fix, ready to copy and run. Read-only checks first.', 'items' => [
+                    'type' => 'object',
+                    'required' => ['purpose', 'where', 'kind', 'command'],
+                    'properties' => [
+                        'purpose' => $text + ['description' => 'What it does, in a few words: "check the service\'s recurring price".'],
+                        'where' => $text + ['description' => 'Where it runs: which system, database, server or API.'],
+                        'kind' => ['type' => 'string', 'enum' => ['read', 'change'], 'description' => 'read only reads; change changes data or code.'],
+                        'command' => $text + ['description' => 'The command itself, with real names; <placeholders> only for what cannot be known.'],
+                        'undo' => $text + ['description' => 'For a change: how to undo it.'],
+                    ],
+                ]],
                 'fix_kind' => ['type' => 'string', 'enum' => ['code', 'data', 'configuration', 'none'],
                     'description' => 'code when the fix is a change to files in one of the systems: a patch is then prepared for it.'],
                 'workaround' => $text,
@@ -87,7 +98,8 @@ class Instructions
         - Check the casebook first. When a case fits, confirm it in the code and build on it.
         - Regressions are the most common cause: look at the history of the files involved.
         - Cite code as system/path:line, for example boss/app/Services/Invoice.php:212.
-        - Talk to the engineer in English, briefly. Write reply drafts in {$language}.
+        - Talk to the engineer in English, short and to the point, by the answer rules sent with each
+          request. Give exact commands, queries and code, never open suggestions. Write reply drafts in {$language}.
         - You cannot change files or run code. Say what to change; the engineer does it.{$contexts}
         TEXT;
     }
@@ -251,6 +263,15 @@ The commits since, with the files they touched:
         ask for a token and never write one down. What an API returns can hold customers' data: quote only
         what proves the point, and none of it in the reply draft beyond what the reporter already knows.
         TEXT;
+    }
+
+    /**
+     * How to answer the engineer. Sent with every turn rather than only in the system prompt,
+     * which is fixed when a session starts, so a change applies to sessions already open.
+     */
+    public static function answerRules(): string
+    {
+        return "\n\nHow to answer me:\n".Setting::answerRules();
     }
 
     /** Sent with every turn that writes a reply draft, so a change applies at once. */

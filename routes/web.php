@@ -68,6 +68,7 @@ Route::delete('/systems/{system}/apis/{api}', [SystemController::class, 'destroy
 Route::post('/systems/{system}/apis/{api}/try', [SystemController::class, 'tryApi'])->name('systems.apis.try');
 Route::get('/setup', SetupController::class)->name('setup');
 Route::put('/setup/reply-rules', [SetupController::class, 'replyRules'])->name('setup.reply-rules');
+Route::put('/setup/answer-rules', [SetupController::class, 'answerRules'])->name('setup.answer-rules');
 Route::put('/setup/auto-patch', [SetupController::class, 'autoPatch'])->name('setup.auto-patch');
 Route::get('/docs/{doc}', DocsController::class)->name('docs');
 Route::inertia('/design', 'Design')->name('design');
