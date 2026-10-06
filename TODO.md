@@ -110,3 +110,7 @@ to it, including work you finish.
       last, and a "Next to breach" strip with the five closest across every group.
 - [x] "Draft and open in Outbox": hands the draft over and opens the outbox's link to it in a
       new tab; plain web addresses only, the ticket's outbox page when the link is missing.
+- [x] Ticket text: Jira's wiki links (`[text|url]`, `[url]`, bare addresses) are clickable, and a
+      label that is an address wins over a mail scanner's wrapper; `[^file]` and `!image!` link
+      to the attachment. Attachments open or download through the app, which holds the token:
+      images, PDF and text inline and sandboxed, everything else as a download (2026-10-06)

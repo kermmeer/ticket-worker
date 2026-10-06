@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import ActivityLine from '../../components/ActivityLine.vue';
 import FoldingSection from '../../components/FoldingSection.vue';
+import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
@@ -44,6 +45,11 @@ const draft = useForm({ body: '', visibility: 'public' });
 watch(proposal, (value) => (draft.body = value?.reply_draft ?? ''), { immediate: true });
 
 const openLabel = usePage().props.openLabel ?? 'Jira';
+
+// Attachments come through Ticket Worker, which holds the Jira token; images and PDFs open
+// in the browser, everything else downloads.
+const fileUrl = (file, download = false) => `/tickets/${props.ticket.id}/attachments/${file.id}${download ? '?download=1' : ''}`;
+const size = (bytes) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} kB`);
 
 // Without an outbox, the reply goes over by hand. The clipboard API needs https; on a
 // plain-http address the older copy command does it from the textarea itself.
@@ -136,12 +142,17 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             <p v-if="issueError" class="text-sm text-signal">Jira did not answer: {{ issueError }}</p>
             <template v-else-if="issue">
                 <p class="text-sm text-muted">{{ issue.reporter }} · {{ short(issue.created) }} · {{ issue.type }}</p>
-                <div class="mt-4 text-sm leading-relaxed break-words whitespace-pre-wrap">{{ issue.description || 'No description.' }}</div>
+                <JiraText v-if="issue.description" :text="issue.description" :attachments="issue.attachments" :file-url="fileUrl" class="mt-4 text-sm leading-relaxed" />
+                <p v-else class="mt-4 text-sm text-muted">No description.</p>
 
                 <template v-if="issue.attachments.length">
                     <p class="mt-6 text-sm font-medium">Attachments ({{ issue.attachments.length }})</p>
-                    <ul class="mt-1 space-y-0.5 font-mono text-xs text-muted">
-                        <li v-for="file in issue.attachments" :key="file.id" class="break-all">{{ file.filename }}</li>
+                    <ul class="mt-1 space-y-1 text-xs">
+                        <li v-for="file in issue.attachments" :key="file.id" class="flex flex-wrap items-baseline gap-x-2">
+                            <a :href="fileUrl(file)" target="_blank" rel="noopener" class="font-mono break-all underline decoration-muted/50 underline-offset-2 hover:decoration-ink">{{ file.filename }}</a>
+                            <span class="text-muted">{{ size(file.size) }}</span>
+                            <a :href="fileUrl(file, true)" class="text-muted hover:text-ink">download</a>
+                        </li>
                     </ul>
                 </template>
 
@@ -151,7 +162,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         <p class="text-xs text-muted">
                             {{ comment.author }} · {{ short(comment.created) }}<span v-if="!comment.public" class="text-waiting"> · internal note</span>
                         </p>
-                        <div class="mt-1 break-words whitespace-pre-wrap">{{ comment.body }}</div>
+                        <JiraText :text="comment.body" :attachments="issue.attachments" :file-url="fileUrl" class="mt-1" />
                     </div>
                 </div>
             </template>

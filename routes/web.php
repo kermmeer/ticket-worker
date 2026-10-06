@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\CasebookController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\HiddenTicketController;
@@ -28,6 +29,7 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/close', 'close')->name('close');
     Route::post('/draft', 'draft')->name('draft');
 });
+Route::get('/tickets/{ticket}/attachments/{attachment}', AttachmentController::class)->where('attachment', '[0-9]+')->name('tickets.attachment');
 Route::post('/tickets/{ticket}/hide', [HiddenTicketController::class, 'store'])->name('tickets.hide');
 Route::delete('/tickets/{ticket}/hide', [HiddenTicketController::class, 'destroy'])->name('tickets.unhide');
 
