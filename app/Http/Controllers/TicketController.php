@@ -69,7 +69,10 @@ class TicketController extends Controller
     /** Start an analysis: a new conversation, or a fresh analysis in the open one. */
     public function analyse(Request $request, Ticket $ticket): RedirectResponse
     {
-        $data = $request->validate(['language' => ['required', Rule::in(self::LANGUAGES)]]);
+        $data = $request->validate([
+            'language' => ['required', Rule::in(self::LANGUAGES)],
+            'note' => ['nullable', 'string', 'max:8000'],
+        ]);
         abort_unless(Instructions::credentials() !== [], 409, 'No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN yet: see Setup.');
 
         $session = $ticket->openSession();
@@ -85,7 +88,8 @@ class TicketController extends Controller
         ]);
         $session->update(['reply_language' => $data['language']]);
 
-        $this->turn($session, 'analysis', Instructions::analysis($ticket));
+        $note = filled($data['note'] ?? null) ? trim($data['note']) : null;
+        $this->turn($session, 'analysis', Instructions::analysis($ticket, $note), $note);
 
         return back();
     }
@@ -210,9 +214,9 @@ class TicketController extends Controller
         return back();
     }
 
-    private function turn(AgentSession $session, string $kind, string $prompt): void
+    private function turn(AgentSession $session, string $kind, string $prompt, ?string $note = null): void
     {
-        RunAgentTurn::dispatch(AgentTurn::create(['agent_session_id' => $session->id, 'kind' => $kind, 'prompt' => $prompt]));
+        RunAgentTurn::dispatch(AgentTurn::create(['agent_session_id' => $session->id, 'kind' => $kind, 'prompt' => $prompt, 'note' => $note]));
     }
 
     private function sessionData(AgentSession $session): array
@@ -232,7 +236,7 @@ class TicketController extends Controller
                 'id' => $turn->id,
                 'kind' => $turn->kind,
                 // Your own words show; the long analysis instruction does not.
-                'prompt' => $turn->kind === 'message' ? $turn->prompt : null,
+                'prompt' => $turn->kind === 'message' ? $turn->prompt : $turn->note,
                 'state' => $turn->state,
                 'answer' => $turn->kind === 'message' ? $turn->answer : null,
                 'error' => $turn->error,

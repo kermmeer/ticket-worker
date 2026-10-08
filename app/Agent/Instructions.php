@@ -218,7 +218,7 @@ The commits since, with the files they touched:
 {$shape}";
     }
 
-    public static function analysis(Ticket $ticket): string
+    public static function analysis(Ticket $ticket, ?string $note = null): string
     {
         $matches = collect(CasebookEntry::query()->approved()->get())
             ->map(fn ($entry) => [$entry, (new Matcher([$entry]))->best($ticket->matchText())])
@@ -232,11 +232,21 @@ The commits since, with the files they touched:
 
         $rules = self::replyRules();
         $apis = self::apis($ticket);
+        // From the engineer, not from the reporter: a lead to follow, and to check.
+        $note = $note !== null ? <<<NOTE
+
+        The engineer adds this before you start. It comes from them, not from the reporter: knowledge
+        the ticket does not hold, a suspicion, or what to look at first. Follow it, and check it
+        against the code like anything else; say so if it does not hold.
+
+        {$note}
+
+        NOTE : '';
 
         return <<<TEXT
         Analyse ticket {$ticket->key}. Read ticket.md and the attachments, check the casebook, decide which
         system it is about, investigate the code and its history, and end with the proposal.
-
+        {$note}
         {$hint}
         {$apis}
 

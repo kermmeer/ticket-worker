@@ -41,6 +41,19 @@ const stored = (write) => {
 const message = useForm({ text: stored(() => localStorage.getItem(messageKey)) ?? '' });
 watch(() => message.text, (text) => stored(() => (text ? localStorage.setItem(messageKey, text) : localStorage.removeItem(messageKey))));
 
+// Your own notes for the next analysis: what you know that the ticket does not say. Kept the
+// same way until the analysis starts.
+const noteKey = `ticket.${props.ticket.id}.note`;
+const note = ref(stored(() => localStorage.getItem(noteKey)) ?? '');
+watch(note, (text) => stored(() => (text ? localStorage.setItem(noteKey, text) : localStorage.removeItem(noteKey))));
+
+function analyse() {
+    router.post(`/tickets/${props.ticket.id}/analyse`, { language: language.value, note: note.value }, {
+        preserveScroll: true,
+        onSuccess: () => (note.value = ''),
+    });
+}
+
 const busy = computed(() => props.session?.busy ?? false);
 const proposal = computed(() => props.session?.proposal ?? null);
 const lastTool = computed(() => {
@@ -211,7 +224,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             <option v-for="choice in languages" :key="choice" :value="choice">{{ choice === 'auto' ? "the ticket's language" : choice }}</option>
                         </select>
                     </label>
-                    <button type="button" class="btn btn-signal" :disabled="busy" @click="post('analyse', { language })">
+                    <button type="button" class="btn btn-signal" :disabled="busy" @click="analyse">
                         {{ session ? 'Analyse again' : 'Analyse' }}
                     </button>
                     <button v-if="busy" type="button" class="btn" @click="post('stop')">Stop</button>
@@ -220,6 +233,16 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         ${{ session.cost_usd.toFixed(2) }} so far<br />
                         {{ tokens(session.tokens_in) }} tokens in<template v-if="session.tokens_cached"> ({{ tokens(session.tokens_cached) }} from cache)</template> · {{ tokens(session.tokens_out) }} out
                     </span>
+                </div>
+                <div v-if="agentReady && !busy" class="mt-3">
+                    <label for="note" class="text-sm text-muted">Your notes for the agent <span class="text-xs">(optional, goes with the analysis)</span></label>
+                    <textarea
+                        id="note"
+                        v-model="note"
+                        rows="2"
+                        placeholder="What you know that the ticket does not say: the customer's service ID, a suspicion, what to check first…"
+                        class="mt-1 w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"
+                    ></textarea>
                 </div>
             </FoldingSection>
 

@@ -129,3 +129,6 @@ to it, including work you finish.
       error asks /up, and a redirect there shows "sign-in expired, sign in again"; background
       refreshes pause; the message you were typing is kept across the reload; the manifest is
       fetched with cookies (2026-10-08)
+- [x] Your notes for the agent: an optional box with Analyse; the note goes in as the
+      engineer's lead (to follow and check, unlike ticket text), shows in the log as yours,
+      and is kept in the browser until the analysis starts (2026-10-08)
