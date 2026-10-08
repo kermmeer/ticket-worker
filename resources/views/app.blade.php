@@ -16,7 +16,8 @@
         <link rel="icon" href="/favicon.ico" sizes="32x32">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-        <link rel="manifest" href="/site.webmanifest">
+        {{-- With cookies, or a sign-in in front of the app turns the manifest into a login redirect. --}}
+        <link rel="manifest" href="/site.webmanifest" crossorigin="use-credentials">
         <meta name="theme-color" content="#c2410c">
         <title inertia>{{ config('app.name') }}</title>
         @fonts

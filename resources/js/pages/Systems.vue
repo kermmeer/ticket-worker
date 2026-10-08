@@ -2,6 +2,7 @@
 import { onBeforeUnmount, ref, watchEffect } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import ApiConnections from '../components/ApiConnections.vue';
+import { reachable } from '../connection.js';
 import { tokens } from '../time.js';
 
 const props = defineProps({
@@ -50,7 +51,7 @@ let timer = null;
 watchEffect(() => {
     const waiting = props.systems.some((system) => system.state === 'preparing' || scanning(system));
     if (waiting && !timer) {
-        timer = setInterval(() => router.reload({ only: ['systems'], showProgress: false, preserveScroll: true, preserveState: true }), 2000);
+        timer = setInterval(() => reachable() && router.reload({ only: ['systems'], showProgress: false, preserveScroll: true, preserveState: true }), 2000);
     } else if (!waiting && timer) {
         clearInterval(timer);
         timer = null;

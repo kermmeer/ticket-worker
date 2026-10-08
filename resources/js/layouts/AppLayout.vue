@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import ThemeSwitch from '../components/ThemeSwitch.vue';
+import { connection, signInAgain } from '../connection.js';
 
 const page = usePage();
 
@@ -67,6 +68,14 @@ function toggleHyper() {
         </header>
 
         <main class="w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-10">
+            <div v-if="connection.signedOut" role="alert" class="mb-8 flex flex-wrap items-center gap-3 rounded-md border border-signal/40 bg-surface px-4 py-2.5 text-sm">
+                <span class="text-signal">Your sign-in has expired, so nothing reaches Ticket Worker until you sign in again.</span>
+                <span class="text-muted">A message you were typing to the agent is kept.</span>
+                <button type="button" class="btn btn-signal ml-auto px-3 py-1" @click="signInAgain">Sign in again</button>
+            </div>
+            <p v-else-if="connection.offline" role="status" class="mb-8 rounded-md border border-waiting/40 bg-surface px-4 py-2.5 text-sm text-waiting">
+                Cannot reach Ticket Worker. It tries again by itself; what you typed is kept.
+            </p>
             <p v-if="flash.success" role="status" class="mb-8 rounded-md border border-done/40 bg-surface px-4 py-2.5 text-sm text-done">
                 {{ flash.success }}
             </p>

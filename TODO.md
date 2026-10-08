@@ -125,3 +125,7 @@ to it, including work you finish.
       undo) with Copy buttons; code blocks in answers copy too (2026-10-06)
 - [x] Ticket comments newest first on the page (ticket.md keeps Jira's order); short dates
       carry the year when it is not this one (2026-10-06)
+- [x] An expired sign-in in front of the app (Authentik) no longer fails silently: a network
+      error asks /up, and a redirect there shows "sign-in expired, sign in again"; background
+      refreshes pause; the message you were typing is kept across the reload; the manifest is
+      fetched with cookies (2026-10-08)

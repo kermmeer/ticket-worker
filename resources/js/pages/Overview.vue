@@ -6,6 +6,7 @@ import SpaceLabel from '../components/SpaceLabel.vue';
 import StatusLabel from '../components/StatusLabel.vue';
 import TicketRow from '../components/TicketRow.vue';
 import TicketKey from '../components/TicketKey.vue';
+import { reachable } from '../connection.js';
 import { ago, short } from '../time.js';
 import { byDueNext, dueAt, phrase, shortName, tone, urgency } from '../sla.js';
 
@@ -158,7 +159,7 @@ const REFRESH_MS = 30000;
 let refresher = null;
 
 function refresh() {
-    if (document.visibilityState === 'visible') {
+    if (document.visibilityState === 'visible' && reachable()) {
         // Quietly: no progress bar, and rows are keyed, so only what changed is redrawn.
         router.reload({ only: ['tickets', 'spaces', 'hasSpaces'], preserveScroll: true, preserveState: true, showProgress: false });
     }

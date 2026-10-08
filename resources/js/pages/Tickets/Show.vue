@@ -10,6 +10,7 @@ import LogEntry from '../../components/LogEntry.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
 import TicketKey from '../../components/TicketKey.vue';
+import { reachable } from '../../connection.js';
 import { copyText } from '../../copy.js';
 import { phrase, shortName, tone } from '../../sla.js';
 import { short, tokens } from '../../time.js';
@@ -27,7 +28,18 @@ const props = defineProps({
 });
 
 const language = ref(props.session?.reply_language ?? 'auto');
-const message = useForm({ text: '' });
+// What you are typing to the agent is kept in the browser until it is sent, so a reload
+// (signing in again, say) never loses it.
+const messageKey = `ticket.${props.ticket.id}.message`;
+const stored = (write) => {
+    try {
+        return write();
+    } catch {
+        return null; // storage refused (private mode): it still works, just not across a reload
+    }
+};
+const message = useForm({ text: stored(() => localStorage.getItem(messageKey)) ?? '' });
+watch(() => message.text, (text) => stored(() => (text ? localStorage.setItem(messageKey, text) : localStorage.removeItem(messageKey))));
 
 const busy = computed(() => props.session?.busy ?? false);
 const proposal = computed(() => props.session?.proposal ?? null);
@@ -41,7 +53,7 @@ function post(path, data = {}) {
 }
 
 function send() {
-    message.post(`/tickets/${props.ticket.id}/messages`, { preserveScroll: true, onSuccess: () => message.reset() });
+    message.post(`/tickets/${props.ticket.id}/messages`, { preserveScroll: true, onSuccess: () => (message.text = '') });
 }
 
 // The reply draft, editable before it goes to the outbox.
@@ -103,7 +115,7 @@ watch(
     (working) => {
         clearInterval(poll);
         if (working) {
-            poll = setInterval(() => router.reload({ only: ['session'], preserveScroll: true, preserveState: true, showProgress: false }), 2000);
+            poll = setInterval(() => reachable() && router.reload({ only: ['session'], preserveScroll: true, preserveState: true, showProgress: false }), 2000);
         }
     },
     { immediate: true },
