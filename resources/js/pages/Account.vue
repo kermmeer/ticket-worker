@@ -13,7 +13,23 @@ const props = defineProps({
     people: { type: Array, default: null },
     invite: { type: Object, default: null },
     spaces: { type: Array, default: () => [] },
+    knownAssignees: { type: Array, default: () => [] },
 });
+
+// Your Jira user: picked from who tickets are assigned to, or found by name or e-mail.
+const jiraQuery = ref('');
+const jiraFound = ref([]);
+const jiraError = ref(null);
+async function findJira() {
+    jiraError.value = null;
+    const response = await fetch(`/account/jira/find?q=${encodeURIComponent(jiraQuery.value)}`, { headers: { Accept: 'application/json' } });
+    const data = await response.json();
+    jiraFound.value = data.users ?? [];
+    jiraError.value = data.error ?? (jiraFound.value.length ? null : 'Nobody found by that.');
+}
+function linkJira(jira) {
+    router.put('/account/jira', jira ? { account_id: jira.account_id, name: jira.name } : { account_id: null }, { preserveScroll: true });
+}
 
 // Which spaces a person sees: every one, or those ticked. Open one person at a time.
 const editingSpaces = ref(null);
@@ -97,6 +113,36 @@ const open = ref(false);
                 <p class="text-xs text-muted">Stored encrypted. Never shown again, never sent anywhere but to Claude Code when your work runs.</p>
                 <button type="submit" class="btn btn-signal" :disabled="claude.processing || !claude.secret">Save</button>
             </form>
+        </section>
+
+        <!-- Jira -->
+        <section class="card p-5 xl:col-span-2">
+            <h2 class="text-lg font-medium">You in Jira</h2>
+            <p class="mt-1 max-w-3xl text-sm text-muted">So the overview can show what is assigned to you, and Assign to me knows who you are.</p>
+            <p class="mt-3 text-sm">
+                Now:
+                <strong v-if="account.jira" class="font-medium text-done">{{ account.jira.name }}</strong>
+                <strong v-else class="font-medium text-muted">not linked</strong>
+                <button v-if="account.jira" type="button" class="ml-2 text-muted underline hover:text-ink" @click="linkJira(null)">unlink</button>
+            </p>
+            <div v-if="!account.jira" class="mt-3 flex flex-wrap items-end gap-3">
+                <label v-if="knownAssignees.length" class="text-sm">One of the people tickets are assigned to
+                    <select class="mt-1 block rounded-md border border-line bg-page px-2 py-1.5 text-sm" @change="linkJira(knownAssignees.find((jira) => jira.account_id === $event.target.value))">
+                        <option value="">pick yourself…</option>
+                        <option v-for="jira in knownAssignees" :key="jira.account_id" :value="jira.account_id">{{ jira.name }}</option>
+                    </select>
+                </label>
+                <form class="flex items-end gap-2" @submit.prevent="findJira">
+                    <label class="text-sm">or find yourself by name or e-mail
+                        <input v-model="jiraQuery" class="mt-1 block rounded-md border border-line bg-page px-2 py-1.5 text-sm" />
+                    </label>
+                    <button type="submit" class="btn px-3 py-1.5" :disabled="jiraQuery.trim().length < 2">Find</button>
+                </form>
+            </div>
+            <ul v-if="!account.jira && jiraFound.length" class="mt-2 flex flex-wrap gap-2">
+                <li v-for="jira in jiraFound" :key="jira.account_id"><button type="button" class="btn px-3 py-1 text-sm" @click="linkJira(jira)">{{ jira.name }}</button></li>
+            </ul>
+            <p v-if="jiraError" class="mt-2 text-sm text-muted">{{ jiraError }}</p>
         </section>
 
         <!-- Name -->

@@ -90,9 +90,22 @@ class AccountController extends Controller
         return to_route('account.sign-in');
     }
 
+    /** The Jira users tickets here are assigned to: what an account links to, most of the time. */
+    private static function knownAssignees(): \Illuminate\Support\Collection
+    {
+        return \App\Models\Ticket::query()->whereNotNull('assignee_account_id')
+            ->select('assignee_account_id', 'assignee')->distinct()->orderBy('assignee')->get()
+            ->map(fn ($row) => ['account_id' => $row->assignee_account_id, 'name' => $row->assignee])->unique('account_id')->values();
+    }
+
     public function show(Request $request): Response
     {
         $user = $request->user();
+        $known = self::knownAssignees();
+        // Not linked yet, and exactly one assignee has this person's name: that is them.
+        if (! filled($user->jira_account_id) && ($match = $known->filter(fn ($jira) => mb_strtolower(trim($jira['name'])) === mb_strtolower(trim($user->name))))->count() === 1) {
+            $user->update(['jira_account_id' => $match->first()['account_id'], 'jira_name' => $match->first()['name']]);
+        }
 
         return Inertia::render('Account', [
             'account' => [
@@ -100,7 +113,9 @@ class AccountController extends Controller
                 'claude' => match (true) { filled($user->claude_api_key) => 'key', filled($user->claude_oauth_token) => 'token', default => null },
                 'usage' => Budget::personThisMonth($user->id),
                 'budget' => $user->monthly_budget_usd,
+                'jira' => $user->jira_account_id ? ['account_id' => $user->jira_account_id, 'name' => $user->jira_name] : null,
             ],
+            'knownAssignees' => $known,
             'instanceClaude' => \App\Agent\Instructions::instanceCredentials() !== [],
             'viaHeader' => self::viaHeader(),
             'people' => $user->is_admin ? User::query()->orderBy('name')->get()->map(fn (User $person) => [
@@ -140,6 +155,26 @@ class AccountController extends Controller
         });
 
         return back()->with('success', $data['kind'] === 'none' ? 'Removed. Your agents now run on the instance\'s sign-in, if it has one.' : 'Saved. Your agents run on it from their next turn.');
+    }
+
+    /** Link your account to your Jira user, or unlink it. */
+    public function jira(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['account_id' => ['nullable', 'string', 'max:128'], 'name' => ['nullable', 'string', 'max:200']]);
+        $request->user()->update(['jira_account_id' => $data['account_id'] ?: null, 'jira_name' => $data['account_id'] ? ($data['name'] ?? $data['account_id']) : null]);
+
+        return back()->with('success', $data['account_id'] ? "Linked to {$data['name']} in Jira: Assigned to me now works." : 'Unlinked from Jira.');
+    }
+
+    /** Jira users matching what you type: a name or an e-mail address. */
+    public function findJira(Request $request, \App\Jira\JiraClient $jira): \Illuminate\Http\JsonResponse
+    {
+        $query = (string) $request->validate(['q' => ['required', 'string', 'min:2', 'max:200']])['q'];
+        try {
+            return response()->json(['users' => $jira->findUsers($query)]);
+        } catch (\App\Jira\JiraException $e) {
+            return response()->json(['users' => [], 'error' => $e->getMessage()]);
+        }
     }
 
     public function password(Request $request): RedirectResponse

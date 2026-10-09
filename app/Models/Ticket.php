@@ -19,7 +19,7 @@ class Ticket extends Model
 {
     protected $fillable = [
         'space_id', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
-        'issue_type', 'reporter', 'assignee', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
+        'issue_type', 'reporter', 'assignee', 'assignee_account_id', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
         'first_seen_at', 'last_seen_at', 'left_at', 'hidden_at',
         'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id',
     ];
@@ -143,6 +143,7 @@ class Ticket extends Model
             'issue_type' => $fields['issuetype']['name'] ?? null,
             'reporter' => $fields['reporter']['displayName'] ?? null,
             'assignee' => $fields['assignee']['displayName'] ?? null,
+            'assignee_account_id' => $fields['assignee']['accountId'] ?? null,
             'slas' => $slaFields === [] ? null : self::slasFrom($fields, $slaFields),
             // Jira writes its own offset (+0200); the database keeps UTC without one, so convert
             // first, or every time comes back hours off ("updated in 2 hours").

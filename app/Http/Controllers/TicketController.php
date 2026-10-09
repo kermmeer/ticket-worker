@@ -52,6 +52,7 @@ class TicketController extends Controller
                 'status_tone' => $ticket->space->statusTone($ticket->status, $ticket->status_category),
                 'priority' => $ticket->priority,
                 'assignee' => $ticket->assignee,
+                'assigned_to_me' => filled($ticket->assignee_account_id) && $ticket->assignee_account_id === auth()->user()?->jira_account_id,
                 'slas' => $ticket->space->visibleSlas($ticket->slas),
                 'url' => $jira->browseUrl($ticket->key),
                 'space' => ['label' => $ticket->space->label, 'colour' => $ticket->space->colour, 'type' => $ticket->space->type],
@@ -133,6 +134,28 @@ class TicketController extends Controller
         QuickScanTicket::start($ticket);
 
         return back();
+    }
+
+    /** Assign the ticket to yourself in Jira; with JIRA_WRITE=dummy, say so and send nothing. */
+    public function assignToMe(Request $request, Ticket $ticket, JiraClient $jira): RedirectResponse
+    {
+        $user = $request->user();
+        if (! filled($user->jira_account_id)) {
+            return back()->with('error', 'Link your Jira user first, on Your account.');
+        }
+        if (config('services.jira.write') !== 'real') {
+            return back()->with('error', "JIRA_WRITE=dummy: nothing was sent. With it real, {$ticket->key} would now be assigned to {$user->jira_name}.");
+        }
+
+        try {
+            $jira->assign($ticket->key, $user->jira_account_id);
+        } catch (JiraException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+        $ticket->update(['assignee' => $user->jira_name, 'assignee_account_id' => $user->jira_account_id]);
+        Cache::forget("ticket.issue.{$ticket->key}");
+
+        return back()->with('success', "{$ticket->key} is assigned to you in Jira.");
     }
 
     /** Have the agent write its fix as a patch (CONCEPT.md §8). */

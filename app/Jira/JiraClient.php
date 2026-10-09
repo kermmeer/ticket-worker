@@ -282,6 +282,25 @@ class JiraClient
         ];
     }
 
+    /**
+     * Jira users matching a name or an e-mail address, for linking an account to its Jira user.
+     *
+     * @return list<array{account_id: string, name: string}>
+     */
+    public function findUsers(string $query): array
+    {
+        return collect($this->send('get', '/rest/api/3/user/search', ['query' => $query, 'maxResults' => 10]))
+            ->filter(fn ($user) => ($user['accountType'] ?? 'atlassian') === 'atlassian' && ($user['active'] ?? true))
+            ->map(fn ($user) => ['account_id' => (string) $user['accountId'], 'name' => (string) ($user['displayName'] ?? $user['accountId'])])
+            ->values()->all();
+    }
+
+    /** Assign a ticket. Only with JIRA_WRITE=real; the caller says what would have happened otherwise. */
+    public function assign(string $key, string $accountId): void
+    {
+        $this->send('put', '/rest/api/3/issue/'.rawurlencode($key).'/assignee', ['accountId' => $accountId]);
+    }
+
     private function send(string $method, string $path, array $data = []): array
     {
         if (! $this->configured()) {

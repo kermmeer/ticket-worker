@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import FoldingSection from '../components/FoldingSection.vue';
 import SpaceLabel from '../components/SpaceLabel.vue';
 import StatusLabel from '../components/StatusLabel.vue';
@@ -38,6 +38,10 @@ const folds = [
 // the overview starts with yours.
 const followed = computed(() => new Set(props.spaces.filter((space) => space.followed).map((space) => space.id)));
 const spaceFilter = ref(props.spaces.some((space) => space.followed) ? 'mine' : null);
+// Assigned to you in Jira, once your account is linked to your Jira user.
+const myJira = computed(() => usePage().props.me?.jira_account_id ?? null);
+const mineOnly = ref(false);
+
 const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value === 'mine' ? followed.value.has(ticket.space_id) : ticket.space_id === spaceFilter.value);
 const statusFilter = ref(null);
 const search = ref('');
@@ -64,6 +68,7 @@ const shown = computed(() => {
     return props.tickets.filter(
         (ticket) =>
             inSpace(ticket) &&
+            (!mineOnly.value || ticket.assignee_account_id === myJira.value) &&
             (statusFilter.value === null || ticket.status === statusFilter.value) &&
             (query === '' || ticket.key.toLowerCase().includes(query) || ticket.summary.toLowerCase().includes(query)),
     );
@@ -275,6 +280,16 @@ onBeforeUnmount(() => {
         </section>
 
         <div class="mt-10 flex flex-wrap items-center gap-2">
+            <button
+                v-if="myJira"
+                type="button"
+                class="rounded-full border px-3 py-1 text-sm transition-colors"
+                :class="mineOnly ? 'border-signal bg-signal text-page' : 'border-line text-muted hover:text-ink'"
+                :aria-pressed="mineOnly"
+                @click="mineOnly = !mineOnly"
+            >
+                Assigned to me
+            </button>
             <button
                 v-if="followed.size"
                 type="button"

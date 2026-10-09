@@ -32,6 +32,8 @@ Route::controller(AccountController::class)->group(function () {
     Route::put('/account', 'update')->name('account.update');
     Route::put('/account/claude', 'claude')->name('account.claude');
     Route::put('/account/password', 'password')->name('account.password');
+    Route::put('/account/jira', 'jira')->name('account.jira');
+    Route::get('/account/jira/find', 'findJira')->middleware('throttle:30,1')->name('account.jira.find');
     Route::post('/people', 'invite')->name('people.invite');
     Route::post('/people/{user}/link', 'newLink')->name('people.link');
     Route::put('/people/{user}/role', 'role')->name('people.role');

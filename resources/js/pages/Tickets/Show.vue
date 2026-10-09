@@ -184,6 +184,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         <SpaceLabel :label="ticket.space.label" :colour="ticket.space.colour" class="text-sm text-muted" />
         <span v-if="ticket.priority" class="text-sm text-muted">· {{ ticket.priority }}</span>
         <span class="text-sm text-muted">· {{ ticket.assignee ? `assigned to ${ticket.assignee}` : 'assigned to nobody' }}</span>
+        <button v-if="$page.props.me?.jira_account_id && !ticket.assigned_to_me" type="button" class="text-sm text-muted underline hover:text-ink" @click="post('assign-to-me')">Assign to me</button>
         <a :href="ticket.url" target="_blank" rel="noopener" class="ml-auto text-sm text-muted hover:text-ink">Open in {{ openLabel }} ↗</a>
     </div>
     <h1 class="display mt-3 text-3xl leading-tight sm:text-4xl">{{ ticket.summary }}</h1>

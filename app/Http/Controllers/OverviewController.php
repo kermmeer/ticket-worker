@@ -62,6 +62,7 @@ class OverviewController extends Controller
                 'priority' => $ticket->priority,
                 'reporter' => $ticket->reporter,
                 'assignee' => $ticket->assignee,
+                'assignee_account_id' => $ticket->assignee_account_id,
                 'slas' => $byId[$ticket->space_id]->visibleSlas($ticket->slas),
                 // Messages waiting in the outbox for this ticket, and the status each will set.
                 'outbox' => collect($waiting[$ticket->key] ?? [])->map(fn (array $message) => [
