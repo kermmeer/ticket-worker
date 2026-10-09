@@ -90,8 +90,9 @@ function toggleHidden() {
         <!-- A fixed width, so the columns before it line up from row to row. -->
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 lg:flex-col lg:items-end lg:pt-0.5">
             <StateBadge :state="ticket.group" />
-            <p class="flex gap-3 text-sm whitespace-nowrap text-muted">
-                <button v-if="!['queued', 'running'].includes(ticket.quick_scan?.state)" type="button" class="hover:text-ink hover:underline" @click="quickScan">
+            <!-- One per line on a wide screen, under the badge; side by side on a narrow one. -->
+            <p class="flex flex-wrap gap-x-3 gap-y-1 text-sm whitespace-nowrap text-muted lg:flex-col lg:items-end lg:gap-y-0.5">
+                <button v-if="!['queued', 'running', 'pending'].includes(ticket.quick_scan?.state)" type="button" class="hover:text-ink hover:underline" @click="quickScan">
                     {{ ticket.quick_scan?.result ? 'Scan again' : 'Quick scan' }}
                 </button>
                 <button type="button" class="hover:text-ink hover:underline" @click="toggleHidden">{{ ticket.group === 'hidden' ? 'Unhide' : 'Hide' }}</button>

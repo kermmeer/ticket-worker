@@ -7,6 +7,7 @@ use App\Http\Controllers\HiddenTicketController;
 use App\Http\Controllers\HyperModeController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OverviewController;
+use App\Http\Controllers\QuickScanBatchController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SpaceController;
 use App\Http\Controllers\SystemController;
@@ -19,6 +20,8 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::get('/', OverviewController::class)->name('overview');
 Route::post('/hyper', HyperModeController::class)->name('hyper');
+Route::post('/quick-scans', [QuickScanBatchController::class, 'store'])->name('quick-scans.store');
+Route::delete('/quick-scans', [QuickScanBatchController::class, 'destroy'])->name('quick-scans.destroy');
 Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('tickets.')->group(function () {
     Route::get('/', 'show')->name('show');
     Route::post('/analyse', 'analyse')->name('analyse');

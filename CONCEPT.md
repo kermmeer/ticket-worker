@@ -265,6 +265,13 @@ never on a space's first sync), at most `AGENT_QUICK_PER_SYNC` (10) a sync; olde
 have a *Quick scan* button. The first real one cost $0.12. The analysis proper is still
 yours to start.
 
+*Quick scan N without one* on the overview scans everything in view that has no scan yet
+(the space, status and search filters decide what is in view), after a confirmation with
+the count and an estimate. Those wait as *pending* and go one at a time, newest first, and
+only when no analysis waits for an agent (`FeedQuickScans`, every minute and after each
+scan), so a batch of hundreds costs hours but never your turn. *Stop the rest* drops what
+still waits.
+
 ## 8. Working the ticket
 
 After the proposal, the session stays open. You talk, and the agent carries on with the whole

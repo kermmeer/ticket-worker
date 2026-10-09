@@ -135,8 +135,10 @@ class Ticket extends Model
             'reporter' => $fields['reporter']['displayName'] ?? null,
             'assignee' => $fields['assignee']['displayName'] ?? null,
             'slas' => $slaFields === [] ? null : self::slasFrom($fields, $slaFields),
-            'jira_created_at' => isset($fields['created']) ? Carbon::parse($fields['created']) : null,
-            'jira_updated_at' => isset($fields['updated']) ? Carbon::parse($fields['updated']) : null,
+            // Jira writes its own offset (+0200); the database keeps UTC without one, so convert
+            // first, or every time comes back hours off ("updated in 2 hours").
+            'jira_created_at' => isset($fields['created']) ? Carbon::parse($fields['created'])->utc() : null,
+            'jira_updated_at' => isset($fields['updated']) ? Carbon::parse($fields['updated'])->utc() : null,
             'last_seen_at' => $now,
             'left_at' => null,
         ]);

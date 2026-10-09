@@ -58,6 +58,9 @@ class SyncSpaceTest extends TestCase
         $this->assertSame(['SUP-1', 'SUP-2'], Ticket::orderBy('key')->pluck('key')->all());
         $ticket = Ticket::firstWhere('key', 'SUP-1');
         $this->assertSame(['Waiting for support', 'High', 'A. Reporter'], [$ticket->status, $ticket->priority, $ticket->reporter]);
+        // Jira's 10:00 at +02:00 is 08:00 UTC, stored as such.
+        $this->assertSame('2026-09-30 08:00:00', $ticket->getRawOriginal('jira_created_at'));
+        $this->assertSame('2026-10-01T13:30:00+00:00', $ticket->jira_updated_at->toIso8601String());
         $this->assertNotNull($this->space->fresh()->synced_at);
         $this->assertNull($this->space->fresh()->sync_error);
     }

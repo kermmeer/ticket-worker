@@ -38,6 +38,7 @@ function scanNow() {
             <div><p class="text-muted">Next step</p><AgentText :text="scan.result.next_step" class="mt-1" /></div>
         </template>
         <p v-else-if="busy()" class="text-working">Scanning… {{ scan.steps.at(-1) ?? '' }}</p>
+        <p v-else-if="scan?.state === 'pending'" class="text-muted">Waiting its turn in a batch of quick scans.</p>
         <p v-else-if="scan?.state === 'failed'" class="text-signal">The quick scan failed: {{ scan.error }}</p>
         <p v-else class="text-muted">No quick scan yet: a first look in a minute or two, for cents rather than dollars.</p>
 

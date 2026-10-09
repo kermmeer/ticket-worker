@@ -13,6 +13,7 @@ const still = {
 
 <template>
     <p v-if="scan.state === 'queued' || scan.state === 'running'" class="mt-1.5 text-sm text-working">Quick scan…</p>
+    <p v-else-if="scan.state === 'pending'" class="mt-1.5 text-sm text-muted">Quick scan waiting its turn</p>
     <p v-else-if="scan.state === 'failed'" class="mt-1.5 text-sm text-muted">Quick scan failed</p>
     <p v-else-if="scan.result" class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-sm">
         <span class="rounded-[3px] border border-line px-1.5 font-mono text-[0.66rem] leading-5 tracking-wide text-muted uppercase">{{ kinds[scan.result.kind] ?? scan.result.kind }}</span>

@@ -132,6 +132,34 @@ const dueSoon = computed(() => {
 });
 const firstRunning = (ticket) => ticket.slas.filter((sla) => sla.state === 'running').sort((a, b) => Date.parse(a.due_at ?? 0) - Date.parse(b.due_at ?? 0))[0];
 
+// Quick scans for everything in view that has none yet: the filters above decide what "in
+// view" is. They go one at a time, after any analysis, so a batch costs time, not your turn.
+const toScan = computed(() =>
+    shown.value.filter((ticket) => ticket.group !== 'hidden' && (!ticket.quick_scan || ticket.quick_scan.state === 'failed')),
+);
+const scanBatch = computed(() => {
+    const states = props.tickets.map((ticket) => ticket.quick_scan?.state);
+    return { waiting: states.filter((state) => state === 'pending').length, running: states.filter((state) => state === 'queued' || state === 'running').length };
+});
+// What one cost so far, for the estimate; the first real one was $0.12.
+const costPerScan = computed(() => {
+    const costs = props.tickets.map((ticket) => ticket.quick_scan?.cost_usd).filter((cost) => cost != null);
+    return costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : 0.12;
+});
+
+function scanAll() {
+    const count = toScan.value.length;
+    const hours = count / 60;
+    const time = hours >= 1 ? `about ${Math.round(hours)} hour${Math.round(hours) === 1 ? '' : 's'}` : `about ${count} minutes`;
+    if (confirm(`Quick scan ${count} tickets?\n\nAbout $${(count * costPerScan.value).toFixed(2)} at $${costPerScan.value.toFixed(2)} each, one at a time: ${time}. Your analyses go first, and you can stop the rest at any time.`)) {
+        router.post('/quick-scans', { ids: toScan.value.map((ticket) => ticket.id) }, { preserveScroll: true, preserveState: true });
+    }
+}
+
+function stopScans() {
+    router.delete('/quick-scans', { preserveScroll: true, preserveState: true });
+}
+
 // While you search or show one status, every section opens, so no match stays folded away.
 const searching = computed(() => statusFilter.value !== null || search.value.trim() !== '');
 
@@ -323,6 +351,16 @@ onBeforeUnmount(() => {
                 </li>
             </ol>
         </FoldingSection>
+
+        <div v-if="toScan.length || scanBatch.waiting || scanBatch.running" class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+            <button v-if="toScan.length" type="button" class="btn px-3 py-1.5" @click="scanAll">
+                Quick scan {{ toScan.length === shown.length ? 'all' : '' }} {{ toScan.length }} without one
+            </button>
+            <span v-if="scanBatch.waiting || scanBatch.running" class="text-working">
+                Quick scans: {{ scanBatch.running ? 'one running' : 'none running' }}<template v-if="scanBatch.waiting">, {{ scanBatch.waiting }} waiting</template>
+            </span>
+            <button v-if="scanBatch.waiting" type="button" class="text-muted hover:text-ink hover:underline" @click="stopScans">Stop the rest</button>
+        </div>
 
         <p v-if="shown.length === 0" class="mt-10 text-muted">Nothing matches.</p>
 

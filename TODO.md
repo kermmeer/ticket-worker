@@ -136,3 +136,7 @@ to it, including work you finish.
       (kind, system, likely cause, next step; for data problems, whether it is still there via
       the system's API); one line on the overview, the whole scan on the ticket page, a button
       for older tickets (2026-10-09)
+- [x] Batch quick scan from the overview (what is in view, without a scan), one at a time after
+      any analysis, with an estimate first and Stop the rest; row links one per line (2026-10-09)
+- [x] Jira's times were stored without their offset and came back 2 hours late ("updated in 2
+      hours"): converted to UTC on sync; open tickets correct themselves at the next sync

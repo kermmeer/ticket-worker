@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Agent\ClaudeRun;
+use App\Agent\FeedQuickScans;
 use App\Agent\Instructions;
 use App\Agent\Workspace;
 use App\Models\ApiConnection;
@@ -104,6 +105,9 @@ class QuickScanTicket implements ShouldQueue
         } catch (Throwable $e) {
             $ticket->forceFill(['quick_scan_state' => 'failed', 'quick_scan_error' => Str::limit($e->getMessage(), 1000), 'quick_scan_at' => now()])->save();
         }
+
+        // A batch carries on at once rather than at the next minute.
+        (new FeedQuickScans)();
     }
 
     /** The queue gave up on it: the row must not say "scanning" forever. */
