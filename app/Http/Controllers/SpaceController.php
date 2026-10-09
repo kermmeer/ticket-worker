@@ -27,15 +27,31 @@ class SpaceController extends Controller
 
     public function index(JiraClient $jira): Response
     {
+        $followed = request()->user()?->followedSpaces()->pluck('spaces.id')->all() ?? [];
         $spaces = Space::query()
+            ->with('followers:id,name,username')
             ->withCount(['tickets as open_count' => fn ($query) => $query->open()])
             ->orderBy('label')
             ->get();
 
         return Inertia::render('Spaces/Index', [
             'jiraConfigured' => $jira->configured(),
-            'spaces' => $spaces->map(fn (Space $space) => $this->summary($space) + ['open_count' => $space->open_count]),
+            'spaces' => $spaces->map(fn (Space $space) => $this->summary($space) + [
+                'open_count' => $space->open_count,
+                'followed' => in_array($space->id, $followed, true),
+                'followers' => $space->followers->map(fn ($user) => $user->firstName())->values(),
+            ]),
         ]);
+    }
+
+    /** Follow a space, or stop: what your overview starts with. */
+    public function follow(Request $request, Space $space): RedirectResponse
+    {
+        $request->boolean('follow')
+            ? $request->user()->followedSpaces()->syncWithoutDetaching([$space->id])
+            : $request->user()->followedSpaces()->detach($space->id);
+
+        return back();
     }
 
     public function create(JiraClient $jira): Response

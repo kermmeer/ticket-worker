@@ -34,6 +34,12 @@ class User extends Authenticatable
         ];
     }
 
+    /** The spaces this person follows: their overview starts with these. */
+    public function followedSpaces(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Space::class);
+    }
+
     /** What reply drafts are signed with: the first word of the name. */
     public function firstName(): string
     {

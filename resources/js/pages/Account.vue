@@ -47,6 +47,10 @@ const open = ref(false);
     <Head title="Your account" />
     <p class="eyebrow">Your account</p>
     <h1 class="display mt-2 text-3xl">{{ account.name }} <span class="font-mono text-base text-muted">{{ account.username }}</span></h1>
+    <p class="mt-2 text-sm text-muted">
+        This month: <span class="font-mono text-ink">${{ account.usage.cost.toFixed(2) }}</span> of agent work you asked for
+        ({{ account.usage.turns }} turns, {{ account.usage.scans }} quick scans), priced as the API would.
+    </p>
 
     <div class="mt-8 grid gap-6 xl:grid-cols-2">
         <!-- Claude -->
@@ -116,6 +120,7 @@ const open = ref(false);
                 <span v-if="person.is_admin" class="text-xs text-working">admin</span>
                 <span class="text-xs" :class="person.has_claude ? 'text-done' : 'text-muted'">{{ person.has_claude ? 'own Claude sign-in' : 'no Claude sign-in of their own' }}</span>
                 <span class="text-xs text-muted">{{ person.last_seen_at ? `seen ${ago(person.last_seen_at)}` : 'not signed in yet' }}</span>
+                <span class="font-mono text-xs" :class="person.usage.cost ? 'text-ink' : 'text-muted'">${{ person.usage.cost.toFixed(2) }} this month</span>
                 <span v-if="!person.you" class="ml-auto flex gap-3 text-xs">
                     <button v-if="!viaHeader" type="button" class="text-muted hover:text-ink" @click="router.post(`/people/${person.id}/link`, {}, { preserveScroll: true })">New link</button>
                     <button type="button" class="text-muted hover:text-ink" @click="setAdmin(person, !person.is_admin)">{{ person.is_admin ? 'Not admin' : 'Make admin' }}</button>

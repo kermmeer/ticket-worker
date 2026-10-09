@@ -49,7 +49,17 @@ function post(space, action) {
                 <span class="ml-auto font-mono text-xs font-medium tracking-wide uppercase" :class="states[space.state]?.tone">
                     {{ states[space.state]?.label ?? space.state }}
                 </span>
+                <button
+                    type="button"
+                    class="rounded-full border px-3 py-0.5 text-xs transition-colors"
+                    :class="space.followed ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
+                    :aria-pressed="space.followed"
+                    @click="router.put(`/spaces/${space.id}/follow`, { follow: !space.followed }, { preserveScroll: true })"
+                >
+                    {{ space.followed ? 'Following' : 'Follow' }}
+                </button>
             </div>
+            <p v-if="space.followers?.length" class="mt-1 text-xs text-muted">Followed by {{ space.followers.join(', ') }}</p>
 
             <p class="mt-3 text-sm">
                 <span>{{ space.open_count }} open {{ space.open_count === 1 ? 'ticket' : 'tickets' }}</span>

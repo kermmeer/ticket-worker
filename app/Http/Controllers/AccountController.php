@@ -89,14 +89,43 @@ class AccountController extends Controller
         return to_route('account.sign-in');
     }
 
+    /**
+     * What each person's agent work cost this month, by who asked: turns, and quick scans.
+     * Prices are what the API would charge, also for work on a subscription.
+     *
+     * @return array<int, array{cost: float, turns: int, scans: int}>
+     */
+    private static function usageThisMonth(): array
+    {
+        $since = now()->startOfMonth();
+        $turns = \App\Models\AgentTurn::query()->where('created_at', '>=', $since)->whereNotNull('user_id')
+            ->selectRaw('user_id, count(*) as n, coalesce(sum(cost_usd), 0) as cost')->groupBy('user_id')->get()->keyBy('user_id');
+        $scans = \App\Models\Ticket::query()->where('quick_scan_at', '>=', $since)->whereNotNull('quick_scan_user_id')
+            ->selectRaw('quick_scan_user_id as user_id, count(*) as n, coalesce(sum(quick_scan_cost_usd), 0) as cost')->groupBy('quick_scan_user_id')->get()->keyBy('user_id');
+
+        $usage = [];
+        foreach ($turns->keys()->merge($scans->keys())->unique() as $id) {
+            $usage[$id] = [
+                'cost' => round((float) ($turns[$id]->cost ?? 0) + (float) ($scans[$id]->cost ?? 0), 2),
+                'turns' => (int) ($turns[$id]->n ?? 0),
+                'scans' => (int) ($scans[$id]->n ?? 0),
+            ];
+        }
+
+        return $usage;
+    }
+
     public function show(Request $request): Response
     {
         $user = $request->user();
+        $usage = self::usageThisMonth();
+        $none = ['cost' => 0.0, 'turns' => 0, 'scans' => 0];
 
         return Inertia::render('Account', [
             'account' => [
                 'name' => $user->name, 'username' => $user->username, 'is_admin' => $user->is_admin,
                 'claude' => match (true) { filled($user->claude_api_key) => 'key', filled($user->claude_oauth_token) => 'token', default => null },
+                'usage' => $usage[$user->id] ?? $none,
             ],
             'instanceClaude' => \App\Agent\Instructions::instanceCredentials() !== [],
             'viaHeader' => self::viaHeader(),
@@ -104,6 +133,7 @@ class AccountController extends Controller
                 'id' => $person->id, 'name' => $person->name, 'username' => $person->username, 'is_admin' => $person->is_admin,
                 'has_claude' => $person->claudeCredentials() !== [], 'last_seen_at' => $person->last_seen_at?->toIso8601String(),
                 'you' => $person->is($user),
+                'usage' => $usage[$person->id] ?? $none,
             ]) : null,
             'invite' => session('invite'),
         ]);

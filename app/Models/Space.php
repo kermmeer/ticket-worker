@@ -48,6 +48,12 @@ class Space extends Model
         ];
     }
 
+    /** Who follows it: their overview starts with it. */
+    public function followers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class);
+    }
+
     public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);

@@ -34,7 +34,11 @@ const folds = [
     { key: 'hidden', label: 'Hidden', hint: 'Tickets you will not take on; they stay hidden until you unhide them' },
 ];
 
-const spaceFilter = ref(null);
+// null: every space; 'mine': the spaces you follow; or one space's id. With spaces followed,
+// the overview starts with yours.
+const followed = computed(() => new Set(props.spaces.filter((space) => space.followed).map((space) => space.id)));
+const spaceFilter = ref(props.spaces.some((space) => space.followed) ? 'mine' : null);
+const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value === 'mine' ? followed.value.has(ticket.space_id) : ticket.space_id === spaceFilter.value);
 const statusFilter = ref(null);
 const search = ref('');
 const searchBox = ref(null);
@@ -45,7 +49,7 @@ const spacesById = computed(() => Object.fromEntries(props.spaces.map((space) =>
 const statuses = computed(() => {
     const counts = new Map();
     for (const ticket of props.tickets) {
-        if (spaceFilter.value !== null && ticket.space_id !== spaceFilter.value) {
+        if (!inSpace(ticket)) {
             continue;
         }
         const entry = counts.get(ticket.status) ?? { status: ticket.status, tone: ticket.status_tone, count: 0 };
@@ -59,7 +63,7 @@ const shown = computed(() => {
     const query = search.value.trim().toLowerCase();
     return props.tickets.filter(
         (ticket) =>
-            (spaceFilter.value === null || ticket.space_id === spaceFilter.value) &&
+            inSpace(ticket) &&
             (statusFilter.value === null || ticket.status === statusFilter.value) &&
             (query === '' || ticket.key.toLowerCase().includes(query) || ticket.summary.toLowerCase().includes(query)),
     );
@@ -271,6 +275,16 @@ onBeforeUnmount(() => {
         </section>
 
         <div class="mt-10 flex flex-wrap items-center gap-2">
+            <button
+                v-if="followed.size"
+                type="button"
+                class="rounded-full border px-3 py-1 text-sm transition-colors"
+                :class="spaceFilter === 'mine' ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
+                :aria-pressed="spaceFilter === 'mine'"
+                @click="pickSpace('mine')"
+            >
+                My spaces
+            </button>
             <button
                 type="button"
                 class="rounded-full border px-3 py-1 text-sm transition-colors"

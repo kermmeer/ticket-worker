@@ -39,6 +39,8 @@ class OverviewController extends Controller
             ->get()
             ->keyBy('ticket_id');
 
+        $followed = request()->user()?->followedSpaces()->pluck('spaces.id')->all() ?? [];
+
         return Inertia::render('Overview', [
             'hasSpaces' => Space::query()->exists(),
             'spaces' => $spaces->map(fn (Space $space) => [
@@ -46,6 +48,7 @@ class OverviewController extends Controller
                 'label' => $space->label,
                 'colour' => $space->colour,
                 'synced_at' => $space->synced_at?->toIso8601String(),
+                'followed' => in_array($space->id, $followed, true),
                 'sync_error' => $space->sync_error,
             ]),
             'tickets' => $tickets->map(fn (Ticket $ticket) => [
