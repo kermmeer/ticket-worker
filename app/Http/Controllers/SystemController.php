@@ -114,13 +114,27 @@ class SystemController extends Controller
     {
         abort_unless($api->system_id === $system->id, 404);
         $data = $this->apiData($request, $system, $api);
-        // An empty secret field keeps the one there is: it is never sent to the page.
-        if (! filled($data['secret'] ?? null) && ! $request->boolean('clear_secret')) {
-            unset($data['secret']);
+        // A secret only ever goes where it was given for. Moving the API (another server,
+        // another way of signing in) without giving the secret again would let anyone who
+        // can edit it send the stored one to a server of their own: so that drops it.
+        // Another server, that is: a new path on the same one is no risk.
+        $server = fn (string $url) => mb_strtolower(implode('|', [parse_url($url, PHP_URL_SCHEME), parse_url($url, PHP_URL_HOST), parse_url($url, PHP_URL_PORT)]));
+        $moved = $server($data['base_url']) !== $server($api->base_url)
+            || $data['auth'] !== $api->auth
+            || ($data['username'] ?? null) !== $api->username
+            || ($data['field'] ?? null) !== $api->field;
+        if (! filled($data['secret'] ?? null)) {
+            if ($moved || $request->boolean('clear_secret')) {
+                $data['secret'] = null;
+            } else {
+                unset($data['secret']);
+            }
         }
         $api->update($data);
 
-        return back()->with('success', "Saved {$api->name}.");
+        return back()->with('success', $moved && ! filled($data['secret'] ?? null) && $api->auth !== 'none'
+            ? "Saved {$api->name}. It moved, so its secret was dropped: enter it again."
+            : "Saved {$api->name}.");
     }
 
     public function destroyApi(System $system, ApiConnection $api): RedirectResponse

@@ -130,6 +130,15 @@ class ApiConnectionTest extends TestCase
         $this->assertSame('https://boss.example.com/api/v2', $this->api->fresh()->base_url);
     }
 
+    public function test_moving_an_api_elsewhere_drops_its_secret(): void
+    {
+        $this->put("/systems/{$this->system->id}/apis/{$this->api->id}", [
+            'name' => 'api', 'base_url' => 'https://evil.example.com/collect', 'auth' => 'basic', 'username' => 'support', 'secret' => '',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($this->api->fresh()->secret, 'The stored secret must never follow the API to a new address.');
+    }
+
     public function test_an_analysis_gets_the_tool_server_when_its_systems_have_apis(): void
     {
         config(['agent.claude.api_key' => 'sk-ant-test', 'agent.claude.bin' => 'claude', 'agent.workspaces_path' => sys_get_temp_dir().'/tw-api-ws-'.uniqid()]);
