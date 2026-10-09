@@ -3,6 +3,7 @@ import { onBeforeUnmount, ref, watchEffect } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import ApiConnections from '../components/ApiConnections.vue';
 import DbConnections from '../components/DbConnections.vue';
+import PullFrom from '../components/PullFrom.vue';
 import { reachable } from '../connection.js';
 import { tokens } from '../time.js';
 
@@ -11,6 +12,7 @@ const props = defineProps({
     agentReady: { type: Boolean, default: false },
     authKinds: { type: Object, default: () => ({}) },
     dbDrivers: { type: Object, default: () => ({}) },
+    sshAvailable: { type: Boolean, default: false },
 });
 
 function scan(system) {
@@ -284,6 +286,7 @@ const states = {
                     </details>
                 </div>
 
+                <PullFrom :system="system" :ssh-available="sshAvailable" />
                 <ApiConnections :system="system" :auth-kinds="authKinds" />
                 <DbConnections :system="system" :drivers="dbDrivers" />
             </template>

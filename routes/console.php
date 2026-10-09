@@ -26,3 +26,8 @@ Schedule::call(new ForgetOldWork)->dailyAt('03:17')->name('forget-old-work');
 
 // An SLA under an hour from breaking, in its space's channel, once per deadline.
 Schedule::call(new WarnSlas)->everyFiveMinutes()->name('warn-slas')->withoutOverlapping();
+
+// Projects with a reachable Git host are fetched every night; pushing stays the way in for the rest.
+Schedule::call(function () {
+    \App\Models\System::query()->whereNotNull('pull_url')->where('kind', \App\Models\System::CODE)->each(fn ($system) => \App\Jobs\PullSystem::dispatch($system));
+})->dailyAt('02:43')->name('pull-systems');

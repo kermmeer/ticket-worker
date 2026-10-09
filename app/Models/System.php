@@ -26,15 +26,20 @@ class System extends Model
     /** Only APIs to call: nothing to push, nothing to read but its notes. */
     public const API = 'api';
 
+    protected $hidden = ['pull_secret'];
+
     protected $fillable = [
         'name', 'kind', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
         'scan_state', 'scan_stop_requested', 'scan_log', 'scan_error', 'scan_cost_usd',
         'scan_input_tokens', 'scan_output_tokens', 'scan_user_id',
+        'pull_url', 'pull_auth', 'pull_username', 'pull_secret', 'pull_public_key', 'pulled_at', 'pull_state', 'pull_error',
     ];
 
     protected function casts(): array
     {
         return [
+            'pull_secret' => 'encrypted',
+            'pulled_at' => 'datetime',
             'context_written_at' => 'datetime',
             'scan_stop_requested' => 'boolean',
             'scan_cost_usd' => 'float',

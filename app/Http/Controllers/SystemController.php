@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Agent\Instructions;
 use App\Jobs\PrepareSystemFolder;
+use App\Jobs\PullSystem;
 use App\Jobs\ScanSystem;
 use App\Models\ApiConnection;
 use App\Models\AuditEvent;
@@ -11,6 +12,7 @@ use App\Models\DbConnection;
 use App\Models\System;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,6 +41,11 @@ class SystemController extends Controller
                 'scan_cost_usd' => $system->scan_cost_usd,
                 'scan_tokens_in' => $system->scan_input_tokens,
                 'scan_tokens_out' => $system->scan_output_tokens,
+                'pull' => $system->hasCode() ? [
+                    'url' => $system->pull_url, 'auth' => $system->pull_auth, 'username' => $system->pull_username,
+                    'has_secret' => filled($system->pull_secret), 'public_key' => $system->pull_public_key,
+                    'state' => $system->pull_state, 'error' => $system->pull_error, 'at' => $system->pulled_at?->toIso8601String(),
+                ] : null,
                 // Its APIs; a secret is only ever "set" or not.
                 'databases' => $system->databases->map(fn (DbConnection $db) => [
                     'id' => $db->id, 'name' => $db->name, 'driver' => $db->driver, 'host' => $db->host, 'port' => $db->port,
@@ -53,6 +60,7 @@ class SystemController extends Controller
             ]),
             'authKinds' => ApiConnection::AUTH,
             'dbDrivers' => DbConnection::DRIVERS,
+            'sshAvailable' => PullSystem::sshAvailable(),
             'agentReady' => Instructions::credentials() !== [],
         ]);
     }
@@ -179,6 +187,60 @@ class SystemController extends Controller
         };
 
         return back()->with($answer['status'] >= 200 && $answer['status'] < 400 ? 'success' : 'error', "{$api->name}: {$verdict}");
+    }
+
+    /** Where to pull from, and how to sign in: editors and up (the route says so). */
+    public function pull(Request $request, System $system): RedirectResponse
+    {
+        abort_unless($system->hasCode(), 409, 'An API-only project has no code to pull.');
+        $data = $request->validate([
+            'url' => ['nullable', 'string', 'max:500', 'regex:~^(https://[^\s@]+|ssh://[^\s]+|[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+)$~'],
+            'auth' => ['required', 'in:none,token,ssh'],
+            'username' => ['nullable', 'string', 'max:200'],
+            'secret' => ['nullable', 'string', 'max:500'],
+        ], ['url.regex' => 'An https:// address without a password in it, or an SSH one (git@host:group/project.git).']);
+
+        $host = fn (?string $url) => mb_strtolower((string) (parse_url((string) $url, PHP_URL_HOST) ?: Str::between((string) $url, '@', ':')));
+        $changes = ['pull_url' => $data['url'] ?: null, 'pull_auth' => $data['auth'], 'pull_username' => $data['username'] ?: null];
+        if ($data['auth'] === 'token' && filled($data['secret'] ?? null)) {
+            $changes += ['pull_secret' => trim($data['secret']), 'pull_public_key' => null];
+        } elseif ($data['auth'] === 'none' || $data['auth'] !== $system->pull_auth || $host($data['url']) !== $host($system->pull_url)) {
+            // Another host or another way in: the old secret does not follow (as with APIs).
+            $changes += ['pull_secret' => null, 'pull_public_key' => null];
+        }
+        $system->update($changes);
+        AuditEvent::record('project.pull', $system->name, $changes['pull_url'] ? "pull from {$changes['pull_url']} ({$data['auth']})".(isset($changes['pull_secret']) && $changes['pull_secret'] ? ', secret changed' : '') : 'no pulling');
+
+        return back()->with('success', 'Saved.'.($data['auth'] === 'ssh' && ! filled($system->pull_public_key) ? ' Now make a deploy key.' : ''));
+    }
+
+    /** A fresh SSH key pair: the private half stays here, the public half goes on the Git host. */
+    public function pullKey(System $system): RedirectResponse
+    {
+        abort_unless(PullSystem::sshAvailable(), 409, 'This server has no ssh: use a token instead.');
+        $dir = sys_get_temp_dir().'/key-'.Str::random(12);
+        mkdir($dir, 0700);
+        $process = new \Symfony\Component\Process\Process(['ssh-keygen', '-t', 'ed25519', '-N', '', '-C', "ticket-worker {$system->name}", '-f', $dir.'/key', '-q']);
+        $process->run();
+        if (! $process->isSuccessful()) {
+            return back()->with('error', 'ssh-keygen failed: '.$process->getErrorOutput());
+        }
+        $system->update(['pull_auth' => 'ssh', 'pull_secret' => file_get_contents($dir.'/key'), 'pull_public_key' => trim(file_get_contents($dir.'/key.pub'))]);
+        @unlink($dir.'/key');
+        @unlink($dir.'/key.pub');
+        @rmdir($dir);
+        AuditEvent::record('project.pull-key', $system->name, 'new deploy key (secret changed)');
+
+        return back()->with('success', 'Made. Add the public key as a read-only deploy key on the Git host, then Pull now.');
+    }
+
+    public function pullNow(System $system): RedirectResponse
+    {
+        abort_unless(filled($system->pull_url), 409, 'Set where to pull from first.');
+        $system->update(['pull_state' => 'queued', 'pull_error' => null]);
+        PullSystem::dispatch($system);
+
+        return back();
     }
 
     public function storeDb(Request $request, System $system): RedirectResponse
