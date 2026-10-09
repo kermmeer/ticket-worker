@@ -193,7 +193,12 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         </span>
     </p>
 
-    <div class="mt-10 grid gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+    <!-- First, at every width: on a narrow screen it would otherwise sit below the whole ticket. -->
+    <FoldingSection title="Quick scan" remember="ticket.quick-scan" class="mt-8">
+        <QuickScanCard :ticket-id="ticket.id" :scan="ticket.quick_scan" :agent-ready="agentReady" />
+    </FoldingSection>
+
+    <div class="mt-8 grid gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <!-- The ticket, as Jira has it now -->
         <FoldingSection title="Ticket" remember="ticket.ticket" class="self-start">
             <p v-if="issueError" class="text-sm text-signal">Jira did not answer: {{ issueError }}</p>
@@ -227,10 +232,6 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
 
         <!-- The agent -->
         <section class="min-w-0 space-y-6">
-            <FoldingSection title="Quick scan" remember="ticket.quick-scan">
-                <QuickScanCard :ticket-id="ticket.id" :scan="ticket.quick_scan" :agent-ready="agentReady" />
-            </FoldingSection>
-
             <FoldingSection title="Agent" remember="ticket.agent">
                 <p v-if="!agentReady" class="text-sm text-signal">
                     No Anthropic sign-in yet (an API key or a subscription token), so no agent can run.

@@ -156,7 +156,10 @@ function onKey(event) {
 // come back to the tab. A sync, a message scheduled in the outbox or a status changed in
 // Jira shows without reloading; filters, search and scroll stay as they are.
 const REFRESH_MS = 30000;
+// A quick scan takes a minute or so: while one runs, look more often.
+const SCANNING_MS = 5000;
 let refresher = null;
+let scanWatcher = null;
 
 function refresh() {
     if (document.visibilityState === 'visible' && reachable()) {
@@ -175,12 +178,14 @@ onMounted(() => {
     window.addEventListener('keydown', onKey);
     document.addEventListener('visibilitychange', onVisible);
     refresher = setInterval(refresh, REFRESH_MS);
+    scanWatcher = setInterval(() => props.tickets.some((ticket) => ['queued', 'running'].includes(ticket.quick_scan?.state)) && refresh(), SCANNING_MS);
 });
 
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKey);
     document.removeEventListener('visibilitychange', onVisible);
     clearInterval(refresher);
+    clearInterval(scanWatcher);
 });
 </script>
 

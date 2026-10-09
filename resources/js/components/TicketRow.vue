@@ -20,6 +20,11 @@ function when(iso) {
     return iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 }
 
+// A first look from the overview itself; the row says "Quick scan…" until it is done.
+function quickScan() {
+    router.post(`/tickets/${props.ticket.id}/quick-scan`, {}, { preserveScroll: true, preserveState: true });
+}
+
 function toggleHidden() {
     const url = `/tickets/${props.ticket.id}/hide`;
     const options = { preserveScroll: true, preserveState: true };
@@ -86,6 +91,9 @@ function toggleHidden() {
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 lg:flex-col lg:items-end lg:pt-0.5">
             <StateBadge :state="ticket.group" />
             <p class="flex gap-3 text-sm whitespace-nowrap text-muted">
+                <button v-if="!['queued', 'running'].includes(ticket.quick_scan?.state)" type="button" class="hover:text-ink hover:underline" @click="quickScan">
+                    {{ ticket.quick_scan?.result ? 'Scan again' : 'Quick scan' }}
+                </button>
                 <button type="button" class="hover:text-ink hover:underline" @click="toggleHidden">{{ ticket.group === 'hidden' ? 'Unhide' : 'Hide' }}</button>
                 <Link :href="`/casebook/create?ticket=${encodeURIComponent(ticket.key)}`" class="hover:text-ink hover:underline">Write it up</Link>
                 <a :href="ticket.url" target="_blank" rel="noopener" class="hover:text-ink">{{ openLabel }} ↗</a>
