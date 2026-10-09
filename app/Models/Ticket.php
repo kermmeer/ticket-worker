@@ -73,6 +73,8 @@ class Ticket extends Model
             'cost_usd' => $this->quick_scan_cost_usd,
             'tokens' => $this->quick_scan_tokens,
             'at' => $this->quick_scan_at?->toIso8601String(),
+            // Who started it, or nobody: then the sync did, when the ticket arrived.
+            'by' => $this->quick_scan_user_id ? (User::find($this->quick_scan_user_id)?->firstName() ?? 'someone') : null,
         ];
     }
 

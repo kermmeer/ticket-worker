@@ -50,7 +50,7 @@ function scanNow() {
         <div class="flex flex-wrap items-center gap-3">
             <button v-if="agentReady && !busy()" type="button" class="btn px-3 py-1.5" @click="scanNow">{{ scan?.result ? 'Scan again' : 'Quick scan' }}</button>
             <span v-if="scan?.at && !busy()" class="font-mono text-xs text-muted">
-                {{ short(scan.at) }}<template v-if="scan.cost_usd != null"> · ${{ scan.cost_usd.toFixed(2) }}</template><template v-if="scan.tokens"> · {{ tokens(scan.tokens) }} tokens</template>
+                {{ short(scan.at) }} · {{ scan.by ? `started by ${scan.by}` : 'by itself, when the ticket arrived' }}<template v-if="scan.cost_usd != null"> · ${{ scan.cost_usd.toFixed(2) }}</template><template v-if="scan.tokens"> · {{ tokens(scan.tokens) }} tokens</template>
             </span>
         </div>
     </div>
