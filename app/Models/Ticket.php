@@ -75,6 +75,15 @@ class Ticket extends Model
         ];
     }
 
+    /** Only the tickets of spaces this person may see. */
+    public function scopeVisibleTo(\Illuminate\Database\Eloquent\Builder $query, ?User $user): void
+    {
+        $ids = $user?->visibleSpaceIds();
+        if ($ids !== null) {
+            $query->whereIn('space_id', $ids);
+        }
+    }
+
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);

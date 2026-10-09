@@ -48,6 +48,21 @@ class Space extends Model
         ];
     }
 
+    /** Who may see it besides those who see every space. */
+    public function access(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'space_access');
+    }
+
+    /** Only the spaces this person may see (all, for most). */
+    public function scopeVisibleTo(\Illuminate\Database\Eloquent\Builder $query, ?User $user): void
+    {
+        $ids = $user?->visibleSpaceIds();
+        if ($ids !== null) {
+            $query->whereIn('spaces.id', $ids);
+        }
+    }
+
     /** Who follows it: their overview starts with it. */
     public function followers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {

@@ -18,7 +18,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    protected $fillable = ['username', 'name', 'email', 'password', 'role', 'claude_api_key', 'claude_oauth_token', 'last_seen_at'];
+    protected $fillable = ['username', 'name', 'email', 'password', 'role', 'all_spaces', 'claude_api_key', 'claude_oauth_token', 'last_seen_at'];
 
     protected $hidden = ['password', 'remember_token', 'claude_api_key', 'claude_oauth_token'];
 
@@ -28,6 +28,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'password' => 'hashed',
+            'all_spaces' => 'boolean',
             'claude_api_key' => 'encrypted',
             'claude_oauth_token' => 'encrypted',
         ];
@@ -48,6 +49,30 @@ class User extends Authenticatable
     public function atLeast(string $role): bool
     {
         return array_search($this->role ?? 'member', self::ROLES, true) >= array_search($role, self::ROLES, true);
+    }
+
+    /** The spaces this person may see when not all of them. */
+    public function spaceAccess(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Space::class, 'space_access');
+    }
+
+    /** The ids of the spaces this person may see and work, or null for all of them. */
+    public function visibleSpaceIds(): ?array
+    {
+        // Unset (a new account not yet read back) is the default: every space.
+        if ($this->is_admin || $this->all_spaces !== false) {
+            return null;
+        }
+
+        return $this->spaceAccess()->pluck('spaces.id')->all();
+    }
+
+    public function canSee(Space|int $space): bool
+    {
+        $ids = $this->visibleSpaceIds();
+
+        return $ids === null || in_array($space instanceof Space ? $space->id : $space, $ids, true);
     }
 
     public function getIsAdminAttribute(): bool

@@ -13,7 +13,15 @@ const props = defineProps({
     vocabulary: { type: Object, required: true },
     slas: { type: Object, required: true },
     permissions: { type: Object, required: true },
+    // For admins: who may see this space. Null for everyone else.
+    people: { type: Array, default: null },
 });
+
+// Who sees this space besides those who see all of them. Saved on its own.
+const seers = ref((props.people ?? []).filter((person) => person.chosen).map((person) => person.id));
+function saveSeers() {
+    router.put(`/spaces/${props.space.id}/people`, { user_ids: seers.value }, { preserveScroll: true });
+}
 
 const form = useForm({
     label: props.space.label,
@@ -374,4 +382,20 @@ onMounted(runPreview);
             <button type="button" class="btn ml-auto" @click="remove">Remove this space</button>
         </div>
     </form>
+
+    <section v-if="people" class="card mt-6 p-5">
+        <h2 class="text-lg font-medium">Who sees this space</h2>
+        <p class="mt-1 max-w-3xl text-sm text-muted">
+            Everyone who sees every space sees this one. Tick the others who should too; the rest never see its tickets.
+            The same choice shows on each person, under Your account → People.
+        </p>
+        <div class="mt-3 flex flex-wrap gap-2">
+            <label v-for="person in people" :key="person.id" class="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm" :class="{ 'text-muted': person.sees_all }">
+                <input v-if="!person.sees_all" v-model="seers" type="checkbox" :value="person.id" />
+                <input v-else type="checkbox" checked disabled />
+                {{ person.name }}<span v-if="person.sees_all" class="text-xs"> · sees every space</span>
+            </label>
+        </div>
+        <button type="button" class="btn mt-3" @click="saveSeers">Save who sees it</button>
+    </section>
 </template>

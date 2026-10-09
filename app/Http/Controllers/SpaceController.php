@@ -6,6 +6,7 @@ use App\Jira\JiraClient;
 use App\Jira\JiraException;
 use App\Jobs\SyncSpace;
 use App\Models\Space;
+use App\Models\User;
 use App\Models\System;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,7 @@ class SpaceController extends Controller
     {
         $followed = request()->user()?->followedSpaces()->pluck('spaces.id')->all() ?? [];
         $spaces = Space::query()
+            ->visibleTo(request()->user())
             ->with('followers:id,name,username')
             ->withCount(['tickets as open_count' => fn ($query) => $query->open()])
             ->orderBy('label')
@@ -42,6 +44,17 @@ class SpaceController extends Controller
                 'followers' => $space->followers->map(fn ($user) => $user->firstName())->values(),
             ]),
         ]);
+    }
+
+    /** Who may see this space, besides everyone who sees all spaces: admins decide. */
+    public function people(Request $request, Space $space): RedirectResponse
+    {
+        abort_unless($request->user()->is_admin, 403, 'Only an admin decides who sees what.');
+        $data = $request->validate(['user_ids' => ['array'], 'user_ids.*' => ['integer', Rule::exists('users', 'id')]]);
+        $space->access()->sync($data['user_ids'] ?? []);
+        \App\Models\AuditEvent::record('space.access', $space->label, 'who may see it: '.(User::whereIn('id', $data['user_ids'] ?? [])->pluck('name')->join(', ') ?: 'only those who see every space'));
+
+        return back()->with('success', 'Saved who sees this space.');
     }
 
     /** Follow a space, or stop: what your overview starts with. */
@@ -113,6 +126,11 @@ class SpaceController extends Controller
                 'quick_scan' => $space->quick_scan,
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
+            // Who may see it: for an admin to change; everyone who sees all spaces always does.
+            'people' => request()->user()->is_admin ? User::query()->orderBy('name')->get()->map(fn (User $user) => [
+                'id' => $user->id, 'name' => $user->name, 'sees_all' => $user->is_admin || $user->all_spaces,
+                'chosen' => $space->access()->whereKey($user->id)->exists(),
+            ]) : null,
             'colours' => Space::COLOURS,
             'tones' => Space::TONES,
             // Both come from Jira; the page still works when it does not answer.

@@ -12,7 +12,19 @@ const props = defineProps({
     viaHeader: { type: Boolean, default: false },
     people: { type: Array, default: null },
     invite: { type: Object, default: null },
+    spaces: { type: Array, default: () => [] },
 });
+
+// Which spaces a person sees: every one, or those ticked. Open one person at a time.
+const editingSpaces = ref(null);
+const access = ref({ all_spaces: true, space_ids: [] });
+function editSpaces(person) {
+    editingSpaces.value = editingSpaces.value === person.id ? null : person.id;
+    access.value = { all_spaces: person.all_spaces, space_ids: [...person.space_ids] };
+}
+function saveSpaces(person) {
+    router.put(`/people/${person.id}/spaces`, access.value, { preserveScroll: true, onSuccess: () => (editingSpaces.value = null) });
+}
 
 const profile = useForm({ name: props.account.name });
 const claude = useForm({ kind: 'token', secret: '' });
@@ -128,11 +140,24 @@ const open = ref(false);
                 <span class="text-xs" :class="person.has_claude ? 'text-done' : 'text-muted'">{{ person.has_claude ? 'own Claude sign-in' : 'no Claude sign-in of their own' }}</span>
                 <span class="text-xs text-muted">{{ person.last_seen_at ? `seen ${ago(person.last_seen_at)}` : 'not signed in yet' }}</span>
                 <span class="font-mono text-xs" :class="person.usage.cost ? 'text-ink' : 'text-muted'">${{ person.usage.cost.toFixed(2) }} this month</span>
+                <button v-if="person.role !== 'admin'" type="button" class="text-xs text-muted hover:text-ink" :aria-expanded="editingSpaces === person.id" @click="editSpaces(person)">
+                    {{ person.all_spaces ? 'every space' : `${person.space_ids.length} space${person.space_ids.length === 1 ? '' : 's'}` }}
+                </button>
+                <span v-else class="text-xs text-muted">every space</span>
                 <span v-if="!person.you" class="ml-auto flex gap-3 text-xs">
                     <button v-if="!viaHeader" type="button" class="text-muted hover:text-ink" @click="router.post(`/people/${person.id}/link`, {}, { preserveScroll: true })">New link</button>
                     <button type="button" class="text-muted hover:text-signal" @click="remove(person)">Remove</button>
                 </span>
                 <span v-else class="ml-auto text-xs text-muted">you</span>
+                <form v-if="editingSpaces === person.id" class="w-full space-y-2 rounded-md border border-line p-3" @submit.prevent="saveSpaces(person)">
+                    <label class="flex items-center gap-2"><input v-model="access.all_spaces" type="checkbox" /> Every space, also new ones</label>
+                    <div v-if="!access.all_spaces" class="flex flex-wrap gap-2">
+                        <label v-for="space in spaces" :key="space.id" class="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs">
+                            <input v-model="access.space_ids" type="checkbox" :value="space.id" /> {{ space.label }}
+                        </label>
+                    </div>
+                    <button type="submit" class="btn px-3 py-1 text-xs">Save</button>
+                </form>
             </li>
         </ul>
         <p v-if="viaHeader" class="mt-3 text-sm text-muted">People are added by themselves: the sign-in in front of the app tells who they are, the first time they open it.</p>

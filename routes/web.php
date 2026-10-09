@@ -35,6 +35,7 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('/people', 'invite')->name('people.invite');
     Route::post('/people/{user}/link', 'newLink')->name('people.link');
     Route::put('/people/{user}/role', 'role')->name('people.role');
+    Route::put('/people/{user}/spaces', 'spaces')->name('people.spaces');
     Route::delete('/people/{user}', 'remove')->name('people.remove');
 });
 

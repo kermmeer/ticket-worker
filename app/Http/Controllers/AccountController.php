@@ -133,9 +133,12 @@ class AccountController extends Controller
                 'id' => $person->id, 'name' => $person->name, 'username' => $person->username, 'role' => $person->role,
                 'has_claude' => $person->claudeCredentials() !== [], 'last_seen_at' => $person->last_seen_at?->toIso8601String(),
                 'you' => $person->is($user),
+                'all_spaces' => $person->all_spaces,
+                'space_ids' => $person->spaceAccess()->pluck('spaces.id'),
                 'usage' => $usage[$person->id] ?? $none,
             ]) : null,
             'invite' => session('invite'),
+            'spaces' => $user->is_admin ? \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']) : [],
         ]);
     }
 
@@ -203,6 +206,18 @@ class AccountController extends Controller
         $user->update($data);
 
         return back()->with('success', "{$user->name} is now ".($data['role'] === 'admin' ? 'an admin' : "an {$data['role']}").'.');
+    }
+
+    /** Which spaces someone sees: all of them (the default), or the ones chosen. */
+    public function spaces(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->is_admin, 403);
+        $data = $request->validate(['all_spaces' => ['required', 'boolean'], 'space_ids' => ['array'], 'space_ids.*' => ['integer', 'exists:spaces,id']]);
+        $user->update(['all_spaces' => $data['all_spaces']]);
+        $user->spaceAccess()->sync($data['all_spaces'] ? [] : ($data['space_ids'] ?? []));
+        \App\Models\AuditEvent::record('person.spaces', $user->name, $data['all_spaces'] ? 'sees every space' : 'sees '.(\App\Models\Space::whereIn('id', $data['space_ids'] ?? [])->pluck('label')->join(', ') ?: 'no space'));
+
+        return back()->with('success', "Saved which spaces {$user->name} sees.");
     }
 
     public function remove(Request $request, User $user): RedirectResponse

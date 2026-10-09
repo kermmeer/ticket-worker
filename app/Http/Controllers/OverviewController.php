@@ -20,7 +20,8 @@ class OverviewController extends Controller
         // cache keeps a busy page from asking on every click.
         $waiting = Cache::remember('overview.outbox', 30, fn () => $outbox->waiting());
 
-        $spaces = Space::query()->where('state', Space::ACTIVE)->orderBy('label')->get();
+        // Only the spaces this person may see; the tickets follow from them.
+        $spaces = Space::query()->visibleTo(auth()->user())->where('state', Space::ACTIVE)->orderBy('label')->get();
 
         $byId = $spaces->keyBy('id');
 
