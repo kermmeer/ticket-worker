@@ -64,6 +64,7 @@ class CasebookController extends Controller
                     'state' => CasebookEntry::DRAFT,
                 ],
                 'systems' => System::query()->orderBy('name')->get(['id', 'name']),
+                'spaces' => \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']),
                 'matches' => [],
                 'fromAgent' => true,
             ]);
@@ -87,6 +88,7 @@ class CasebookController extends Controller
                 'state' => CasebookEntry::DRAFT,
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
+            'spaces' => \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']),
             'matches' => [],
         ]);
     }
@@ -113,6 +115,7 @@ class CasebookController extends Controller
                 'id' => $entry->id,
                 'title' => $entry->title,
                 'system_id' => $entry->system_id,
+                'space_ids' => $entry->space_ids ?? [],
                 'symptoms' => $entry->symptoms,
                 'cause' => $entry->cause ?? '',
                 'solution' => $entry->solution,
@@ -123,6 +126,7 @@ class CasebookController extends Controller
                 'used_count' => $entry->used_count,
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
+            'spaces' => \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']),
             // The open tickets it matches right now: the quickest check on its words.
             'matches' => $entry->tickets()->open()->orderByDesc('casebook_score')->limit(20)->get()
                 ->map(fn (Ticket $ticket) => [
@@ -155,6 +159,9 @@ class CasebookController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'system_id' => ['nullable', 'integer', Rule::exists('systems', 'id')],
+            // Empty: every space.
+            'space_ids' => ['nullable', 'array'],
+            'space_ids.*' => ['integer', Rule::exists('spaces', 'id')],
             'symptoms' => ['required', 'string', 'max:10000'],
             'cause' => ['nullable', 'string', 'max:10000'],
             'solution' => ['required', 'string', 'max:20000'],
@@ -162,6 +169,8 @@ class CasebookController extends Controller
             'source_tickets' => ['nullable', 'string', 'max:2000'],
             'state' => ['required', Rule::in([CasebookEntry::DRAFT, CasebookEntry::APPROVED, CasebookEntry::RETIRED])],
         ]);
+
+        $data['space_ids'] = array_values(array_map('intval', $data['space_ids'] ?? [])) ?: null;
 
         // "SUP-1, SUP-2" in the form, a list in the database.
         $data['source_tickets'] = collect(preg_split('/[\s,;]+/', (string) ($data['source_tickets'] ?? ''), -1, PREG_SPLIT_NO_EMPTY))

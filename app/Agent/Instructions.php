@@ -316,7 +316,7 @@ The commits since, with the files they touched:
 
     public static function analysis(Ticket $ticket, ?string $note = null): string
     {
-        $matches = collect(CasebookEntry::query()->approved()->get())
+        $matches = collect(CasebookEntry::query()->approved()->forSpace($ticket->space_id)->get())
             ->map(fn ($entry) => [$entry, (new Matcher([$entry]))->best($ticket->matchText())])
             ->filter(fn ($pair) => $pair[1] !== null)
             ->sortByDesc(fn ($pair) => $pair[1]['score'])

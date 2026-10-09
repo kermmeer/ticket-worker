@@ -21,13 +21,14 @@ class CasebookEntry extends Model
     public const RETIRED = 'retired';
 
     protected $fillable = [
-        'system_id', 'title', 'symptoms', 'cause', 'solution', 'keywords',
+        'system_id', 'space_ids', 'title', 'symptoms', 'cause', 'solution', 'keywords',
         'source_tickets', 'state', 'written_by', 'used_count', 'last_used_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'space_ids' => 'array',
             'source_tickets' => 'array',
             'last_used_at' => 'datetime',
         ];
@@ -41,6 +42,14 @@ class CasebookEntry extends Model
     public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);
+    }
+
+    /** Cases for this space: those tagged with it, and those for every space. */
+    public function scopeForSpace(Builder $query, int $spaceId): void
+    {
+        $query->where(fn (Builder $query) => $query->whereNull('space_ids')
+            ->orWhereJsonLength('space_ids', 0)
+            ->orWhereJsonContains('space_ids', $spaceId));
     }
 
     public function scopeApproved(Builder $query): void

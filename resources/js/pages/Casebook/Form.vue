@@ -5,6 +5,7 @@ import TicketKey from '../../components/TicketKey.vue';
 const props = defineProps({
     entry: { type: Object, required: true },
     systems: { type: Array, required: true },
+    spaces: { type: Array, default: () => [] },
     matches: { type: Array, required: true },
     fromAgent: { type: Boolean, default: false },
 });
@@ -12,6 +13,8 @@ const props = defineProps({
 const form = useForm({
     title: props.entry.title,
     system_id: props.entry.system_id,
+    // Empty: for every space.
+    space_ids: [...(props.entry.space_ids ?? [])],
     symptoms: props.entry.symptoms,
     cause: props.entry.cause,
     solution: props.entry.solution,
@@ -94,6 +97,15 @@ const fieldClass = 'mt-1 w-full rounded-md border border-line bg-page px-3 py-2 
                         <option v-for="system in systems" :key="system.id" :value="system.id">{{ system.name }}</option>
                     </select>
                 </div>
+                <fieldset>
+                    <legend class="text-sm font-medium">For which spaces</legend>
+                    <p class="text-sm text-muted">None ticked: every space. Tick some to offer it only to their tickets.</p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <label v-for="space in spaces" :key="space.id" class="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-sm">
+                            <input v-model="form.space_ids" type="checkbox" :value="space.id" /> {{ space.label }}
+                        </label>
+                    </div>
+                </fieldset>
                 <div>
                     <label for="keywords" class="text-sm font-medium">Extra words to match on</label>
                     <input id="keywords" v-model="form.keywords" placeholder="invoice, factuur, facture, faktura" :class="fieldClass" />

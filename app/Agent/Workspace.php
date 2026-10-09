@@ -65,7 +65,7 @@ class Workspace
             file_put_contents($root.'/systems/'.$system->name.'.history.txt', self::history($system));
         }
 
-        $this->writeCasebook($root.'/casebook');
+        $this->writeCasebook($root.'/casebook', $ticket->space_id);
 
         return $skipped;
     }
@@ -130,11 +130,11 @@ class Workspace
             : "No history yet: nothing has been pushed to {$system->name}.\n";
     }
 
-    private function writeCasebook(string $folder): void
+    private function writeCasebook(string $folder, int $spaceId): void
     {
         $index = ['# The casebook: solved cases', '', 'Each file holds one case: symptoms, cause, fix. Check them before digging.', ''];
 
-        foreach (CasebookEntry::query()->approved()->with('system:id,name')->get() as $entry) {
+        foreach (CasebookEntry::query()->approved()->forSpace($spaceId)->with('system:id,name')->get() as $entry) {
             $file = "case-{$entry->id}.md";
             file_put_contents("{$folder}/{$file}", implode("\n", [
                 "# Case {$entry->id}: {$entry->title}",

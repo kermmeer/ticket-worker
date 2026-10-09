@@ -72,6 +72,7 @@ class Matcher
 
         return new self(CasebookEntry::query()
             ->approved()
+            ->forSpace($space->id)
             ->when($systems->isNotEmpty(), fn ($query) => $query->where(
                 fn ($query) => $query->whereNull('system_id')->orWhereIn('system_id', $systems),
             ))
