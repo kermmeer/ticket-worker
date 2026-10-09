@@ -35,7 +35,23 @@ function toggleHidden() {
 <template>
     <div class="grid gap-x-6 gap-y-2 p-4 transition-colors hover:bg-sunken/50 lg:grid-cols-[12rem_minmax(0,1fr)_11rem_17rem_11rem] lg:items-start">
         <div class="flex flex-wrap items-start gap-1.5 lg:flex-col">
-            <Link :href="ticket.page"><TicketKey :value="ticket.key" /></Link>
+            <span class="flex items-center gap-1">
+                <Link :href="ticket.page"><TicketKey :value="ticket.key" /></Link>
+                <!-- Out to the outbox or Jira. The label says where, for screen readers and on hover;
+                     the arrow-out-of-a-box shape says "elsewhere" without it. -->
+                <a
+                    :href="ticket.url"
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex size-6 items-center justify-center rounded text-muted hover:bg-sunken hover:text-ink"
+                    :aria-label="`Open ${ticket.key} in ${openLabel}`"
+                    :title="`Open in ${openLabel}`"
+                >
+                    <svg aria-hidden="true" viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3" />
+                    </svg>
+                </a>
+            </span>
             <StatusLabel :status="ticket.status" :tone="ticket.status_tone" />
         </div>
 
@@ -97,7 +113,6 @@ function toggleHidden() {
                 </button>
                 <button type="button" class="hover:text-ink hover:underline" @click="toggleHidden">{{ ticket.group === 'hidden' ? 'Unhide' : 'Hide' }}</button>
                 <Link :href="`/casebook/create?ticket=${encodeURIComponent(ticket.key)}`" class="hover:text-ink hover:underline">Write it up</Link>
-                <a :href="ticket.url" target="_blank" rel="noopener" class="hover:text-ink">{{ openLabel }} ↗</a>
             </p>
         </div>
     </div>
