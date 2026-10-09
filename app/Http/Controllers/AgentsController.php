@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Agent\Budget;
 use App\Agent\Instructions;
 use App\Models\AgentTurn;
-use App\Models\Setting;
 use App\Models\Space;
 use App\Models\System;
 use App\Models\Ticket;
@@ -53,7 +52,6 @@ class AgentsController extends Controller
 
         $myLimit = $me->monthly_budget_usd;
         $mySpend = Budget::personThisMonth($me->id);
-        $shared = Setting::secret(Setting::SHARED_CLAUDE);
 
         return Inertia::render('Agents', [
             'working' => $turns->values(),
@@ -74,12 +72,6 @@ class AgentsController extends Controller
             ]),
             'you' => [
                 // What your agents sign in with right now, in the order it is chosen.
-                'claude' => match (true) {
-                    $me->claudeCredentials() !== [] => filled($me->claude_api_key) ? 'your own API key' : 'your own subscription token',
-                    filled($shared['secret'] ?? null) => ($shared['kind'] ?? 'token') === 'key' ? 'the shared API key (Setup)' : 'the shared subscription token (Setup)',
-                    Instructions::instanceCredentials() !== [] => 'the sign-in in .env',
-                    default => null,
-                },
                 'usage' => $mySpend,
                 'budget' => $myLimit,
                 'role' => $me->role,
@@ -89,10 +81,8 @@ class AgentsController extends Controller
             'signIns' => [
                 ['what' => 'Your own (Your account)', 'set' => $me->claudeCredentials() !== [],
                     'kind' => filled($me->claude_api_key) ? 'API key' : (filled($me->claude_oauth_token) ? 'subscription token' : null)],
-                ['what' => 'Shared (Setup)', 'set' => filled($shared['secret'] ?? null),
-                    'kind' => filled($shared['secret'] ?? null) ? (($shared['kind'] ?? 'token') === 'key' ? 'API key' : 'subscription token') : null],
-                ['what' => 'The server (.env)', 'set' => filled(config('agent.claude.api_key')) || filled(config('agent.claude.oauth_token')),
-                    'kind' => filled(config('agent.claude.api_key')) ? 'API key' : (filled(config('agent.claude.oauth_token')) ? 'subscription token' : null)],
+                ['what' => ($source = Instructions::sharedSource()) && $source[0] === 'setup' ? 'Shared (set on Setup)' : 'Shared (the server\'s .env)',
+                    'set' => $source !== null, 'kind' => $source[1] ?? null],
             ],
             'spaces' => Space::query()->visibleTo($me)->orderBy('label')->get()->map(function (Space $space) {
                 $settings = SpaceSettings::for($space);

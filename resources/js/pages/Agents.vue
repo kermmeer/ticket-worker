@@ -57,7 +57,7 @@ const show = (key, value) => (value === null || value === undefined ? 'none' : k
             <p v-if="active === -1" class="mt-3 text-sm text-signal">None is set: your agents cannot run. Add your own on <Link href="/account" class="underline">Your account</Link>.</p>
             <p v-else-if="active > 0" class="mt-3 text-xs text-muted">Add your own on <Link href="/account" class="underline">Your account</Link> to run on your own subscription or bill.</p>
             <p class="mt-3 text-xs text-muted">
-                Automatic quick scans of new tickets run on the shared one or .env:
+                Automatic quick scans of new tickets run on the shared one:
                 <span :class="autoScanSignIn ? 'text-done' : 'text-signal'">{{ autoScanSignIn ? 'one is set' : 'neither is set, so none run' }}</span>.
             </p>
         </div>

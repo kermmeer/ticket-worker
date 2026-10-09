@@ -34,22 +34,42 @@ class Instructions
     }
 
     /**
-     * The shared sign-in: the one an admin set on the Setup page, for everyone without their
-     * own, or else the one in .env. What work by nobody in particular (automatic quick scans)
-     * runs on; with neither, that work does not run.
+     * The shared sign-in, for everyone without their own and for automatic quick scans: the
+     * one in .env when there is one, else the one an admin set on the Setup page. With
+     * neither, work by nobody in particular does not run.
      */
     public static function instanceCredentials(): array
     {
-        $shared = Setting::secret(Setting::SHARED_CLAUDE);
-        if (filled($shared['secret'] ?? null)) {
-            return [($shared['kind'] ?? 'token') === 'key' ? 'ANTHROPIC_API_KEY' : 'CLAUDE_CODE_OAUTH_TOKEN' => $shared['secret']];
+        if (($env = self::envCredentials()) !== []) {
+            return $env;
         }
 
+        $shared = Setting::secret(Setting::SHARED_CLAUDE);
+
+        return filled($shared['secret'] ?? null)
+            ? [($shared['kind'] ?? 'token') === 'key' ? 'ANTHROPIC_API_KEY' : 'CLAUDE_CODE_OAUTH_TOKEN' => $shared['secret']]
+            : [];
+    }
+
+    /** The sign-in in .env, if the server has one. */
+    public static function envCredentials(): array
+    {
         return match (true) {
             filled(config('agent.claude.api_key')) => ['ANTHROPIC_API_KEY' => config('agent.claude.api_key')],
             filled(config('agent.claude.oauth_token')) => ['CLAUDE_CODE_OAUTH_TOKEN' => config('agent.claude.oauth_token')],
             default => [],
         };
+    }
+
+    /** Where the shared sign-in comes from and what kind it is: ['env'|'setup', 'API key'|'subscription token'], or null. */
+    public static function sharedSource(): ?array
+    {
+        if (($env = self::envCredentials()) !== []) {
+            return ['env', isset($env['ANTHROPIC_API_KEY']) ? 'API key' : 'subscription token'];
+        }
+        $shared = Setting::secret(Setting::SHARED_CLAUDE);
+
+        return filled($shared['secret'] ?? null) ? ['setup', ($shared['kind'] ?? 'token') === 'key' ? 'API key' : 'subscription token'] : null;
     }
 
     /** The proposal's shape (CONCEPT.md §7), enforced with --json-schema. */

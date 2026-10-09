@@ -29,7 +29,8 @@ class SetupController extends Controller
             'defaults' => SpaceSettings::defaults(),
             'savedDefaults' => (object) (json_decode((string) Setting::get(SpaceSettings::DEFAULTS), true) ?: []),
             'sharedClaude' => ($shared = Setting::secret(Setting::SHARED_CLAUDE)) ? $shared['kind'] : null,
-            'envClaude' => filled(config('agent.claude.api_key')) || filled(config('agent.claude.oauth_token')),
+            // The .env one is the shared one when there is one; the form is for when there is none.
+            'envClaude' => ($env = \App\Agent\Instructions::envCredentials()) !== [] ? (isset($env['ANTHROPIC_API_KEY']) ? 'API key' : 'subscription token') : null,
             'answerRules' => Setting::answerRules(),
             'defaultAnswerRules' => Setting::DEFAULT_ANSWER_RULES,
         ]);

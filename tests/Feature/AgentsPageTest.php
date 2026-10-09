@@ -26,7 +26,8 @@ class AgentsPageTest extends TestCase
             ->where('working.0.who', 'Stijn')
             ->where('working.0.ticket', 'SUP-1')
             ->where('signIns.0.set', false)
-            ->where('signIns.2.set', true)
+            ->where('signIns.1.set', true)
+            ->where('signIns.1.what', "Shared (the server's .env)")
             ->where('spaces.0.settings.model', 'claude-sonnet-5')
             ->where('spaces.0.own', ['model']));
         $this->assertFalse(str_contains($this->get('/agents')->getContent(), 'sk-ant-oat-env'));

@@ -16,7 +16,7 @@ const props = defineProps({
     defaults: { type: Object, required: true },
     jiraSites: { type: Array, default: () => [] },
     savedDefaults: { type: Object, default: () => ({}) },
-    envClaude: { type: Boolean, default: false },
+    envClaude: { type: String, default: null },
 });
 
 // The defaults as saved here; an empty field is what .env gives, shown as its placeholder.
@@ -143,16 +143,22 @@ const marks = {
         <form class="card mt-3 space-y-3 p-5" @submit.prevent="saveShared">
             <p class="max-w-3xl text-sm text-muted">
                 One sign-in for everyone who has none of their own: the agents of anyone without one run on it, and so do the
-                automatic quick scans of new tickets. Someone's own sign-in (Your account) always goes first. Give it a budget
+                automatic quick scans of new tickets. Someone's own sign-in (Your account) always goes first. When the server's
+                .env has one, that is the shared one; otherwise set it here. Give it a budget
                 where you make it (a workspace limit in the Claude Console), since everyone draws on it.
             </p>
             <p class="text-sm">
                 Now:
-                <strong v-if="sharedClaude" class="font-medium text-done">a shared {{ sharedClaude === 'key' ? 'API key' : 'subscription token' }} is set</strong>
-                <strong v-else-if="envClaude" class="font-medium text-muted">none here; the one in .env is used</strong>
+                <strong v-if="envClaude" class="font-medium text-done">the server's .env has a {{ envClaude }}: that is the shared sign-in</strong>
+                <strong v-else-if="sharedClaude" class="font-medium text-done">a shared {{ sharedClaude === 'key' ? 'API key' : 'subscription token' }} is set here</strong>
                 <strong v-else class="font-medium text-signal">none: only people with their own sign-in can run agents, and no automatic quick scans</strong>
-                <button v-if="sharedClaude" type="button" class="ml-2 text-muted underline hover:text-ink" @click="router.put('/setup/claude', { kind: 'none' }, { preserveScroll: true })">remove it</button>
+                <button v-if="sharedClaude && !envClaude" type="button" class="ml-2 text-muted underline hover:text-ink" @click="router.put('/setup/claude', { kind: 'none' }, { preserveScroll: true })">remove it</button>
             </p>
+            <p v-if="envClaude" class="text-sm text-muted">
+                To set one here instead, remove ANTHROPIC_API_KEY and CLAUDE_CODE_OAUTH_TOKEN from .env (and restart the workers).
+                <template v-if="sharedClaude"> One is saved here too; it is used only once .env has none.</template>
+            </p>
+            <template v-if="!envClaude">
             <div class="flex flex-wrap gap-3 text-sm">
                 <label class="flex items-center gap-1.5"><input v-model="shared.kind" type="radio" value="key" /> An API key <span class="text-muted">(best for sharing)</span></label>
                 <label class="flex items-center gap-1.5"><input v-model="shared.kind" type="radio" value="token" /> A subscription token</label>
@@ -185,6 +191,7 @@ const marks = {
             <p v-if="shared.errors.secret" class="text-sm text-signal">{{ shared.errors.secret }}</p>
             <p class="text-xs text-muted">Stored encrypted; never shown again.</p>
             <button type="submit" class="btn btn-signal" :disabled="shared.processing || !shared.secret">Save</button>
+            </template>
         </form>
     </section>
 
