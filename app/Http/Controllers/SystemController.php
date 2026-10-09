@@ -21,11 +21,12 @@ class SystemController extends Controller
             'systems' => System::query()->with('apis')->orderBy('name')->get()->map(fn (System $system) => [
                 'id' => $system->id,
                 'name' => $system->name,
+                'kind' => $system->kind,
                 'branch' => $system->branch,
                 'state' => $system->state,
                 'error' => $system->error,
-                'path' => $system->path(),
-                'remote' => $system->pushRemote(),
+                'path' => $system->hasCode() ? $system->path() : null,
+                'remote' => $system->hasCode() ? $system->pushRemote() : null,
                 'head' => $system->state === System::READY ? $system->head() : null,
                 'context' => $system->context,
                 'context_written_at' => $system->context_written_at?->toIso8601String(),
@@ -50,6 +51,19 @@ class SystemController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // An API-only project: the project and its API in one go, ready at once.
+        if ($request->input('kind') === System::API) {
+            $name = $request->validate([
+                'name' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9][a-z0-9-]*$/', 'unique:systems,name'],
+            ], ['name.regex' => 'Lower-case letters, digits and dashes only, starting with a letter or digit.'])['name'];
+            $system = new System(['name' => $name, 'kind' => System::API, 'branch' => '-', 'state' => System::READY]);
+            $api = $this->apiData($request->merge(['name' => 'api']), $system);
+            $system->save();
+            $system->apis()->create($api);
+
+            return to_route('systems.index')->with('success', "Added {$name}. Link it to a space (Spaces → edit) and its tickets can use it.");
+        }
+
         $data = $request->validate([
             // It becomes a folder name: lower case, digits and dashes, nothing that climbs out.
             'name' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9][a-z0-9-]*$/', 'unique:systems,name'],
@@ -69,6 +83,7 @@ class SystemController extends Controller
     public function scan(System $system): RedirectResponse
     {
         abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        abort_unless($system->hasCode(), 409, 'An API-only project has no code to scan: write its notes by hand.');
         if (in_array($system->scan_state, ['queued', 'running'], true)) {
             return back();
         }
@@ -142,7 +157,7 @@ class SystemController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9][a-z0-9-]*$/',
-                Rule::unique('api_connections')->where('system_id', $system->id)->ignore($api?->id)],
+                Rule::unique('api_connections')->where('system_id', $system->id ?? 0)->ignore($api?->id)],
             'base_url' => ['required', 'string', 'max:500', 'url:https,http'],
             'auth' => ['required', Rule::in(array_keys(ApiConnection::AUTH))],
             'username' => ['nullable', 'required_if:auth,basic', 'string', 'max:200'],

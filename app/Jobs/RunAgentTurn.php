@@ -101,13 +101,13 @@ class RunAgentTurn implements ShouldQueue
             // given: so it gets only the workspace, where its copy is. Without Docker's
             // read-only mounts, that is what keeps the systems themselves untouched.
             if ($turn->kind !== 'patch') {
-                foreach ($systems as $system) {
+                foreach ($systems->filter->hasCode() as $system) {
                     $command = [...$command, '--add-dir', $system->path()];
                 }
             }
 
             $shorten = [$root.'/' => ''];
-            foreach ($systems as $system) {
+            foreach ($systems->filter->hasCode() as $system) {
                 $shorten[$system->path()] = $system->name.'/';
             }
 
@@ -202,6 +202,8 @@ class RunAgentTurn implements ShouldQueue
     public static function systemFor(?array $proposal, Collection $systems): ?System
     {
         $name = mb_strtolower(trim((string) ($proposal['system'] ?? '')));
+        // A patch needs code to change.
+        $systems = $systems->filter->hasCode()->values();
 
         return $systems->first(fn (System $system) => mb_strtolower($system->name) === $name)
             ?? ($systems->count() === 1 ? $systems->first() : null);

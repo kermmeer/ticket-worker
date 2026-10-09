@@ -70,7 +70,7 @@ class QuickScanTicket implements ShouldQueue
                 '--append-system-prompt', Instructions::quickScanSystem($ticket, $systems),
                 '--json-schema', json_encode(Instructions::quickScanSchema()),
             ];
-            foreach ($systems as $system) {
+            foreach ($systems->filter->hasCode() as $system) {
                 $command = [...$command, '--add-dir', $system->path()];
             }
             if ($hasApis) {
@@ -80,7 +80,7 @@ class QuickScanTicket implements ShouldQueue
             }
 
             $shorten = [$root.'/' => ''];
-            foreach ($systems as $system) {
+            foreach ($systems->filter->hasCode() as $system) {
                 $shorten[$system->path()] = $system->name.'/';
             }
 

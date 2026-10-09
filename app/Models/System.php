@@ -20,8 +20,14 @@ class System extends Model
 
     public const FAILED = 'failed';
 
+    /** A folder you push code into, which the agent reads. */
+    public const CODE = 'code';
+
+    /** Only APIs to call: nothing to push, nothing to read but its notes. */
+    public const API = 'api';
+
     protected $fillable = [
-        'name', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
+        'name', 'kind', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
         'scan_state', 'scan_stop_requested', 'scan_log', 'scan_error', 'scan_cost_usd',
         'scan_input_tokens', 'scan_output_tokens',
     ];
@@ -47,9 +53,18 @@ class System extends Model
         $this->contexts()->create(['body' => $body, 'commit' => $commit, 'written_by' => $by]);
     }
 
+    public function hasCode(): bool
+    {
+        return $this->kind !== self::API;
+    }
+
     /** The commit the folder is at now, full hash, or null before the first push. */
     public function headCommit(): ?string
     {
+        if (! $this->hasCode()) {
+            return null;
+        }
+
         $result = Process::path($this->path())->run(['git', '-c', 'safe.directory=*', 'rev-parse', 'HEAD']);
 
         return $result->successful() ? trim($result->output()) : null;
@@ -58,7 +73,7 @@ class System extends Model
     /** How many commits the code has moved since the context was written; null when unknown. */
     public function commitsBehind(): ?int
     {
-        if ($this->context_commit === null || ! is_dir($this->path().'/.git')) {
+        if (! $this->hasCode() || $this->context_commit === null || ! is_dir($this->path().'/.git')) {
             return null;
         }
 
@@ -98,7 +113,7 @@ class System extends Model
      */
     public function head(): ?array
     {
-        if (! is_dir($this->path().'/.git')) {
+        if (! $this->hasCode() || ! is_dir($this->path().'/.git')) {
             return null;
         }
 

@@ -61,7 +61,7 @@ class Workspace
 
         file_put_contents($root.'/ticket.md', self::ticketDocument($issue, $skipped));
 
-        foreach ($this->systems($ticket) as $system) {
+        foreach ($this->systems($ticket)->filter->hasCode() as $system) {
             file_put_contents($root.'/systems/'.$system->name.'.history.txt', self::history($system));
         }
 
