@@ -123,8 +123,13 @@ Everyone signs in with their own account. On **Your account** (your name, top ri
 adds people and gets a link for each, good for a week, to set their own password. Each person
 then stores **their own Claude sign-in** there (a `claude setup-token` token or an API key):
 what they ask for runs on it, so it counts against their own subscription or bill. The
-instance's sign-in from step 4 is the fallback, and what automatic quick scans run on; leave it
-empty if every person brings their own and new tickets need no automatic scan.
+instance's sign-in is the fallback: an admin sets a shared one on **Setup → Claude, shared**
+(else the one from step 4 in `.env` is used), and automatic quick scans run on it; with none,
+only people with their own can run agents and new tickets get no automatic scan.
+
+Roles: the first account is an **admin** (people, Setup, the docs); **editors** run spaces,
+projects and the casebook; **members** work tickets. An admin can limit which spaces someone
+sees, and set budgets per person; budgets per space are in each space's settings.
 
 Behind a sign-in that passes the user on in a header (Authentik, an SSO proxy), set
 `AUTH_HEADER` (e.g. `X-authentik-username`) and nobody signs in twice: accounts are made on

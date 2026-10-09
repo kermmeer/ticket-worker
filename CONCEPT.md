@@ -533,6 +533,10 @@ own work.
     team, one board. A session can be continued by anyone, under their own name.
   - Reply drafts are signed with the first name of whoever asks for them.
   - `APP_PASSWORD` still works, as an outer gate in front of the accounts.
+  - **Roles, visibility, budgets and the rest** followed the same day: docs/TEAM.md lists
+    what was decided and built (roles admin/editor/member, which spaces each person sees,
+    a shared Claude sign-in on Setup, settings and budgets per space, Jira sites, SQL,
+    pulling, notifications, hand-over, an audit trail).
 - **The worker containers**: see below.
 - **Live output by polling.** While a turn runs, the page asks once a second for the events
   after the last one it has. There is no websocket server to run. Reverb can come later if

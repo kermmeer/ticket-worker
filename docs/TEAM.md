@@ -22,49 +22,45 @@ built; the rest is a proposal, ordered by what it unblocks, to be argued with.
   edit rights can redirect it to themselves.
 - **Forgetting.** Workspaces and transcripts go 30 days after a ticket's work ended.
 
-## Next, in order
+## Built after the first round (2026-10-09)
 
-1. **Pass the Authentik user to the app on minas.** One line in nginx, in the
-   `@reverse_proxy` block (a `proxy_set_header` in `location /` does not carry over to a
-   named location): `proxy_set_header X-authentik-username $authentik_username;`. Then
-   `AUTH_HEADER=X-authentik-username` in `shared/.env`, and nobody signs in twice.
-   *Effort: minutes; needs nginx access.*
-2. **Mine, from Jira.** Link each account to its Jira user (by e-mail, looked up once) for
-   an *Assigned to me* filter, and, with `JIRA_WRITE=real`, an *Assign to me* button.
-   With many projects, "what is mine" matters more than "what is in this space".
-   *Effort: half a day.*
-3. **Settings per space.** Different projects, different customers: reply rules (tone,
-   signature, language), the model and budget, and the quick scan's model per space,
-   falling back to the instance's. *Effort: half a day.*
-4. **Tell me when it is done.** An analysis takes minutes; nobody watches it. A browser
-   notification when your turn finishes, and per space an optional Slack or Teams webhook
-   for "quick scan says the data is still wrong" and for SLAs about to break.
-   *Effort: a day.*
-5. **Who may change what.** Today everyone may edit spaces, projects, APIs and the rules.
-   Fine for a small trusted team; for more, an *editor* role: admins and editors change
-   setup, everyone else works tickets. *Effort: half a day.*
-6. **Read-only SQL per project.** The other half of data tools (CONCEPT.md §11): a
-   read-only database account per project, SELECT only, row and time limits, every query
-   in the log, the password kept by the tool. *Effort: a day.*
-7. **Pull, where a host is reachable.** Not every repository sits behind the VPN. A
-   per-project read-only deploy key and a nightly fetch, with push staying the way in for
-   the rest. *Effort: half a day.*
-8. **More than one Jira site.** If some teams' projects live in another Jira (a
-   customer's, say), sites become a table and each space picks one. *Effort: a day.*
-9. **Budgets.** A monthly ceiling per person and per space, with a warning at 80% and a
-   stop at 100%, so a shared instance never surprises whoever pays. *Effort: half a day.*
-10. **Hand-over.** *Take over* on a session someone else started, and a note to the next
-    person when you close one. *Effort: hours.*
-11. **An audit trail.** Who changed a space's rules, an API, the reply rules, and when.
-    *Effort: hours.*
+Decided by Karl the same day, item by item:
 
-## Open questions
+- **Roles.** Admin (everything, people and the global setup and docs included), editor
+  (spaces, projects with their APIs, databases and pulling, the casebook, hyper mode),
+  member (works tickets, follows spaces, proposes cases an editor approves). One role per
+  person, for the whole instance.
+- **Which spaces someone sees.** Every space by default; an admin can limit a person, on
+  the person (People) or on the space (Who sees this space). A ticket of a space someone
+  may not see does not exist for them, by any route.
+- **A shared Claude sign-in**, set by an admin on Setup, for everyone without their own;
+  their own always goes first, `.env` last. Automatic quick scans run on the shared one,
+  and without one they do not run (open question B).
+- **Mine from Jira.** Accounts link to their Jira user: by name on sight, by picking from
+  the assignees seen, or by a search. *Assigned to me* on the overview; *Assign to me* on a
+  ticket (with `JIRA_WRITE=real`).
+- **Settings per space,** with defaults for every space on Setup: model, effort, budget per
+  turn, the quick scan's model, effort and budget, automatic patches, reply and answer
+  rules, and a monthly budget.
+- **Notifications.** In the browser when your work is done; per space, a Slack or Teams
+  webhook for data still wrong and SLAs within the hour.
+- **Budgets,** per space and per person, none by default: a warning at 80%, no new agent
+  work at 100% that month.
+- **Read-only SQL per project,** for the agent through the tool, which holds the password.
+- **Pulling** from reachable Git hosts, for editors and up: a read-only token over https,
+  or a deploy key over SSH where the server has `ssh`.
+- **More than one Jira site,** added on Setup; each space reads from its own.
+- **Hand-over:** take over someone's session; leave a note when closing one.
+- **An audit trail** of setup changes, secrets only as "changed".
+- **Casebook tags** (open question A): a case is for every space unless tagged with the
+  spaces it is for.
+- Open question C: one board, with which spaces each person sees decided per person or per
+  space, as above. The role stays global.
 
-- **A. Shared or personal casebook?** Shared now: one team learns once. Per-space cases
-  might suit very different projects better; tags per project may be enough.
-- **B. Whose Claude runs automatic work?** Quick scans of new tickets have nobody asking
-  and use the instance's sign-in. The alternative is the person who turned quick scans on
-  for that space, so each project's owner pays for its own.
-- **C. One board or many?** Everyone sees every space now, with *My spaces* as the
-  default. A team that must not see another's tickets (other customers) needs spaces per
-  group, which is a bigger step than anything above.
+## Still open
+
+- **Pass the Authentik user to the app on minas** (skipped for now): one line in the
+  nginx `@reverse_proxy` block, then `AUTH_HEADER`.
+- **SSH on minas.** Its image has no `ssh`, so pulling there works with tokens only until
+  `openssh-client` is added to its `Dockerfile.deploy` (the repository's image has it).
+- **PostgreSQL on minas.** Same: `pdo_pgsql` is in the repository's image, not minas's.

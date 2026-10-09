@@ -151,3 +151,7 @@ to it, including work you finish.
 - [x] An API's stored secret is dropped when it moves to another server or sign-in (2026-10-09)
 - [x] Follow spaces: the overview starts with yours; usage per person this month (2026-10-09)
 - [ ] docs/TEAM.md: the team proposal, items 1–11 in order (written 2026-10-09)
+- [x] Team, second round (2026-10-09): roles, space visibility, shared Claude sign-in, Mine from
+      Jira, settings and budgets per space, notifications, read-only SQL, pulling, Jira sites,
+      hand-over, audit trail, casebook tags. See docs/TEAM.md.
+- [ ] On minas: openssh-client and pdo_pgsql in Dockerfile.deploy (SSH pulls, PostgreSQL)
