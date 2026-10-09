@@ -49,6 +49,13 @@ const noteKey = `ticket.${props.ticket.id}.note`;
 const note = ref(stored(() => localStorage.getItem(noteKey)) ?? '');
 watch(note, (text) => stored(() => (text ? localStorage.setItem(noteKey, text) : localStorage.removeItem(noteKey))));
 
+// Closing, with a note for the next person.
+const closing = ref(false);
+const handover = ref('');
+function closeSession() {
+    router.post(`/tickets/${props.ticket.id}/close`, { note: handover.value }, { preserveScroll: true, onSuccess: () => { closing.value = false; handover.value = ''; } });
+}
+
 function analyse() {
     router.post(`/tickets/${props.ticket.id}/analyse`, { language: language.value, note: note.value }, {
         preserveScroll: true,
@@ -195,6 +202,11 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         </span>
     </p>
 
+    <div v-if="!session && history[0]?.handover_note" role="note" class="mt-6 rounded-md border border-working/40 px-4 py-2.5 text-sm">
+        <span class="font-medium text-working">{{ history[0].closed_by ?? 'Someone' }} left a note when closing the last session:</span>
+        <span class="mt-1 block whitespace-pre-wrap">{{ history[0].handover_note }}</span>
+    </div>
+
     <p v-if="budget" role="status" class="mt-6 rounded-md border px-4 py-2.5 text-sm" :class="budget.level === 'stop' ? 'border-signal/40 text-signal' : 'border-waiting/40 text-waiting'">
         {{ budget.text }}
     </p>
@@ -254,12 +266,21 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         {{ session ? 'Analyse again' : 'Analyse' }}
                     </button>
                     <button v-if="busy" type="button" class="btn" @click="post('stop')">Stop</button>
-                    <button v-if="session && !busy" type="button" class="btn" @click="post('close')">Close session</button>
+                    <button v-if="session && !busy" type="button" class="btn" :aria-expanded="closing" @click="closing = !closing">Close session</button>
+                    <span v-if="session?.owner" class="text-sm text-working">
+                        {{ session.owner }}'s session
+                        <button type="button" class="ml-1 text-muted underline hover:text-ink" @click="post('take-over')">Take over</button>
+                    </span>
                     <span v-if="session" class="ml-auto text-right font-mono text-xs text-muted">
                         ${{ session.cost_usd.toFixed(2) }} so far<br />
                         {{ tokens(session.tokens_in) }} tokens in<template v-if="session.tokens_cached"> ({{ tokens(session.tokens_cached) }} from cache)</template> · {{ tokens(session.tokens_out) }} out
                     </span>
                 </div>
+                <form v-if="closing && session && !busy" class="mt-3 space-y-2 rounded-md border border-line p-3" @submit.prevent="closeSession">
+                    <label for="handover" class="text-sm">A note for whoever picks this up <span class="text-muted">(optional)</span></label>
+                    <textarea id="handover" v-model="handover" rows="2" placeholder="Where it stands, what you tried, what is left…" class="w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"></textarea>
+                    <div class="flex gap-2"><button type="submit" class="btn btn-signal">Close the session</button><button type="button" class="btn" @click="closing = false">Cancel</button></div>
+                </form>
                 <div v-if="agentReady && !busy" class="mt-3">
                     <label for="note" class="text-sm text-muted">Your notes for the agent <span class="text-xs">(optional, goes with the analysis)</span></label>
                     <textarea
@@ -357,7 +378,9 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             {{ past.turns }} {{ past.turns === 1 ? 'turn' : 'turns' }}<template v-if="past.questions">, {{ past.questions }} of them your questions</template>
                             · {{ past.steps }} steps<template v-if="past.minutes"> · {{ past.minutes }} min of agent time</template>
                             <template v-if="past.case_drafted"> · drafted a case</template>
+                            <template v-if="past.started_by"> · started by {{ past.started_by }}</template><template v-if="past.closed_by">, closed by {{ past.closed_by }}</template>
                         </p>
+                        <p v-if="past.handover_note" class="mt-1 whitespace-pre-wrap"><span class="text-muted">Note:</span> {{ past.handover_note }}</p>
                         <p v-if="past.cause" class="mt-1">
                             <span class="font-mono text-xs">{{ past.system }}</span>
                             <span class="text-muted"> · {{ past.confidence }} confidence · </span>{{ past.cause }}

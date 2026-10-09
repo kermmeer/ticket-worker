@@ -211,13 +211,25 @@ class TicketController extends Controller
         return back();
     }
 
-    public function close(Ticket $ticket): RedirectResponse
+    public function close(Request $request, Ticket $ticket): RedirectResponse
     {
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:4000']]);
         $session = $ticket->openSession();
         abort_if($session?->busy(), 409, 'Stop the agent first.');
-        $session?->update(['state' => 'closed', 'closed_at' => now()]);
+        $session?->update(['state' => 'closed', 'closed_at' => now(), 'closed_by' => auth()->id(), 'handover_note' => filled($data['note'] ?? null) ? trim($data['note']) : null]);
 
         return back()->with('success', 'Session closed. Analyse starts a new one.');
+    }
+
+    /** Make someone else's open session yours: their work stays, under their name. */
+    public function takeOver(Ticket $ticket): RedirectResponse
+    {
+        $session = $ticket->openSession();
+        abort_if($session === null, 409, 'There is no session to take over.');
+        $from = $session->user?->firstName();
+        $session->update(['user_id' => auth()->id()]);
+
+        return back()->with('success', $from ? "It is yours now; {$from}'s work on it stays in the log." : 'It is yours now.');
     }
 
     /** Hand the reply draft to the outbox, where it waits for you to send it. */
@@ -286,6 +298,8 @@ class TicketController extends Controller
         return [
             'id' => $session->id,
             'reply_language' => $session->reply_language,
+            // Whose it is: someone else's can be taken over.
+            'owner' => $session->user ? ($session->user->is(auth()->user()) ? null : $session->user->firstName()) : null,
             'cost_usd' => $session->cost_usd,
             'tokens_in' => $turns->sum(fn (AgentTurn $turn) => (int) $turn->tokensIn()),
             'tokens_cached' => $turns->sum(fn (AgentTurn $turn) => (int) $turn->cache_read_tokens),
