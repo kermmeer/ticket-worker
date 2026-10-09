@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
+import CodeBlock from '../components/CodeBlock.vue';
 import SettingsFields from '../components/SettingsFields.vue';
 
 const props = defineProps({
@@ -24,7 +25,7 @@ function saveDefaults() {
     router.put('/setup/settings', defaultsValues.value, { preserveScroll: true });
 }
 
-const shared = useForm({ kind: 'token', secret: '' });
+const shared = useForm({ kind: 'key', secret: '' });
 
 // More Jira sites, for spaces whose projects live elsewhere.
 const site = useForm({ name: '', base_url: '', email: '', token: '', open_url: '', open_label: '' });
@@ -153,8 +154,32 @@ const marks = {
                 <button v-if="sharedClaude" type="button" class="ml-2 text-muted underline hover:text-ink" @click="router.put('/setup/claude', { kind: 'none' }, { preserveScroll: true })">remove it</button>
             </p>
             <div class="flex flex-wrap gap-3 text-sm">
-                <label class="flex items-center gap-1.5"><input v-model="shared.kind" type="radio" value="key" /> An API key</label>
+                <label class="flex items-center gap-1.5"><input v-model="shared.kind" type="radio" value="key" /> An API key <span class="text-muted">(best for sharing)</span></label>
                 <label class="flex items-center gap-1.5"><input v-model="shared.kind" type="radio" value="token" /> A subscription token</label>
+            </div>
+
+            <!-- How to get one: the steps for the kind picked above. -->
+            <div v-if="shared.kind === 'key'" class="rounded-md border border-line p-4 text-sm">
+                <p class="font-medium">Getting an API key</p>
+                <ol class="mt-2 list-decimal space-y-1.5 pl-5">
+                    <li>Sign in at <a href="https://platform.claude.com" target="_blank" rel="noopener" class="underline">platform.claude.com</a> (the Claude Console), or make an account there. The API is billed on its own, not through a Claude subscription: add credits or a payment method under Billing first.</li>
+                    <li>Under <a href="https://platform.claude.com/settings/workspaces" target="_blank" rel="noopener" class="underline">Settings → Workspaces</a>, make a workspace for Ticket Worker and give it a <strong class="font-medium">spend limit</strong>. Everyone without their own sign-in draws on this key, so the limit is what keeps the month in hand; its usage shows on its own there.</li>
+                    <li>Under <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener" class="underline">Settings → API keys</a>, press <strong class="font-medium">Create key</strong>. Name it after this instance, put it in the workspace from step 2, and link it to a service account rather than yourself, since others rely on it.</li>
+                    <li>Copy it: it starts with <code class="font-mono">sk-ant-api</code> and is shown <strong class="font-medium">only once</strong>. Paste it below.</li>
+                </ol>
+                <p class="mt-2 text-xs text-muted">The Commercial Terms apply: Anthropic does not train on what the agents send, and keeps it 30 days.</p>
+            </div>
+            <div v-else class="rounded-md border border-line p-4 text-sm">
+                <p class="font-medium">Getting a subscription token</p>
+                <p class="mt-1 text-signal">A Pro or Max subscription is one person's plan, with that person's usage limits. To share a sign-in among several people, use an API key instead; a token here is for when it really is one person's, say the person who runs this instance.</p>
+                <ol class="mt-2 list-decimal space-y-1.5 pl-5">
+                    <li>On a computer where Claude Code is installed and signed in with that subscription, run this, and follow the link it opens to approve it:
+                        <CodeBlock code="claude setup-token" language="shell" class="mt-2 max-w-sm" />
+                    </li>
+                    <li>Copy the token it prints (it starts with <code class="font-mono">sk-ant-oat</code>) and paste it below. It is made for unattended use; never copy someone's <code class="font-mono">~/.claude</code> folder instead, which would hand the agents their settings and other projects.</li>
+                    <li>In <a href="https://claude.ai/settings" target="_blank" rel="noopener" class="underline">claude.ai → Settings → Privacy</a>, turn <strong class="font-medium">off</strong> <em>Help improve Claude</em>. With it on, the Consumer Terms let Anthropic train on what the agents read, ticket contents included.</li>
+                </ol>
+                <p class="mt-2 text-xs text-muted">Its use counts against that subscription's limits, the same ones its owner's own Claude use draws on. Costs shown here are what the work would cost on the API.</p>
             </div>
             <input v-model="shared.secret" type="password" autocomplete="off" :placeholder="shared.kind === 'key' ? 'sk-ant-api…' : 'sk-ant-oat…'" class="w-full max-w-xl rounded-md border border-line bg-page px-3 py-2 font-mono text-sm" />
             <p v-if="shared.errors.secret" class="text-sm text-signal">{{ shared.errors.secret }}</p>
