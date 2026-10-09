@@ -6,6 +6,7 @@ use App\Agent\Instructions;
 use App\Agent\Workspace;
 use App\Jira\JiraClient;
 use App\Jira\JiraException;
+use App\Jobs\QuickScanTicket;
 use App\Jobs\RunAgentTurn;
 use App\Models\AgentSession;
 use App\Models\AgentTurn;
@@ -52,6 +53,7 @@ class TicketController extends Controller
                 'slas' => $ticket->space->visibleSlas($ticket->slas),
                 'url' => $jira->browseUrl($ticket->key),
                 'space' => ['label' => $ticket->space->label, 'colour' => $ticket->space->colour, 'type' => $ticket->space->type],
+                'quick_scan' => $ticket->quickScanData(),
             ],
             'issue' => $issue,
             'issueError' => $issueError,
@@ -110,6 +112,15 @@ class TicketController extends Controller
     public function draftCase(Ticket $ticket): RedirectResponse
     {
         return $this->follow($ticket, 'case', Instructions::caseRequest());
+    }
+
+    /** A quick first look, by hand: for a ticket from before quick scans were on, or again. */
+    public function quickScan(Ticket $ticket): RedirectResponse
+    {
+        abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        QuickScanTicket::start($ticket);
+
+        return back();
     }
 
     /** Have the agent write its fix as a patch (CONCEPT.md §8). */

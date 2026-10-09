@@ -7,6 +7,7 @@ import CodeBlock from '../../components/CodeBlock.vue';
 import FoldingSection from '../../components/FoldingSection.vue';
 import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
+import QuickScanCard from '../../components/QuickScanCard.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
 import TicketKey from '../../components/TicketKey.vue';
@@ -135,6 +136,20 @@ watch(
 );
 onBeforeUnmount(() => clearInterval(poll));
 
+// A quick scan takes a minute or two: look again every few seconds until it is done.
+let scanPoll = null;
+watch(
+    () => ['queued', 'running'].includes(props.ticket.quick_scan?.state),
+    (scanning) => {
+        clearInterval(scanPoll);
+        if (scanning) {
+            scanPoll = setInterval(() => reachable() && router.reload({ only: ['ticket'], preserveScroll: true, preserveState: true, showProgress: false }), 3000);
+        }
+    },
+    { immediate: true },
+);
+onBeforeUnmount(() => clearInterval(scanPoll));
+
 const turnLabels = { analysis: 'Analysis', message: 'Your question', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
 
 // A patch is for one system: the proposal's, unless you pick another.
@@ -212,6 +227,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
 
         <!-- The agent -->
         <section class="min-w-0 space-y-6">
+            <FoldingSection title="Quick scan" remember="ticket.quick-scan">
+                <QuickScanCard :ticket-id="ticket.id" :scan="ticket.quick_scan" :agent-ready="agentReady" />
+            </FoldingSection>
+
             <FoldingSection title="Agent" remember="ticket.agent">
                 <p v-if="!agentReady" class="text-sm text-signal">
                     No Anthropic sign-in yet (an API key or a subscription token), so no agent can run.

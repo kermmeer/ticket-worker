@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Agent\ApiToolServer;
 use App\Agent\Workspace;
 use App\Models\AgentTurn;
+use App\Models\Ticket;
 use Illuminate\Console\Command;
 
 /**
@@ -13,7 +14,7 @@ use Illuminate\Console\Command;
  */
 class AgentTools extends Command
 {
-    protected $signature = 'agent:tools {turn}';
+    protected $signature = 'agent:tools {turn?} {--ticket= : a quick scan of this ticket instead of a turn}';
 
     protected $description = 'The API tools of an agent turn, as an MCP server on stdio (started by Claude Code)';
 
@@ -24,8 +25,13 @@ class AgentTools extends Command
         // stdout is the protocol: a PHP notice printed there would break it.
         ini_set('display_errors', 'stderr');
 
-        $turn = AgentTurn::with('session.ticket.space')->findOrFail($this->argument('turn'));
-        $server = ApiToolServer::forTurn($turn, $workspace->systems($turn->session->ticket));
+        if ($this->option('ticket') !== null) {
+            $ticket = Ticket::with('space')->findOrFail($this->option('ticket'));
+            $server = ApiToolServer::forQuickScan($ticket, $workspace->systems($ticket));
+        } else {
+            $turn = AgentTurn::with('session.ticket.space')->findOrFail($this->argument('turn'));
+            $server = ApiToolServer::forTurn($turn, $workspace->systems($turn->session->ticket));
+        }
 
         while (($line = fgets(STDIN)) !== false) {
             $message = json_decode(trim($line), true);

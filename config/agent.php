@@ -47,4 +47,14 @@ return [
 
     'sync_every_minutes' => (int) env('SYNC_EVERY_MINUTES', 10),
 
+    // The quick scan of a new ticket: a lighter model, little effort and a small budget,
+    // since it runs on every new ticket of a space that has it on.
+    'quick' => [
+        'model' => env('CLAUDE_QUICK_MODEL', 'claude-sonnet-5'),
+        'effort' => env('CLAUDE_QUICK_EFFORT', 'low'),
+        'budget_usd' => (float) env('AGENT_QUICK_BUDGET_USD', 0.5),
+        // At most this many new tickets scanned per sync: a flood waits for you.
+        'per_sync' => (int) env('AGENT_QUICK_PER_SYNC', 10),
+    ],
+
 ];

@@ -94,6 +94,7 @@ class SpaceController extends Controller
                 // Null until chosen: the page then shows what the automatic choice puts to sleep.
                 'sleep_statuses' => $space->sleep_statuses,
                 'hidden_slas' => $space->hidden_slas ?? [],
+                'quick_scan' => $space->quick_scan,
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
             'colours' => Space::COLOURS,
@@ -124,6 +125,7 @@ class SpaceController extends Controller
             'sleep_statuses.*' => ['string', 'max:255'],
             'hidden_slas' => ['array'],
             'hidden_slas.*' => ['string', 'max:255'],
+            'quick_scan' => ['boolean'],
         ], [
             'rules.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',
             'done_rule.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',

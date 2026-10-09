@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -20,6 +21,7 @@ class Ticket extends Model
         'space_id', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
         'issue_type', 'reporter', 'assignee', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
         'first_seen_at', 'last_seen_at', 'left_at', 'hidden_at',
+        'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at',
     ];
 
     protected function casts(): array
@@ -32,6 +34,44 @@ class Ticket extends Model
             'left_at' => 'datetime',
             'hidden_at' => 'datetime',
             'slas' => 'array',
+            'quick_scan' => 'array',
+            'quick_scan_steps' => 'array',
+            'quick_scan_cost_usd' => 'float',
+            'quick_scan_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * One line of a quick scan's trail, added in place: the scan itself and the API tool
+     * server (another process) both write to it while the scan runs.
+     */
+    public static function addQuickStep(int $id, string $line): void
+    {
+        DB::transaction(function () use ($id, $line) {
+            $ticket = static::query()->lockForUpdate()->find($id, ['id', 'quick_scan_steps']);
+            if ($ticket !== null) {
+                $steps = $ticket->quick_scan_steps ?? [];
+                $steps[] = mb_strimwidth($line, 0, 300, '…');
+                $ticket->forceFill(['quick_scan_steps' => array_slice($steps, -60)])->saveQuietly();
+            }
+        });
+    }
+
+    /** A quick scan as the pages show it. */
+    public function quickScanData(): ?array
+    {
+        if ($this->quick_scan_state === null) {
+            return null;
+        }
+
+        return [
+            'state' => $this->quick_scan_state,
+            'result' => $this->quick_scan,
+            'error' => $this->quick_scan_error,
+            'steps' => $this->quick_scan_steps ?? [],
+            'cost_usd' => $this->quick_scan_cost_usd,
+            'tokens' => $this->quick_scan_tokens,
+            'at' => $this->quick_scan_at?->toIso8601String(),
         ];
     }
 

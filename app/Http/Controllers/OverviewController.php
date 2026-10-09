@@ -80,6 +80,7 @@ class OverviewController extends Controller
                 'updated_at' => $ticket->jira_updated_at?->toIso8601String(),
                 'url' => $jira->browseUrl($ticket->key),
                 'page' => route('tickets.show', $ticket, false),
+                'quick_scan' => $ticket->quickScanData(),
                 // Waiting on the requester sleeps, whatever else is going on. Agents arrive
                 // with step 2; until then every other ticket waits for a first look.
                 'group' => $this->group($ticket, $sessions[$ticket->id] ?? null, $byId[$ticket->space_id]),

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Agent\Instructions;
 use App\Casebook\Matcher;
 use App\Jira\JiraClient;
 use App\Jira\JiraException;
@@ -41,8 +42,11 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
         }
 
         $now = now();
+        // A space's first sync brings in everything it has: none of that is "new".
+        $firstSync = $space->synced_at === null;
         $space->update(['sync_attempted_at' => $now]);
         $seen = [];
+        $fresh = [];
         $casebook = Matcher::forSpace($space);
 
         // SLAs live in service spaces only. Not being able to read them is no reason to
@@ -63,6 +67,9 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
                     $seen[] = (string) $issue['id'];
                     $ticket = Ticket::record($space, $issue, $now, $slaFields);
                     $ticket->rememberMatch($casebook->best($ticket->matchText()));
+                    if ($ticket->wasRecentlyCreated && ! $firstSync) {
+                        $fresh[] = $ticket;
+                    }
                     $ticket->save();
                 }
 
@@ -76,5 +83,13 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
 
         $space->tickets()->open()->whereNotIn('jira_id', $seen)->update(['left_at' => $now]);
         $space->update(['synced_at' => $now, 'sync_error' => null]);
+
+        // New tickets get their quick scan, if the space has it on and an agent can sign in;
+        // a flood beyond the limit waits for you to press Quick scan.
+        if ($space->quick_scan && Instructions::credentials() !== []) {
+            foreach (array_slice($fresh, 0, (int) config('agent.quick.per_sync')) as $ticket) {
+                QuickScanTicket::start($ticket);
+            }
+        }
     }
 }

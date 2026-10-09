@@ -26,6 +26,7 @@ const form = useForm({
     // null: automatic, until a box is ticked or unticked.
     sleep_statuses: props.space.sleep_statuses,
     hidden_slas: [...props.space.hidden_slas],
+    quick_scan: props.space.quick_scan ?? false,
 });
 
 function setSlaShown(name, shown) {
@@ -328,6 +329,23 @@ onMounted(runPreview);
                     {{ name }}
                 </label>
             </div>
+        </section>
+
+        <!-- Quick scans -->
+        <section class="card p-5">
+            <h2 class="text-lg font-medium">Quick scan</h2>
+            <label class="mt-3 flex items-start gap-3">
+                <input v-model="form.quick_scan" type="checkbox" class="mt-1" />
+                <span>
+                    <span class="font-medium">Give every new ticket a quick scan as soon as it arrives</span>
+                    <span class="mt-1 block max-w-3xl text-sm text-muted">
+                        A lighter model takes a first look: what it is, which system, the likely cause and the next step. If the
+                        problem is in data and the system has an API, it checks whether the data is still wrong. Cents per ticket
+                        rather than dollars, and only for tickets that arrive after you turn it on (at most ten per sync); older
+                        ones have a Quick scan button on their page.
+                    </span>
+                </span>
+            </label>
         </section>
 
         <!-- Systems -->

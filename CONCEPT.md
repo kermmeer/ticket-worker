@@ -250,6 +250,21 @@ claim without leaving the ticket.
 
 ---
 
+### Quick scan
+
+A space can give every new ticket a **quick scan** as soon as the sync brings it in (built
+2026-10-08): a first look by a lighter model (`CLAUDE_QUICK_MODEL`, default Sonnet, low
+effort, `AGENT_QUICK_BUDGET_USD` 0.50 a ticket), without a session to come back to. It reads
+the ticket, the attachments and the casebook index, names the system, the kind of problem
+(bug, data, configuration, question, feature) and the likely cause, and gives one next
+step. When the problem is in data and the system has an API (§11), it looks the record up:
+is it still wrong now? The overview shows that in one line under the summary, *still there*
+or *already gone* in words as well as colour; the ticket page shows the whole scan, what it
+looked at, and *Scan again*. Turning it on scans only tickets that arrive afterwards (and
+never on a space's first sync), at most `AGENT_QUICK_PER_SYNC` (10) a sync; older tickets
+have a *Quick scan* button. The first real one cost $0.12. The analysis proper is still
+yours to start.
+
 ## 8. Working the ticket
 
 After the proposal, the session stays open. You talk, and the agent carries on with the whole

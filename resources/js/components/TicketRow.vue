@@ -1,6 +1,7 @@
 <script setup>
 import { Link, router, usePage } from '@inertiajs/vue3';
 import SpaceLabel from './SpaceLabel.vue';
+import QuickScanLine from './QuickScanLine.vue';
 import StateBadge from './StateBadge.vue';
 import StatusLabel from './StatusLabel.vue';
 import TicketKey from './TicketKey.vue';
@@ -56,6 +57,7 @@ function toggleHidden() {
                 </template>
                 <span v-if="message.assignee" class="text-muted">· assigns {{ message.assignee }}</span>
             </p>
+            <QuickScanLine v-if="ticket.quick_scan" :scan="ticket.quick_scan" />
             <p v-if="ticket.casebook" class="mt-1.5 text-sm">
                 <Link :href="`/casebook/${ticket.casebook.id}/edit`" class="text-working hover:underline">
                     Looks like a known case: {{ ticket.casebook.title }}

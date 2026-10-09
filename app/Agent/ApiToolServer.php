@@ -5,6 +5,7 @@ namespace App\Agent;
 use App\Models\AgentEvent;
 use App\Models\AgentTurn;
 use App\Models\ApiConnection;
+use App\Models\Ticket;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Throwable;
@@ -22,14 +23,26 @@ class ApiToolServer
 
     private int $calls = 0;
 
-    /** @param  Collection<int, ApiConnection>  $apis */
-    public function __construct(private readonly Collection $apis, private readonly ?AgentTurn $turn = null) {}
+    /**
+     * @param  Collection<int, ApiConnection>  $apis
+     * @param  (\Closure(string): void)|null  $log  where each call is written down
+     */
+    public function __construct(private readonly Collection $apis, private readonly ?\Closure $log = null) {}
 
     public static function forTurn(AgentTurn $turn, iterable $systems): self
     {
-        $ids = collect($systems)->pluck('id');
+        return new self(self::apisOf($systems), fn (string $line) => AgentEvent::create(['agent_turn_id' => $turn->id, 'type' => 'tool', 'summary' => $line]));
+    }
 
-        return new self(ApiConnection::query()->with('system')->whereIn('system_id', $ids)->orderBy('name')->get(), $turn);
+    /** For a quick scan: the calls go into the ticket's scan trail. */
+    public static function forQuickScan(Ticket $ticket, iterable $systems): self
+    {
+        return new self(self::apisOf($systems), fn (string $line) => Ticket::addQuickStep($ticket->id, $line));
+    }
+
+    private static function apisOf(iterable $systems): Collection
+    {
+        return ApiConnection::query()->with('system')->whereIn('system_id', collect($systems)->pluck('id'))->orderBy('name')->get();
     }
 
     /** Answer one message; null for a notification, which gets no answer. */
@@ -147,8 +160,8 @@ class ApiToolServer
 
     private function log(string $summary): void
     {
-        if ($this->turn !== null) {
-            AgentEvent::create(['agent_turn_id' => $this->turn->id, 'type' => 'tool', 'summary' => $summary]);
+        if ($this->log !== null) {
+            ($this->log)($summary);
         }
     }
 }

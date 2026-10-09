@@ -2,10 +2,12 @@
 
 namespace App\Agent;
 
+use App\Jobs\QuickScanTicket;
 use App\Jobs\RunAgentTurn;
 use App\Jobs\ScanSystem;
 use App\Models\AgentTurn;
 use App\Models\System;
+use App\Models\Ticket;
 
 /**
  * A turn or scan whose worker was killed outright (a container restart, say) never gets
@@ -23,6 +25,11 @@ class StaleRuns
             ->where('state', AgentTurn::RUNNING)
             ->where('started_at', '<', now()->subSeconds((new \ReflectionClass(RunAgentTurn::class))->getDefaultProperties()['timeout'] + self::MARGIN_SECONDS))
             ->update(['state' => AgentTurn::FAILED, 'error' => 'Interrupted: the agent stopped without finishing. Ask again.', 'finished_at' => now()]);
+
+        Ticket::query()
+            ->whereIn('quick_scan_state', ['queued', 'running'])
+            ->where('updated_at', '<', now()->subSeconds((new \ReflectionClass(QuickScanTicket::class))->getDefaultProperties()['timeout'] + self::MARGIN_SECONDS))
+            ->update(['quick_scan_state' => 'failed', 'quick_scan_error' => 'Interrupted: the scan stopped without finishing.']);
 
         // A running scan writes its log as it goes, so a quiet one is a dead one.
         System::query()

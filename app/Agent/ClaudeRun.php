@@ -33,7 +33,7 @@ class ClaudeRun
         ];
     }
 
-    public static function command(float $budgetUsd, bool $write = false, array $mcpTools = []): array
+    public static function command(float $budgetUsd, bool $write = false, array $mcpTools = [], ?string $model = null, ?string $effort = null): array
     {
         // Writing is for patch turns only. Restricted mode keeps it inside the workspace,
         // and the systems are read-only mounts besides.
@@ -43,7 +43,7 @@ class ClaudeRun
 
         return [config('agent.claude.bin'), '-p',
             '--output-format', 'stream-json', '--verbose',
-            '--model', config('agent.claude.model'), '--effort', config('agent.claude.effort'),
+            '--model', $model ?? config('agent.claude.model'), '--effort', $effort ?? config('agent.claude.effort'),
             '--restricted', '--strict-mcp-config',
             '--tools', $tools,
             '--allowedTools', $allowed,

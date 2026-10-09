@@ -132,3 +132,7 @@ to it, including work you finish.
 - [x] Your notes for the agent: an optional box with Analyse; the note goes in as the
       engineer's lead (to follow and check, unlike ticket text), shows in the log as yours,
       and is kept in the browser until the analysis starts (2026-10-08)
+- [x] Quick scan per space: new tickets get a first look by a lighter model as they arrive
+      (kind, system, likely cause, next step; for data problems, whether it is still there via
+      the system's API); one line on the overview, the whole scan on the ticket page, a button
+      for older tickets (2026-10-09)
