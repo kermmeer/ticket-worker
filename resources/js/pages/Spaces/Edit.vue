@@ -19,6 +19,8 @@ const props = defineProps({
     defaults: { type: Object, required: true },
 });
 
+const webhookUrl = ref('');
+
 // Who sees this space besides those who see all of them. Saved on its own.
 const seers = ref((props.people ?? []).filter((person) => person.chosen).map((person) => person.id));
 function saveSeers() {
@@ -392,6 +394,23 @@ onMounted(runPreview);
             <button type="button" class="btn ml-auto" @click="remove">Remove this space</button>
         </div>
     </form>
+
+    <section class="card mt-6 p-5">
+        <h2 class="text-lg font-medium">Slack or Teams</h2>
+        <p class="mt-1 max-w-3xl text-sm text-muted">
+            An incoming webhook for this space's channel. It posts when a quick scan finds the data still wrong, and when an SLA
+            is less than an hour from breaking (once per deadline). Stored encrypted, never shown again.
+        </p>
+        <p class="mt-2 text-sm">Now: <strong class="font-medium" :class="space.has_webhook ? 'text-done' : 'text-muted'">{{ space.has_webhook ? 'set' : 'none' }}</strong></p>
+        <form class="mt-3 flex flex-wrap items-end gap-2" @submit.prevent="router.put(`/spaces/${space.id}/webhook`, { url: webhookUrl }, { preserveScroll: true, onSuccess: () => (webhookUrl = '') })">
+            <label class="min-w-0 flex-1 text-sm">Webhook address
+                <input v-model="webhookUrl" type="url" placeholder="https://hooks.slack.com/services/…" autocomplete="off" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm" />
+            </label>
+            <button type="submit" class="btn" :disabled="!webhookUrl">Save</button>
+            <button v-if="space.has_webhook" type="button" class="btn" @click="router.put(`/spaces/${space.id}/webhook`, { test: true }, { preserveScroll: true })">Send a test</button>
+            <button v-if="space.has_webhook" type="button" class="text-sm text-muted underline hover:text-ink" @click="router.put(`/spaces/${space.id}/webhook`, { url: null }, { preserveScroll: true })">remove</button>
+        </form>
+    </section>
 
     <section v-if="people" class="card mt-6 p-5">
         <h2 class="text-lg font-medium">Who sees this space</h2>

@@ -1,9 +1,11 @@
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { watchConnection } from './connection.js';
+import { watchNotices } from './notices.js';
 import AppLayout from './layouts/AppLayout.vue';
 
 watchConnection();
+watchNotices();
 
 createInertiaApp({
     title: (title) => (title ? `${title} · Ticket Worker` : 'Ticket Worker'),

@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import CodeBlock from '../components/CodeBlock.vue';
+import { askForNotifications, notificationsOn, notificationsSupported } from '../notices.js';
 import { ago } from '../time.js';
 
 // Your account: your name, your own Claude sign-in, your password. For an admin, also the
@@ -15,6 +16,12 @@ const props = defineProps({
     spaces: { type: Array, default: () => [] },
     knownAssignees: { type: Array, default: () => [] },
 });
+
+// Browser notifications: per browser, since that is where the permission lives.
+const notify = ref(notificationsOn() ? 'granted' : notificationsSupported() ? Notification.permission : 'unsupported');
+async function turnOnNotifications() {
+    notify.value = await askForNotifications();
+}
 
 // Your Jira user: picked from who tickets are assigned to, or found by name or e-mail.
 const jiraQuery = ref('');
@@ -113,6 +120,18 @@ const open = ref(false);
                 <p class="text-xs text-muted">Stored encrypted. Never shown again, never sent anywhere but to Claude Code when your work runs.</p>
                 <button type="submit" class="btn btn-signal" :disabled="claude.processing || !claude.secret">Save</button>
             </form>
+        </section>
+
+        <!-- Notifications -->
+        <section class="card p-5 xl:col-span-2">
+            <h2 class="text-lg font-medium">Notifications in this browser</h2>
+            <p class="mt-1 max-w-3xl text-sm text-muted">When an analysis, an answer, a patch or a quick scan you asked for is done, this browser says so, also with the tab in the background. Turn it on in each browser you use.</p>
+            <p class="mt-3 text-sm">
+                <strong v-if="notify === 'granted'" class="font-medium text-done">On in this browser</strong>
+                <span v-else-if="notify === 'denied'" class="text-signal">Blocked in this browser: allow notifications for this site in its settings, then reload.</span>
+                <span v-else-if="notify === 'unsupported'" class="text-muted">This browser cannot show them (on an iPhone: add the site to the home screen first).</span>
+                <button v-else type="button" class="btn btn-signal" @click="turnOnNotifications">Turn them on</button>
+            </p>
         </section>
 
         <!-- Jira -->

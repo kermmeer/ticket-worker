@@ -3,6 +3,7 @@
 use App\Agent\FeedQuickScans;
 use App\Agent\ForgetOldWork;
 use App\Agent\StaleRuns;
+use App\Notify\WarnSlas;
 use App\Jobs\ReportHealth;
 use App\Sync\DispatchDueSyncs;
 use Illuminate\Support\Facades\Schedule;
@@ -22,3 +23,6 @@ Schedule::call(new FeedQuickScans)->everyMinute()->name('feed-quick-scans')->wit
 
 // Tickets' workspaces and transcripts go 30 days after their work ended (CONCEPT.md §11).
 Schedule::call(new ForgetOldWork)->dailyAt('03:17')->name('forget-old-work');
+
+// An SLA under an hour from breaking, in its space's channel, once per deadline.
+Schedule::call(new WarnSlas)->everyFiveMinutes()->name('warn-slas')->withoutOverlapping();

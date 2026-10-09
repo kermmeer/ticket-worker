@@ -9,6 +9,7 @@ use App\Agent\Workspace;
 use App\Models\ApiConnection;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Notify\SpaceWebhook;
 use App\Settings\SpaceSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -107,6 +108,9 @@ class QuickScanTicket implements ShouldQueue
                 'quick_scan_tokens' => array_sum(array_filter($tokens, 'is_int')) ?: null,
                 'quick_scan_at' => now(),
             ])->save();
+            if (($answer['data_check']['still_present'] ?? null) === 'yes' && filled($ticket->space->notify_webhook)) {
+                SpaceWebhook::send($ticket->space, "\u{1F534} {$ticket->key}: the data is still wrong. ".($answer['data_check']['evidence'] ?? $answer['summary'] ?? ''), route('tickets.show', $ticket), 'Open in Ticket Worker');
+            }
         } catch (Throwable $e) {
             $ticket->forceFill(['quick_scan_state' => 'failed', 'quick_scan_error' => Str::limit($e->getMessage(), 1000), 'quick_scan_at' => now()])->save();
         }

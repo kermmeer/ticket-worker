@@ -30,15 +30,18 @@ class Space extends Model
     /** Status label colours, each readable on both themes (app.css, --tone-*). */
     public const TONES = ['grey', 'blue', 'amber', 'green', 'rose', 'violet', 'teal'];
 
+    protected $hidden = ['notify_webhook'];
+
     protected $fillable = [
         'project_key', 'project_id', 'name', 'label', 'colour', 'jira_type', 'type',
-        'rules', 'done_rule', 'status_colours', 'sleep_statuses', 'hidden_slas', 'quick_scan', 'settings',
+        'rules', 'done_rule', 'status_colours', 'sleep_statuses', 'hidden_slas', 'quick_scan', 'settings', 'notify_webhook',
         'state', 'sync_attempted_at', 'synced_at', 'sync_error',
     ];
 
     protected function casts(): array
     {
         return [
+            'notify_webhook' => 'encrypted',
             'settings' => 'array',
             'quick_scan' => 'boolean',
             'sync_attempted_at' => 'datetime',

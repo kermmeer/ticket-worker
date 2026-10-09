@@ -48,6 +48,21 @@ class SpaceController extends Controller
         ]);
     }
 
+    /** The space's Slack or Teams webhook: set, clear, or send a test. Never shown back. */
+    public function webhook(Request $request, Space $space): RedirectResponse
+    {
+        $data = $request->validate(['url' => ['nullable', 'url:https', 'max:1000'], 'test' => ['boolean']]);
+        if ($request->boolean('test')) {
+            $failed = \App\Notify\SpaceWebhook::send($space, "\u{2705} Ticket Worker can post here for {$space->label}.");
+
+            return back()->with($failed ? 'error' : 'success', $failed ? "The test did not arrive: {$failed}" : 'Sent. Look in the channel.');
+        }
+        $space->update(['notify_webhook' => $data['url'] ?? null]);
+        AuditEvent::record('space.webhook', $space->label, filled($data['url'] ?? null) ? 'webhook set (secret changed)' : 'webhook removed');
+
+        return back()->with('success', filled($data['url'] ?? null) ? 'Saved. Send a test to see it arrive.' : 'Removed.');
+    }
+
     /** Who may see this space, besides everyone who sees all spaces: admins decide. */
     public function people(Request $request, Space $space): RedirectResponse
     {
@@ -129,6 +144,7 @@ class SpaceController extends Controller
                 'hidden_slas' => $space->hidden_slas ?? [],
                 'quick_scan' => $space->quick_scan,
                 'settings' => (object) ($space->settings ?? []),
+                'has_webhook' => filled($space->notify_webhook),
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
             // What an empty setting falls back to, shown as the placeholder.

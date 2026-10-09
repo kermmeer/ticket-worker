@@ -89,6 +89,7 @@ Route::middleware('role:editor')->group(function () {
         Route::post('/{space}/pause', 'pause')->name('pause');
         Route::post('/{space}/sync', 'sync')->name('sync');
         Route::put('/{space}/people', 'people')->name('people');
+        Route::put('/{space}/webhook', 'webhook')->name('webhook');
     });
 
     Route::controller(CasebookController::class)->prefix('casebook')->name('casebook.')->group(function () {
