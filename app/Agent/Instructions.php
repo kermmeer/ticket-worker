@@ -162,8 +162,9 @@ class Instructions
                     'description' => 'Only when the ticket is about data: whether the problem is still there now.',
                     'required' => ['still_present', 'evidence'],
                     'properties' => [
-                        'still_present' => ['type' => 'string', 'enum' => ['yes', 'no', 'unknown']],
-                        'evidence' => $text + ['description' => 'What you looked up and what it showed, in a line or two; unknown when there was no way to look.'],
+                        'still_present' => ['type' => 'string', 'enum' => ['yes', 'no', 'unknown'],
+                            'description' => 'yes or no only from a call_api lookup you made in this scan. What the ticket or a comment says is not a check: then unknown.'],
+                        'evidence' => $text + ['description' => 'The call you made and what it showed, in a line or two; for unknown, why you could not look.'],
                     ],
                 ],
                 'next_step' => $text + ['description' => 'The one next step for the engineer, as an exact command, query or action.'],
@@ -194,7 +195,8 @@ class Instructions
         - Read the ticket and the casebook index. Look at code only to name the likely place, briefly.
         - If the problem is in data (wrong amounts, missing or duplicate records, a stuck status) and the
           call_api tool can look the record up, look it up now: is the problem still there? One or two
-          calls for the records the ticket names, never a list. Never write a token down.
+          calls for the records the ticket names, never a list. Never write a token down. Without a
+          lookup the answer is unknown, whatever the ticket says.
         - The next step is one exact command, query or action, not a suggestion.
         - Short. End with the JSON.
 
