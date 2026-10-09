@@ -46,6 +46,7 @@ function post(space, action) {
                 <span class="text-sm text-muted">{{ space.name }}</span>
                 <span class="font-mono text-xs text-muted">{{ space.project_key }}</span>
                 <span class="text-xs text-muted">{{ space.type === 'service' ? 'Service space' : 'Plain space' }}</span>
+                <span v-if="space.site" class="text-xs text-working">on {{ space.site }}</span>
                 <span class="ml-auto font-mono text-xs font-medium tracking-wide uppercase" :class="states[space.state]?.tone">
                     {{ states[space.state]?.label ?? space.state }}
                 </span>

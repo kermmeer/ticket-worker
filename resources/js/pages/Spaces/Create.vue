@@ -5,6 +5,9 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 const props = defineProps({
     projects: { type: Array, required: true },
     error: { type: String, default: null },
+    // The site the projects come from: null for the default one in .env.
+    site: { type: Number, default: null },
+    sites: { type: Array, default: () => [] },
 });
 
 const filter = ref('');
@@ -16,7 +19,7 @@ const shown = computed(() => {
         : props.projects.filter((project) => project.key.toLowerCase().includes(query) || project.name.toLowerCase().includes(query));
 });
 
-const form = useForm({ project_key: '' });
+const form = useForm({ project_key: '', site: props.site });
 
 function pick(project) {
     form.project_key = project.key;
@@ -29,6 +32,11 @@ function pick(project) {
 
     <p class="eyebrow"><Link href="/spaces" class="hover:text-ink">Spaces</Link> / New</p>
     <h1 class="display mt-3 text-5xl leading-[1.05] sm:text-6xl">Which space?</h1>
+    <div v-if="sites.length" class="mt-6 flex flex-wrap items-center gap-2 text-sm" role="group" aria-label="Which Jira site">
+        <span class="text-muted">From</span>
+        <Link href="/spaces/create" class="rounded-full border px-3 py-1" :class="site === null ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'">the default Jira</Link>
+        <Link v-for="other in sites" :key="other.id" :href="`/spaces/create?site=${other.id}`" class="rounded-full border px-3 py-1" :class="site === other.id ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'">{{ other.name }}</Link>
+    </div>
     <p class="mt-5 max-w-2xl text-lg text-muted">
         The spaces this Jira account can see, minus the ones already set up. A service space offers both a reply to the
         customer and an internal note; Jira says which kind each one is.

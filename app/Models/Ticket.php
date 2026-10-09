@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
 class Ticket extends Model
 {
     protected $fillable = [
-        'space_id', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
+        'space_id', 'site', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
         'issue_type', 'reporter', 'assignee', 'assignee_account_id', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
         'first_seen_at', 'last_seen_at', 'left_at', 'hidden_at',
         'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id', 'sla_warned',
@@ -74,6 +74,20 @@ class Ticket extends Model
             'tokens' => $this->quick_scan_tokens,
             'at' => $this->quick_scan_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Assigned to this person: by Jira account id on the default site, where accounts are
+     * linked, and by name on another site, where the same person has another id.
+     */
+    public static function isMine(?string $accountId, ?string $assignee, ?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return (filled($accountId) && $accountId === $user->jira_account_id)
+            || (filled($assignee) && filled($user->jira_name) && mb_strtolower($assignee) === mb_strtolower($user->jira_name));
     }
 
     /** Only the tickets of spaces this person may see. */
@@ -133,7 +147,8 @@ class Ticket extends Model
     {
         $fields = $issue['fields'] ?? [];
 
-        $ticket = static::firstOrNew(['jira_id' => (string) $issue['id']]);
+        // An issue id is only unique within its site.
+        $ticket = static::firstOrNew(['site' => $space->jira_site_id ?? 0, 'jira_id' => (string) $issue['id']]);
         $ticket->fill([
             'space_id' => $space->id,
             'key' => (string) $issue['key'],

@@ -82,7 +82,8 @@ function send() {
 const draft = useForm({ body: '', visibility: 'public' });
 watch(proposal, (value) => (draft.body = value?.reply_draft ?? ''), { immediate: true });
 
-const openLabel = usePage().props.openLabel ?? 'Jira';
+// Its own site's name for it: another Jira, or the outbox.
+const openLabel = props.ticket.open_label ?? usePage().props.openLabel ?? 'Jira';
 
 // The latest word on top; the agent's ticket.md keeps Jira's order, oldest first.
 const newestFirst = computed(() => [...(props.issue?.comments ?? [])].reverse());

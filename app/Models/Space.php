@@ -33,7 +33,7 @@ class Space extends Model
     protected $hidden = ['notify_webhook'];
 
     protected $fillable = [
-        'project_key', 'project_id', 'name', 'label', 'colour', 'jira_type', 'type',
+        'jira_site_id', 'project_key', 'project_id', 'name', 'label', 'colour', 'jira_type', 'type',
         'rules', 'done_rule', 'status_colours', 'sleep_statuses', 'hidden_slas', 'quick_scan', 'settings', 'notify_webhook',
         'state', 'sync_attempted_at', 'synced_at', 'sync_error',
     ];
@@ -50,6 +50,23 @@ class Space extends Model
             'sleep_statuses' => 'array',
             'hidden_slas' => 'array',
         ];
+    }
+
+    /** The Jira site it reads from: its own, or the default one in .env. */
+    public function site(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(JiraSite::class, 'jira_site_id');
+    }
+
+    public function jira(): \App\Jira\JiraClient
+    {
+        return $this->jira_site_id && $this->site ? $this->site->client() : app(\App\Jira\JiraClient::class);
+    }
+
+    /** What a link that opens a ticket elsewhere is called: its site's, or the default's. */
+    public function openLabel(): string
+    {
+        return $this->site?->open_label ?: (string) config('services.jira.open_label', 'Jira');
     }
 
     /** Who may see it besides those who see every space. */

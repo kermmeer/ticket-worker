@@ -31,7 +31,8 @@ class Workspace
 
     public static function path(Ticket $ticket): string
     {
-        return config('agent.workspaces_path').'/'.Str::slug($ticket->key, '-');
+        // Another site's tickets get its number in front: two sites can both have a SUP-1.
+        return config('agent.workspaces_path').'/'.($ticket->site ? "site{$ticket->site}-" : '').Str::slug($ticket->key, '-');
     }
 
     /** Everything the agent reads, fetched fresh. Returns what it skipped, in words. */
@@ -43,7 +44,8 @@ class Workspace
         File::deleteDirectory($root.'/casebook');
         File::ensureDirectoryExists($root.'/casebook');
 
-        $issue = $this->jira->issue($ticket->key);
+        $jira = $ticket->space->jira();
+        $issue = $jira->issue($ticket->key);
         $skipped = [];
 
         foreach (array_slice($issue['attachments'], 0, self::MAX_ATTACHMENTS) as $file) {
@@ -51,7 +53,7 @@ class Workspace
             if (is_file($target)) {
                 continue;
             }
-            if ($file['size'] > self::MAX_ATTACHMENT_BYTES || ! $this->jira->download($file['url'], $target, self::MAX_ATTACHMENT_BYTES)) {
+            if ($file['size'] > self::MAX_ATTACHMENT_BYTES || ! $jira->download($file['url'], $target, self::MAX_ATTACHMENT_BYTES)) {
                 $skipped[] = "{$file['filename']} (not downloaded)";
             }
         }

@@ -21,10 +21,11 @@ class AttachmentController extends Controller
 
     private const MAX_BYTES = 100 * 1024 * 1024;
 
-    public function __invoke(Request $request, Ticket $ticket, string $attachment, JiraClient $jira): BinaryFileResponse
+    public function __invoke(Request $request, Ticket $ticket, string $attachment): BinaryFileResponse
     {
+        $jira = $ticket->space->jira();
         try {
-            $issue = Cache::remember("ticket.issue.{$ticket->key}", 60, fn () => $jira->issue($ticket->key));
+            $issue = Cache::remember("ticket.issue.{$ticket->id}", 60, fn () => $jira->issue($ticket->key));
         } catch (JiraException $e) {
             abort(502, $e->getMessage());
         }

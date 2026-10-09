@@ -42,6 +42,7 @@ class SetupChecks
             $this->database(),
             $this->queue(),
             $this->jira(),
+            ...$this->otherSites(),
             $this->jiraWrite(),
             $this->outbox(),
             $this->anthropicKey(),
@@ -197,6 +198,20 @@ class SetupChecks
         }
 
         return $this->item($key, 'Folders', $title, self::OK, "{$path}, {$purpose}.");
+    }
+
+    /** One line per Jira site added on Setup: does it answer, as whom. */
+    private function otherSites(): array
+    {
+        return \App\Models\JiraSite::query()->orderBy('name')->get()->map(function (\App\Models\JiraSite $site) {
+            try {
+                $me = Cache::remember("setup.jira-site.{$site->id}.".md5($site->base_url.$site->email), 60, fn () => $site->client()->myself());
+
+                return $this->item("jira-site-{$site->id}", 'Jira', $site->name, self::OK, 'Connected as '.($me['displayName'] ?? $site->email)." on {$site->base_url}.");
+            } catch (\Throwable $e) {
+                return $this->item("jira-site-{$site->id}", 'Jira', $site->name, self::TODO, $e->getMessage());
+            }
+        })->all();
     }
 
     private function item(string $key, string $group, string $title, string $state, string $detail): array

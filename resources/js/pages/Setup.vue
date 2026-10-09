@@ -13,6 +13,7 @@ const props = defineProps({
     defaultAnswerRules: { type: String, required: true },
     sharedClaude: { type: String, default: null },
     defaults: { type: Object, required: true },
+    jiraSites: { type: Array, default: () => [] },
     savedDefaults: { type: Object, default: () => ({}) },
     envClaude: { type: Boolean, default: false },
 });
@@ -24,6 +25,17 @@ function saveDefaults() {
 }
 
 const shared = useForm({ kind: 'token', secret: '' });
+
+// More Jira sites, for spaces whose projects live elsewhere.
+const site = useForm({ name: '', base_url: '', email: '', token: '', open_url: '', open_label: '' });
+function addSite() {
+    site.post('/setup/jira-sites', { preserveScroll: true, onSuccess: () => site.reset() });
+}
+function removeSite(other) {
+    if (confirm(`Remove ${other.name}?`)) {
+        router.delete(`/setup/jira-sites/${other.id}`, { preserveScroll: true });
+    }
+}
 function saveShared() {
     shared.put('/setup/claude', { preserveScroll: true, onSuccess: () => shared.reset('secret') });
 }
@@ -87,6 +99,33 @@ const marks = {
                 </div>
             </li>
         </ul>
+    </section>
+
+    <section class="mt-10">
+        <h2 class="eyebrow">More Jira sites</h2>
+        <div class="card mt-3 p-5">
+            <p class="max-w-3xl text-sm text-muted">
+                The site in .env is the default. Add another for spaces whose projects live there (a customer's Jira, say);
+                a new space then picks its site. Its token is stored encrypted and never shown again.
+            </p>
+            <ul v-if="jiraSites.length" class="mt-3 divide-y divide-line rounded-md border border-line text-sm">
+                <li v-for="other in jiraSites" :key="other.id" class="flex flex-wrap items-baseline gap-x-3 p-3">
+                    <span class="font-medium">{{ other.name }}</span>
+                    <span class="font-mono text-xs text-muted">{{ other.base_url }} · {{ other.email }}</span>
+                    <span class="text-xs text-muted">{{ other.spaces }} space{{ other.spaces === 1 ? '' : 's' }}</span>
+                    <button v-if="!other.spaces" type="button" class="ml-auto text-xs text-muted hover:text-signal" @click="removeSite(other)">Remove</button>
+                </li>
+            </ul>
+            <form class="mt-4 grid gap-3 sm:grid-cols-2" @submit.prevent="addSite">
+                <label class="text-sm">Name<input v-model="site.name" required placeholder="Customer X" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5" /></label>
+                <label class="text-sm">Address<input v-model="site.base_url" required type="url" placeholder="https://customer-x.atlassian.net" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 font-mono" /><span v-if="site.errors.base_url" class="block text-signal">{{ site.errors.base_url }}</span></label>
+                <label class="text-sm">Account e-mail<input v-model="site.email" required type="email" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5" /></label>
+                <label class="text-sm">API token<input v-model="site.token" required type="password" autocomplete="new-password" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 font-mono" /></label>
+                <label class="text-sm">Open tickets in <span class="text-muted">(optional, with {key})</span><input v-model="site.open_url" placeholder="https://outbox.example.com/{key}" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 font-mono" /><span v-if="site.errors.open_url" class="block text-signal">{{ site.errors.open_url }}</span></label>
+                <label class="text-sm">Called <span class="text-muted">(optional)</span><input v-model="site.open_label" placeholder="Jira" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5" /></label>
+                <div class="sm:col-span-2"><button type="submit" class="btn" :disabled="site.processing">Add the site</button></div>
+            </form>
+        </div>
     </section>
 
     <section class="mt-10">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jira\JiraClient;
 use App\Models\AuditEvent;
+use App\Models\JiraSite;
 use App\Models\Setting;
 use App\Settings\SpaceSettings;
 use App\Setup\SetupChecks;
@@ -22,6 +23,9 @@ class SetupController extends Controller
             'replyRules' => Setting::replyRules(),
             'defaultReplyRules' => Setting::DEFAULT_REPLY_RULES,
             'autoPatch' => Setting::autoPatch(),
+            'jiraSites' => JiraSite::query()->withCount('spaces')->orderBy('name')->get()->map(fn (JiraSite $site) => [
+                'id' => $site->id, 'name' => $site->name, 'base_url' => $site->base_url, 'email' => $site->email, 'spaces' => $site->spaces_count,
+            ]),
             'defaults' => SpaceSettings::defaults(),
             'savedDefaults' => (object) (json_decode((string) Setting::get(SpaceSettings::DEFAULTS), true) ?: []),
             'sharedClaude' => ($shared = Setting::secret(Setting::SHARED_CLAUDE)) ? $shared['kind'] : null,
@@ -59,6 +63,39 @@ class SetupController extends Controller
         AuditEvent::record('setup.defaults', 'defaults for every space', $data === [] ? 'back to .env' : implode(', ', array_map(fn ($k, $v) => "{$k} {$v}", array_keys($data), $data)));
 
         return back()->with('success', 'Saved. Every space without its own setting uses these.');
+    }
+
+    /** Another Jira site, for spaces whose projects live there (docs/TEAM.md, item 8). */
+    public function addSite(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:60'],
+            'base_url' => ['required', 'url:https', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'token' => ['required', 'string', 'max:500'],
+            'open_url' => ['nullable', 'url:https,http', 'max:255', 'regex:/\{key\}/'],
+            'open_label' => ['nullable', 'string', 'max:40'],
+        ], ['open_url.regex' => 'Put {key} where the ticket key goes.']);
+        $site = JiraSite::create($data);
+
+        try {
+            $me = $site->client()->myself();
+            $note = 'Connected as '.($me['displayName'] ?? $data['email']).'.';
+        } catch (\Throwable $e) {
+            $note = 'Saved, but it does not answer yet: '.$e->getMessage();
+        }
+        AuditEvent::record('setup.jira-site', $site->name, "added {$site->base_url} as {$site->email} (token set)");
+
+        return back()->with(str_starts_with($note, 'Connected') ? 'success' : 'error', "{$site->name}: {$note}");
+    }
+
+    public function removeSite(JiraSite $site): RedirectResponse
+    {
+        abort_if($site->spaces()->exists(), 409, 'Spaces still read from this site: remove or move them first.');
+        $site->delete();
+        AuditEvent::record('setup.jira-site', $site->name, 'removed, with its token');
+
+        return back()->with('success', "Removed {$site->name}.");
     }
 
     /** The shared Claude sign-in, for everyone without their own. */

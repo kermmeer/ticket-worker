@@ -393,7 +393,7 @@ The commits since, with the files they touched:
     {
         // Signed by whoever asks for the draft; the Jira account's name when nobody is signed in.
         return "Write the reply draft by these rules:\n".Setting::replyRulesFor(
-            auth()->user()?->firstName() ?? app(JiraClient::class)->firstName(),
+            auth()->user()?->firstName() ?? ($space?->jira() ?? app(JiraClient::class))->firstName(),
             SpaceSettings::for($space)->get('reply_rules'),
         );
     }

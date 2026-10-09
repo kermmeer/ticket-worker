@@ -6,6 +6,7 @@ use App\Jira\JiraClient;
 use App\Jira\JiraException;
 use App\Jobs\SyncSpace;
 use App\Models\AuditEvent;
+use App\Models\JiraSite;
 use App\Models\Space;
 use App\Models\User;
 use App\Settings\SpaceSettings;
@@ -39,7 +40,7 @@ class SpaceController extends Controller
             ->get();
 
         return Inertia::render('Spaces/Index', [
-            'jiraConfigured' => $jira->configured(),
+            'jiraConfigured' => $jira->configured() || JiraSite::query()->exists(),
             'spaces' => $spaces->map(fn (Space $space) => $this->summary($space) + [
                 'open_count' => $space->open_count,
                 'followed' => in_array($space->id, $followed, true),
@@ -84,9 +85,13 @@ class SpaceController extends Controller
         return back();
     }
 
-    public function create(JiraClient $jira): Response
+    public function create(Request $request): Response
     {
-        $known = Space::query()->pluck('project_key')->all();
+        // Which site the new space reads from: the default (.env), or one added on Setup.
+        $siteId = $request->integer('site') ?: null;
+        $site = $siteId ? JiraSite::findOrFail($siteId) : null;
+        $jira = $site?->client() ?? app(JiraClient::class);
+        $known = Space::query()->where('jira_site_id', $siteId)->pluck('project_key')->all();
 
         try {
             $projects = collect($jira->projects())
@@ -100,14 +105,22 @@ class SpaceController extends Controller
             $error = $e->getMessage();
         }
 
-        return Inertia::render('Spaces/Create', ['projects' => $projects, 'error' => $error]);
+        return Inertia::render('Spaces/Create', [
+            'projects' => $projects,
+            'error' => $error,
+            'site' => $siteId,
+            'sites' => JiraSite::query()->orderBy('name')->get(['id', 'name']),
+        ]);
     }
 
-    public function store(Request $request, JiraClient $jira): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'project_key' => ['required', 'string', 'max:50', Rule::unique('spaces', 'project_key')],
+            'site' => ['nullable', 'integer', Rule::exists('jira_sites', 'id')],
+            'project_key' => ['required', 'string', 'max:50', Rule::unique('spaces', 'project_key')->where('jira_site_id', $request->integer('site') ?: null)],
         ]);
+        $siteId = $data['site'] ?? null;
+        $jira = $siteId ? JiraSite::findOrFail($siteId)->client() : app(JiraClient::class);
 
         try {
             $project = $jira->project($data['project_key']);
@@ -116,6 +129,7 @@ class SpaceController extends Controller
         }
 
         $space = Space::create([
+            'jira_site_id' => $siteId,
             'project_key' => $project['key'],
             'project_id' => $project['id'],
             'name' => $project['name'],
@@ -131,8 +145,9 @@ class SpaceController extends Controller
         return to_route('spaces.edit', $space);
     }
 
-    public function edit(Space $space, JiraClient $jira): Response
+    public function edit(Space $space): Response
     {
+        $jira = $space->jira();
         return Inertia::render('Spaces/Edit', [
             'space' => $this->summary($space) + [
                 'rules' => $space->rules,
@@ -201,8 +216,9 @@ class SpaceController extends Controller
     }
 
     /** What the rules being typed would find, before they are saved. */
-    public function preview(Request $request, Space $space, JiraClient $jira): JsonResponse
+    public function preview(Request $request, Space $space): JsonResponse
     {
+        $jira = $space->jira();
         $data = $request->validate([
             'rules' => ['nullable', 'string', 'max:4000', self::NO_ORDER],
             'done_rule' => ['nullable', 'string', 'max:2000', self::NO_ORDER],
@@ -281,6 +297,7 @@ class SpaceController extends Controller
     private function summary(Space $space): array
     {
         return [
+            'site' => $space->site?->name,
             'id' => $space->id,
             'project_key' => $space->project_key,
             'name' => $space->name,

@@ -126,6 +126,8 @@ Route::middleware('role:admin')->group(function () {
     Route::put('/setup/auto-patch', [SetupController::class, 'autoPatch'])->name('setup.auto-patch');
     Route::put('/setup/settings', [SetupController::class, 'settings'])->name('setup.settings');
     Route::put('/setup/claude', [SetupController::class, 'claude'])->name('setup.claude');
+    Route::post('/setup/jira-sites', [SetupController::class, 'addSite'])->name('setup.jira-sites.store');
+    Route::delete('/setup/jira-sites/{site}', [SetupController::class, 'removeSite'])->name('setup.jira-sites.destroy');
     Route::get('/audit', AuditController::class)->name('audit');
     Route::get('/docs/{doc}', DocsController::class)->name('docs');
     Route::inertia('/design', 'Design')->name('design');

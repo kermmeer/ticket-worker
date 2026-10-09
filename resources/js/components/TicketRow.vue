@@ -13,7 +13,7 @@ const props = defineProps({
     space: { type: Object, default: null },
 });
 
-const openLabel = usePage().props.openLabel ?? 'Jira';
+const openLabel = props.ticket.open_label ?? usePage().props.openLabel ?? 'Jira';
 
 // "Sun 5 Oct, 08:00": a send moment, close enough to need the weekday.
 function when(iso) {

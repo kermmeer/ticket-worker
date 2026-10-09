@@ -29,12 +29,13 @@ class TicketController extends Controller
 {
     public const LANGUAGES = ['auto', 'English', 'Nederlands', 'Français', 'Dansk', 'Deutsch'];
 
-    public function show(Ticket $ticket, JiraClient $jira): Response
+    public function show(Ticket $ticket): Response
     {
-        $ticket->load('space');
+        $ticket->load('space.site');
+        $jira = $ticket->space->jira();
 
         try {
-            $issue = Cache::remember("ticket.issue.{$ticket->key}", 60, fn () => $jira->issue($ticket->key));
+            $issue = Cache::remember("ticket.issue.{$ticket->id}", 60, fn () => $jira->issue($ticket->key));
             $issueError = null;
         } catch (JiraException $e) {
             $issue = null;
@@ -52,9 +53,10 @@ class TicketController extends Controller
                 'status_tone' => $ticket->space->statusTone($ticket->status, $ticket->status_category),
                 'priority' => $ticket->priority,
                 'assignee' => $ticket->assignee,
-                'assigned_to_me' => filled($ticket->assignee_account_id) && $ticket->assignee_account_id === auth()->user()?->jira_account_id,
+                'assigned_to_me' => Ticket::isMine($ticket->assignee_account_id, $ticket->assignee, auth()->user()),
                 'slas' => $ticket->space->visibleSlas($ticket->slas),
                 'url' => $jira->browseUrl($ticket->key),
+                'open_label' => $ticket->space->openLabel(),
                 'space' => ['label' => $ticket->space->label, 'colour' => $ticket->space->colour, 'type' => $ticket->space->type],
                 'quick_scan' => $ticket->quickScanData(),
             ],
@@ -137,8 +139,9 @@ class TicketController extends Controller
     }
 
     /** Assign the ticket to yourself in Jira; with JIRA_WRITE=dummy, say so and send nothing. */
-    public function assignToMe(Request $request, Ticket $ticket, JiraClient $jira): RedirectResponse
+    public function assignToMe(Request $request, Ticket $ticket): RedirectResponse
     {
+        $jira = $ticket->space->jira();
         $user = $request->user();
         if (! filled($user->jira_account_id)) {
             return back()->with('error', 'Link your Jira user first, on Your account.');
@@ -148,12 +151,19 @@ class TicketController extends Controller
         }
 
         try {
-            $jira->assign($ticket->key, $user->jira_account_id);
+            // Your account id is the default site's; on another site, you are found by your Jira name.
+            $accountId = $ticket->space->jira_site_id
+                ? (collect($jira->findUsers((string) $user->jira_name))->firstWhere('name', $user->jira_name)['account_id'] ?? null)
+                : $user->jira_account_id;
+            if ($accountId === null) {
+                return back()->with('error', "{$user->jira_name} is not a user on {$ticket->space->site->name}.");
+            }
+            $jira->assign($ticket->key, $accountId);
         } catch (JiraException $e) {
             return back()->with('error', $e->getMessage());
         }
-        $ticket->update(['assignee' => $user->jira_name, 'assignee_account_id' => $user->jira_account_id]);
-        Cache::forget("ticket.issue.{$ticket->key}");
+        $ticket->update(['assignee' => $user->jira_name, 'assignee_account_id' => $accountId]);
+        Cache::forget("ticket.issue.{$ticket->id}");
 
         return back()->with('success', "{$ticket->key} is assigned to you in Jira.");
     }
@@ -233,8 +243,9 @@ class TicketController extends Controller
     }
 
     /** Hand the reply draft to the outbox, where it waits for you to send it. */
-    public function draft(Request $request, Ticket $ticket, OutboxClient $outbox, JiraClient $jira): RedirectResponse
+    public function draft(Request $request, Ticket $ticket, OutboxClient $outbox): RedirectResponse
     {
+        $jira = $ticket->space->jira();
         $data = $request->validate([
             'body' => ['required', 'string', 'max:32000'],
             'visibility' => ['required', Rule::in(['public', 'internal'])],

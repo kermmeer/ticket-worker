@@ -42,6 +42,9 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        // The space's own site, or the default one.
+        $jira = $space->jira();
+
         $now = now();
         // A space's first sync brings in everything it has: none of that is "new".
         $firstSync = $space->synced_at === null;

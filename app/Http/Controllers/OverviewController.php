@@ -21,7 +21,7 @@ class OverviewController extends Controller
         $waiting = Cache::remember('overview.outbox', 30, fn () => $outbox->waiting());
 
         // Only the spaces this person may see; the tickets follow from them.
-        $spaces = Space::query()->visibleTo(auth()->user())->where('state', Space::ACTIVE)->orderBy('label')->get();
+        $spaces = Space::query()->with('site')->visibleTo(auth()->user())->where('state', Space::ACTIVE)->orderBy('label')->get();
 
         $byId = $spaces->keyBy('id');
 
@@ -63,6 +63,7 @@ class OverviewController extends Controller
                 'reporter' => $ticket->reporter,
                 'assignee' => $ticket->assignee,
                 'assignee_account_id' => $ticket->assignee_account_id,
+                'mine' => Ticket::isMine($ticket->assignee_account_id, $ticket->assignee, auth()->user()),
                 'slas' => $byId[$ticket->space_id]->visibleSlas($ticket->slas),
                 // Messages waiting in the outbox for this ticket, and the status each will set.
                 'outbox' => collect($waiting[$ticket->key] ?? [])->map(fn (array $message) => [
@@ -83,7 +84,8 @@ class OverviewController extends Controller
                 ],
                 'created_at' => $ticket->jira_created_at?->toIso8601String(),
                 'updated_at' => $ticket->jira_updated_at?->toIso8601String(),
-                'url' => $jira->browseUrl($ticket->key),
+                'url' => $byId[$ticket->space_id]->jira()->browseUrl($ticket->key),
+                'open_label' => $byId[$ticket->space_id]->openLabel(),
                 'page' => route('tickets.show', $ticket, false),
                 'quick_scan' => $ticket->quickScanData(),
                 // Whose open session it is: "Karl is on it", so two people never work one ticket blind.
