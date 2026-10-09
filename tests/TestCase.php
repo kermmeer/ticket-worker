@@ -20,6 +20,9 @@ abstract class TestCase extends BaseTestCase
         // The gate is this machine's choice; a test that wants it says so.
         config(['app.password' => null, 'auth.trusted_header' => null]);
 
+        // Nor is this machine's Jira: a test that wants one sets it (AGENTS.md).
+        config(['services.jira.base' => '', 'services.jira.email' => null, 'services.jira.token' => null]);
+
         // Someone is signed in, unless a test says otherwise (AccountTest).
         // An admin, so a test reaches every page; RolesTest checks what the others may not.
         $this->actingAs(\App\Models\User::factory()->create(['username' => 'tester', 'name' => 'Test Person', 'role' => 'admin']));

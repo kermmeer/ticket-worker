@@ -31,9 +31,18 @@ class Instructions
         return self::instanceCredentials();
     }
 
-    /** The instance's own sign-in, from .env: what work by nobody in particular runs on. */
+    /**
+     * The shared sign-in: the one an admin set on the Setup page, for everyone without their
+     * own, or else the one in .env. What work by nobody in particular (automatic quick scans)
+     * runs on; with neither, that work does not run.
+     */
     public static function instanceCredentials(): array
     {
+        $shared = Setting::secret(Setting::SHARED_CLAUDE);
+        if (filled($shared['secret'] ?? null)) {
+            return [($shared['kind'] ?? 'token') === 'key' ? 'ANTHROPIC_API_KEY' : 'CLAUDE_CODE_OAUTH_TOKEN' => $shared['secret']];
+        }
+
         return match (true) {
             filled(config('agent.claude.api_key')) => ['ANTHROPIC_API_KEY' => config('agent.claude.api_key')],
             filled(config('agent.claude.oauth_token')) => ['CLAUDE_CODE_OAUTH_TOKEN' => config('agent.claude.oauth_token')],

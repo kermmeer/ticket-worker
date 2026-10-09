@@ -46,6 +46,27 @@ class Setting extends Model
 
     protected $fillable = ['key', 'value'];
 
+    public const SHARED_CLAUDE = 'shared_claude';
+
+    /** A secret setting: stored encrypted with APP_KEY, read back decrypted, never shown. */
+    public static function putSecret(string $key, ?array $value): void
+    {
+        static::put($key, $value === null ? null : \Illuminate\Support\Facades\Crypt::encryptString(json_encode($value)));
+    }
+
+    public static function secret(string $key): ?array
+    {
+        $stored = static::get($key);
+        if (! filled($stored)) {
+            return null;
+        }
+        try {
+            return json_decode(\Illuminate\Support\Facades\Crypt::decryptString($stored), true);
+        } catch (\Throwable) {
+            return null; // APP_KEY changed: as good as not set
+        }
+    }
+
     public static function get(string $key, ?string $default = null): ?string
     {
         return static::query()->find($key)?->value ?? $default;

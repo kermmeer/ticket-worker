@@ -10,7 +10,14 @@ const props = defineProps({
     autoPatch: { type: Boolean, default: true },
     answerRules: { type: String, required: true },
     defaultAnswerRules: { type: String, required: true },
+    sharedClaude: { type: String, default: null },
+    envClaude: { type: Boolean, default: false },
 });
+
+const shared = useForm({ kind: 'token', secret: '' });
+function saveShared() {
+    shared.put('/setup/claude', { preserveScroll: true, onSuccess: () => shared.reset('secret') });
+}
 
 const rules = useForm({ rules: props.replyRules });
 
@@ -71,6 +78,32 @@ const marks = {
                 </div>
             </li>
         </ul>
+    </section>
+
+    <section class="mt-10">
+        <h2 class="eyebrow">Claude, shared</h2>
+        <form class="card mt-3 space-y-3 p-5" @submit.prevent="saveShared">
+            <p class="max-w-3xl text-sm text-muted">
+                One sign-in for everyone who has none of their own: the agents of anyone without one run on it, and so do the
+                automatic quick scans of new tickets. Someone's own sign-in (Your account) always goes first. Give it a budget
+                where you make it (a workspace limit in the Claude Console), since everyone draws on it.
+            </p>
+            <p class="text-sm">
+                Now:
+                <strong v-if="sharedClaude" class="font-medium text-done">a shared {{ sharedClaude === 'key' ? 'API key' : 'subscription token' }} is set</strong>
+                <strong v-else-if="envClaude" class="font-medium text-muted">none here; the one in .env is used</strong>
+                <strong v-else class="font-medium text-signal">none: only people with their own sign-in can run agents, and no automatic quick scans</strong>
+                <button v-if="sharedClaude" type="button" class="ml-2 text-muted underline hover:text-ink" @click="router.put('/setup/claude', { kind: 'none' }, { preserveScroll: true })">remove it</button>
+            </p>
+            <div class="flex flex-wrap gap-3 text-sm">
+                <label class="flex items-center gap-1.5"><input v-model="shared.kind" type="radio" value="key" /> An API key</label>
+                <label class="flex items-center gap-1.5"><input v-model="shared.kind" type="radio" value="token" /> A subscription token</label>
+            </div>
+            <input v-model="shared.secret" type="password" autocomplete="off" :placeholder="shared.kind === 'key' ? 'sk-ant-api…' : 'sk-ant-oat…'" class="w-full max-w-xl rounded-md border border-line bg-page px-3 py-2 font-mono text-sm" />
+            <p v-if="shared.errors.secret" class="text-sm text-signal">{{ shared.errors.secret }}</p>
+            <p class="text-xs text-muted">Stored encrypted; never shown again.</p>
+            <button type="submit" class="btn btn-signal" :disabled="shared.processing || !shared.secret">Save</button>
+        </form>
     </section>
 
     <section class="mt-10">
