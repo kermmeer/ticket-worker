@@ -88,7 +88,7 @@ class SystemController extends Controller
             return back();
         }
 
-        $system->update(['scan_state' => 'queued', 'scan_error' => null, 'scan_log' => null]);
+        $system->update(['scan_state' => 'queued', 'scan_error' => null, 'scan_log' => null, 'scan_user_id' => auth()->id()]);
         ScanSystem::dispatch($system);
 
         return back();

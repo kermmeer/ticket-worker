@@ -10,12 +10,29 @@ use App\Models\CasebookEntry;
 use App\Models\Setting;
 use App\Models\System;
 use App\Models\Ticket;
+use App\Models\User;
 
 /** What the agent is told: its role and rules once, then each turn's request (CONCEPT.md §7, §10). */
 class Instructions
 {
     /** The CLI's sign-in, as environment variables; empty when there is none. */
-    public static function credentials(): array
+    /**
+     * How the CLI signs in for a piece of work: the person's own Claude sign-in when they
+     * have one, otherwise the instance's from .env. Without a person (a job, an automatic
+     * quick scan) the one asking is whoever is signed in, or nobody: then the instance.
+     */
+    public static function credentials(?User $user = null): array
+    {
+        $user ??= auth()->user();
+        if ($user instanceof User && ($own = $user->claudeCredentials()) !== []) {
+            return $own;
+        }
+
+        return self::instanceCredentials();
+    }
+
+    /** The instance's own sign-in, from .env: what work by nobody in particular runs on. */
+    public static function instanceCredentials(): array
     {
         return match (true) {
             filled(config('agent.claude.api_key')) => ['ANTHROPIC_API_KEY' => config('agent.claude.api_key')],
@@ -353,7 +370,8 @@ The commits since, with the files they touched:
     /** Sent with every turn that writes a reply draft, so a change applies at once. */
     public static function replyRules(): string
     {
-        return "Write the reply draft by these rules:\n".Setting::replyRulesFor(app(JiraClient::class)->firstName());
+        // Signed by whoever asks for the draft; the Jira account's name when nobody is signed in.
+        return "Write the reply draft by these rules:\n".Setting::replyRulesFor(auth()->user()?->firstName() ?? app(JiraClient::class)->firstName());
     }
 
     public static function restate(): string

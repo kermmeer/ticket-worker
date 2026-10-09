@@ -18,7 +18,10 @@ abstract class TestCase extends BaseTestCase
         $this->withoutVite();
 
         // The gate is this machine's choice; a test that wants it says so.
-        config(['app.password' => null]);
+        config(['app.password' => null, 'auth.trusted_header' => null]);
+
+        // Someone is signed in, unless a test says otherwise (AccountTest).
+        $this->actingAs(\App\Models\User::factory()->create(['username' => 'tester', 'name' => 'Test Person']));
 
         // Tests never reach Jira: a request nobody faked fails the test instead.
         Http::preventStrayRequests();

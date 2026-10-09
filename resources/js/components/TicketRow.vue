@@ -106,6 +106,7 @@ function toggleHidden() {
         <!-- A fixed width, so the columns before it line up from row to row. -->
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 lg:flex-col lg:items-end lg:pt-0.5">
             <StateBadge :state="ticket.group" />
+            <span v-if="ticket.on_it" class="text-xs" :class="ticket.on_it === 'you' ? 'text-muted' : 'text-working'">{{ ticket.on_it === 'you' ? 'yours' : `${ticket.on_it} is on it` }}</span>
             <!-- One per line on a wide screen, under the badge; side by side on a narrow one. -->
             <p class="flex flex-wrap gap-x-3 gap-y-1 text-sm whitespace-nowrap text-muted lg:flex-col lg:items-end lg:gap-y-0.5">
                 <button v-if="!['queued', 'running', 'pending'].includes(ticket.quick_scan?.state)" type="button" class="hover:text-ink hover:underline" @click="quickScan">

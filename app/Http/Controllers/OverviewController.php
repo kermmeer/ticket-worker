@@ -34,7 +34,7 @@ class OverviewController extends Controller
         // Where each ticket's conversation stands: its latest session and that session's last turn.
         $sessions = AgentSession::query()
             ->whereIn('ticket_id', $tickets->pluck('id'))
-            ->with(['turns' => fn ($query) => $query->select('id', 'agent_session_id', 'state')])
+            ->with(['turns' => fn ($query) => $query->select('id', 'agent_session_id', 'state'), 'user:id,name,username'])
             ->orderBy('id')
             ->get()
             ->keyBy('ticket_id');
@@ -81,6 +81,10 @@ class OverviewController extends Controller
                 'url' => $jira->browseUrl($ticket->key),
                 'page' => route('tickets.show', $ticket, false),
                 'quick_scan' => $ticket->quickScanData(),
+                // Whose open session it is: "Karl is on it", so two people never work one ticket blind.
+                'on_it' => ($session = $sessions[$ticket->id] ?? null) !== null && $session->state !== 'closed' && $session->user !== null
+                    ? ($session->user->is(auth()->user()) ? 'you' : $session->user->firstName())
+                    : null,
                 // Waiting on the requester sleeps, whatever else is going on. Agents arrive
                 // with step 2; until then every other ticket waits for a first look.
                 'group' => $this->group($ticket, $sessions[$ticket->id] ?? null, $byId[$ticket->space_id]),

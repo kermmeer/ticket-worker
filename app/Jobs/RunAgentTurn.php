@@ -12,6 +12,7 @@ use App\Models\AgentTurn;
 use App\Models\ApiConnection;
 use App\Models\Setting;
 use App\Models\System;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Collection;
@@ -119,6 +120,7 @@ class RunAgentTurn implements ShouldQueue
                 fn (string $type, string $summary) => $this->event($turn, $type, Str::limit($summary, $type === 'text' ? 15000 : 4000)),
                 fn () => (bool) $turn->fresh()->stop_requested,
                 $this->timeout,
+                Instructions::credentials($turn->user),
             );
 
             $this->finish($turn, $run['result'], $run['errors'], $copy, $systems);
@@ -194,7 +196,7 @@ class RunAgentTurn implements ShouldQueue
         // A code fix gets its patch without being asked, unless that is switched off.
         if ($proposal !== null && ($proposal['fix_kind'] ?? null) === 'code' && Setting::autoPatch()
             && ($system = self::systemFor($proposal, $systems)) !== null) {
-            self::queuePatch($turn->session, $system);
+            self::queuePatch($turn->session, $system, $turn->user);
         }
     }
 
@@ -209,10 +211,10 @@ class RunAgentTurn implements ShouldQueue
             ?? ($systems->count() === 1 ? $systems->first() : null);
     }
 
-    public static function queuePatch(AgentSession $session, System $system): AgentTurn
+    public static function queuePatch(AgentSession $session, System $system, ?User $user = null): AgentTurn
     {
         $turn = AgentTurn::create([
-            'agent_session_id' => $session->id, 'kind' => 'patch', 'prompt' => '',
+            'agent_session_id' => $session->id, 'kind' => 'patch', 'prompt' => '', 'user_id' => $user?->id ?? auth()->id(),
             'patch_meta' => ['system_id' => $system->id, 'system' => $system->name],
         ]);
         self::dispatch($turn);

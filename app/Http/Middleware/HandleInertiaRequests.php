@@ -36,6 +36,12 @@ class HandleInertiaRequests extends Middleware
                 'gate' => RequirePassword::enabled(),
             ],
             'hyper' => fn () => Setting::hyper(),
+            // Who you are; what of it the pages need, never a secret.
+            'me' => fn () => ($user = $request->user()) ? [
+                'id' => $user->id, 'name' => $user->name, 'first_name' => $user->firstName(), 'is_admin' => $user->is_admin,
+                'has_claude' => $user->claudeCredentials() !== [],
+                'can_run_agents' => \App\Agent\Instructions::credentials($user) !== [],
+            ] : null,
             // The name on the link that opens a ticket: Jira, or the app JIRA_OPEN_URL points to.
             'openLabel' => config('services.jira.open_label'),
             'flash' => [

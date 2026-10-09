@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** One Claude conversation tied to one ticket, open until you close it (CONCEPT.md §8). */
 class AgentSession extends Model
 {
-    protected $fillable = ['ticket_id', 'claude_session_id', 'state', 'reply_language', 'model', 'cost_usd', 'closed_at'];
+    protected $fillable = ['ticket_id', 'user_id', 'claude_session_id', 'state', 'reply_language', 'model', 'cost_usd', 'closed_at'];
 
     protected function casts(): array
     {
@@ -42,6 +42,12 @@ class AgentSession extends Model
             'confidence' => $proposal['confidence'] ?? null,
             'model' => $this->model,
         ];
+    }
+
+    /** Who started it. */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function ticket(): BelongsTo

@@ -8,6 +8,7 @@ use App\Agent\Instructions;
 use App\Agent\Workspace;
 use App\Models\ApiConnection;
 use App\Models\Ticket;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
@@ -37,7 +38,9 @@ class QuickScanTicket implements ShouldQueue
         if (in_array($ticket->quick_scan_state, ['queued', 'running'], true)) {
             return false;
         }
-        $ticket->forceFill(['quick_scan_state' => 'queued', 'quick_scan_error' => null, 'quick_scan_steps' => []])->save();
+        // Who asked runs it on their own Claude sign-in; a scan nobody asked for, on the instance's.
+        $ticket->forceFill(['quick_scan_state' => 'queued', 'quick_scan_error' => null, 'quick_scan_steps' => [],
+            'quick_scan_user_id' => auth()->id() ?? ($ticket->quick_scan_state === 'pending' ? $ticket->quick_scan_user_id : null)])->save();
         self::dispatch($ticket);
 
         return true;
@@ -89,6 +92,7 @@ class QuickScanTicket implements ShouldQueue
                 fn (string $type, string $summary) => $type === 'tool' ? Ticket::addQuickStep($ticket->id, $summary) : null,
                 fn () => false,
                 $this->timeout,
+                Instructions::credentials($ticket->quick_scan_user_id ? User::find($ticket->quick_scan_user_id) : null),
             );
 
             $result = $run['result'];

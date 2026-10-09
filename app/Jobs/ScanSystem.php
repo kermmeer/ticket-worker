@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Agent\ClaudeRun;
 use App\Agent\Instructions;
 use App\Models\System;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\File;
@@ -65,6 +66,7 @@ class ScanSystem implements ShouldQueue
                 },
                 fn () => (bool) $system->fresh()->scan_stop_requested,
                 $this->timeout,
+                Instructions::credentials($system->scan_user_id ? User::find($system->scan_user_id) : null),
             );
 
             $result = $run['result'];

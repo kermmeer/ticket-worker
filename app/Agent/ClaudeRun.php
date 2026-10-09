@@ -57,7 +57,7 @@ class ClaudeRun
      * @param  callable(): bool  $shouldStop  asked every two seconds
      * @return array{result: ?array, errors: string, stopped: bool}
      */
-    public function run(array $command, string $cwd, string $prompt, array $shorten, callable $onStep, callable $shouldStop, int $timeout): array
+    public function run(array $command, string $cwd, string $prompt, array $shorten, callable $onStep, callable $shouldStop, int $timeout, ?array $credentials = null): array
     {
         $reader = new StreamReader($shorten);
 
@@ -65,7 +65,7 @@ class ClaudeRun
         // the last argument could be read as one of them.
         $process = Process::path($cwd)
             ->command($command)
-            ->env(Instructions::credentials())
+            ->env($credentials ?? Instructions::credentials())
             ->input($prompt)
             ->timeout($timeout)
             ->start();

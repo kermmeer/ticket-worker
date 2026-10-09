@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\CasebookController;
 use App\Http\Controllers\DocsController;
@@ -17,6 +18,23 @@ use Illuminate\Support\Facades\Route;
 Route::get('/login', [LoginController::class, 'show'])->name('login');
 Route::post('/login', [LoginController::class, 'attempt'])->middleware('throttle:6,1')->name('login.attempt');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+Route::controller(AccountController::class)->group(function () {
+    Route::get('/sign-in', 'signIn')->name('account.sign-in');
+    Route::post('/sign-in', 'attempt')->middleware('throttle:6,1')->name('account.sign-in.attempt');
+    Route::post('/first-account', 'first')->middleware('throttle:6,1')->name('account.first');
+    Route::get('/welcome/{user}', 'welcome')->name('account.welcome');
+    Route::post('/welcome/{user}', 'saveWelcome')->middleware('throttle:6,1')->name('account.welcome.save');
+    Route::post('/sign-out', 'signOut')->name('account.sign-out');
+    Route::get('/account', 'show')->name('account.show');
+    Route::put('/account', 'update')->name('account.update');
+    Route::put('/account/claude', 'claude')->name('account.claude');
+    Route::put('/account/password', 'password')->name('account.password');
+    Route::post('/people', 'invite')->name('people.invite');
+    Route::post('/people/{user}/link', 'newLink')->name('people.link');
+    Route::put('/people/{user}/admin', 'admin')->name('people.admin');
+    Route::delete('/people/{user}', 'remove')->name('people.remove');
+});
 
 Route::get('/', OverviewController::class)->name('overview');
 Route::post('/hyper', HyperModeController::class)->name('hyper');

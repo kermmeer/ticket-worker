@@ -2,31 +2,68 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+/**
+ * A person using this instance. They sign in with a password, or are known by the header
+ * a sign-in in front of the app sets (AUTH_HEADER). Their agents run on their own Claude
+ * sign-in when they have one (CONCEPT.md §13).
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+    protected $fillable = ['username', 'name', 'email', 'password', 'is_admin', 'claude_api_key', 'claude_oauth_token', 'last_seen_at'];
+
+    protected $hidden = ['password', 'remember_token', 'claude_api_key', 'claude_oauth_token'];
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_seen_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
+            'claude_api_key' => 'encrypted',
+            'claude_oauth_token' => 'encrypted',
         ];
+    }
+
+    /** What reply drafts are signed with: the first word of the name. */
+    public function firstName(): string
+    {
+        return Str::before(trim($this->name), ' ') ?: $this->username;
+    }
+
+    /** This person's own Claude sign-in, as the CLI's environment; empty when none. */
+    public function claudeCredentials(): array
+    {
+        return match (true) {
+            filled($this->claude_api_key) => ['ANTHROPIC_API_KEY' => $this->claude_api_key],
+            filled($this->claude_oauth_token) => ['CLAUDE_CODE_OAUTH_TOKEN' => $this->claude_oauth_token],
+            default => [],
+        };
+    }
+
+    /** The account a header names, made on first sight: the sign-in in front already vouched. */
+    public static function fromHeader(string $username, ?string $name = null, ?string $email = null): self
+    {
+        $user = static::firstOrNew(['username' => $username]);
+        if (! $user->exists) {
+            $user->fill([
+                'name' => $name ?: $username,
+                'email' => $email ?: $username.'@'.(parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'localhost'),
+                // Never used: a header account has no password of its own.
+                'password' => Str::random(64),
+                'is_admin' => ! static::query()->exists(),
+            ])->save();
+        }
+
+        return $user;
     }
 }

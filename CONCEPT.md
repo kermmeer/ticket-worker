@@ -41,8 +41,8 @@ decide, and you are the one who answers in Jira.
 - The agent posting to Jira or changing tickets. It drafts; you post (with a button, in v1.x).
 - The agent changing the systems. It reads them; a patch you ask for is written in a scratch
   copy of its own (§8), and you apply it.
-- More than one Jira site, Jira webhooks, and accounts: an instance belongs to one person, and
-  someone else who wants Ticket Worker runs an instance of their own.
+- More than one Jira site, and Jira webhooks. (Accounts were here too, until a team wanted
+  to share one instance: §12, decided 2026-10-09.)
 
 ---
 
@@ -515,10 +515,24 @@ own work.
 ```
 
 - **Stack:** Laravel 13, Inertia with Vue 3, Tailwind 4.
-- **No accounts.** One person per instance, so there is nothing to log in to inside the app.
-  The site sits behind a gate instead: either something in front that asks who you are
-  (an SSO proxy, a VPN), or one password from `.env` (`APP_PASSWORD`), asked once per
-  browser session. Built 2026-10-06.
+- **Accounts** (built 2026-10-09, replacing "one person per instance"). One instance can
+  serve a team: one person runs it (the first account, an admin), the others use it. Each
+  person signs in with their own password, or, when a sign-in in front passes the user on
+  in a header (`AUTH_HEADER`, e.g. Authentik's `X-authentik-username`), is known by that and
+  never signs in twice; such an account is made on first sight. An admin adds people on
+  *Your account*, and each gets a link, good for a week, to set their own password.
+  - **Each person's own Claude.** On *Your account* a person stores their own subscription
+    token (`claude setup-token`) or API key, encrypted. What they ask for (analyses,
+    questions, patches, quick scans, context scans, batches) runs on it, so it counts
+    against their own subscription or bill, never someone else's. Without one, the
+    instance's sign-in from `.env` is used, if the host gave it one. Automatic quick scans
+    of new tickets have nobody asking, so they always use the instance's.
+  - **Who is on what.** Sessions and turns record who started them. The overview says
+    *Stijn is on it* on a ticket someone else has an open session on; the log names who
+    asked each question. Spaces, systems, the casebook and the settings are shared: one
+    team, one board. A session can be continued by anyone, under their own name.
+  - Reply drafts are signed with the first name of whoever asks for them.
+  - `APP_PASSWORD` still works, as an outer gate in front of the accounts.
 - **The worker containers**: see below.
 - **Live output by polling.** While a turn runs, the page asks once a second for the events
   after the last one it has. There is no websocket server to run. Reverb can come later if
@@ -768,8 +782,8 @@ asked is what the casebook is worth.
 1. **Jira.** Service spaces and plain ones both. The type comes from Jira and can be
    overridden in the space's settings. A service space offers both a public reply and an
    internal note, and the Jira account must be an agent in it (§9).
-2. **Users.** One person per instance. Someone else runs an instance of their own, never a
-   shared one, so the app has no accounts (§12).
+2. **Users.** *Changed 2026-10-09:* one instance for a team, with accounts and each
+   person's own Claude sign-in (§12). It was one person per instance, with no accounts.
 3. **Systems.** Folders on the server that you push into (§4). Ticket Worker never reaches GitLab.
 4. **Contexts.** In the tool (§5).
 5. **Beyond code.** Normally code and history only. Systems with an API or a read-only

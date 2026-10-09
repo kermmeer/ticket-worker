@@ -140,3 +140,9 @@ to it, including work you finish.
       any analysis, with an estimate first and Stop the rest; row links one per line (2026-10-09)
 - [x] Jira's times were stored without their offset and came back 2 hours late ("updated in 2
       hours"): converted to UTC on sync; open tickets correct themselves at the next sync
+- [x] A quieter frame: one slim header row, Concept, Outbox API and Design in the footer (2026-10-09)
+- [x] API-only projects: a project that is just an API, added with its login in one form (2026-10-09)
+- [x] Accounts for a team on one instance: sign in (or AUTH_HEADER), the first account is admin
+      and adds people with a one-week link, each person's own Claude sign-in runs their work,
+      "X is on it" on the overview, names in the log (2026-10-09)
+- [ ] On minas: pass X-authentik-username to the app (nginx @reverse_proxy), then AUTH_HEADER

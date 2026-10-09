@@ -16,8 +16,14 @@ class ReplySignOffTest extends TestCase
         $this->app->forgetInstance(JiraClient::class);
     }
 
-    public function test_replies_are_signed_with_the_first_name_of_the_jira_account(): void
+    public function test_replies_are_signed_by_whoever_asks(): void
     {
+        $this->assertStringContainsString('Sign off as Test.', Instructions::replyRules());
+    }
+
+    public function test_with_nobody_signed_in_the_jira_accounts_first_name_signs(): void
+    {
+        auth()->logout();
         $this->jira();
         Http::fake(['example.atlassian.net/rest/api/3/myself' => Http::response(['displayName' => 'Robin de Vries'])]);
 
@@ -29,6 +35,7 @@ class ReplySignOffTest extends TestCase
 
     public function test_without_an_answer_from_jira_the_team_signs(): void
     {
+        auth()->logout();
         $this->jira();
         Http::fake(['example.atlassian.net/*' => Http::response([], 503)]);
 

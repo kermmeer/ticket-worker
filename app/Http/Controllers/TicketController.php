@@ -84,6 +84,7 @@ class TicketController extends Controller
 
         $session ??= AgentSession::create([
             'ticket_id' => $ticket->id,
+            'user_id' => auth()->id(),
             'claude_session_id' => (string) Str::uuid(),
             'reply_language' => $data['language'],
             'model' => config('agent.claude.model'),
@@ -227,12 +228,12 @@ class TicketController extends Controller
 
     private function turn(AgentSession $session, string $kind, string $prompt, ?string $note = null): void
     {
-        RunAgentTurn::dispatch(AgentTurn::create(['agent_session_id' => $session->id, 'kind' => $kind, 'prompt' => $prompt, 'note' => $note]));
+        RunAgentTurn::dispatch(AgentTurn::create(['agent_session_id' => $session->id, 'user_id' => auth()->id(), 'kind' => $kind, 'prompt' => $prompt, 'note' => $note]));
     }
 
     private function sessionData(AgentSession $session): array
     {
-        $turns = $session->turns()->with('events')->get();
+        $turns = $session->turns()->with(['events', 'user:id,name,username'])->get();
 
         return [
             'id' => $session->id,
@@ -246,6 +247,8 @@ class TicketController extends Controller
             'turns' => $turns->map(fn (AgentTurn $turn) => [
                 'id' => $turn->id,
                 'kind' => $turn->kind,
+                // Who asked: "you", or their first name, so a shared ticket reads as a conversation.
+                'by' => $turn->user === null ? 'you' : ($turn->user->is(auth()->user()) ? 'you' : $turn->user->firstName()),
                 // Your own words show; the long analysis instruction does not.
                 'prompt' => $turn->kind === 'message' ? $turn->prompt : $turn->note,
                 'state' => $turn->state,

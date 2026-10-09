@@ -6,7 +6,7 @@ it is about: it reads the ticket and its attachments, digs through the code and 
 and ends with a proposal (problem, cause, evidence, fix) and a reply draft in the reporter's
 language. You talk it through with the agent until it is right, and you send the reply.
 
-One person per instance: each person who uses it runs their own.
+One instance serves a team: one person runs it, everyone signs in with their own account and their own Claude sign-in, and the board shows who is on which ticket.
 
 ## What it does
 

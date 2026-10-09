@@ -37,6 +37,16 @@ return [
     |
     */
 
+    /*
+    | A sign-in in front of the app (Authentik, say) that passes the user on in a header.
+    | Set only when the app cannot be reached around that proxy: whoever can reach the app
+    | directly could otherwise send the header and be anyone.
+    */
+
+    'trusted_header' => env('AUTH_HEADER'),
+    'trusted_header_name' => env('AUTH_HEADER_NAME'),
+    'trusted_header_email' => env('AUTH_HEADER_EMAIL'),
+
     'guards' => [
         'web' => [
             'driver' => 'session',

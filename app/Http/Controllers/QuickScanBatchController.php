@@ -22,7 +22,7 @@ class QuickScanBatchController extends Controller
         // Open, not hidden, and without a scan yet (or with one that failed).
         $count = Ticket::query()->whereIn('id', $data['ids'])->whereNull('left_at')->whereNull('hidden_at')
             ->where(fn ($query) => $query->whereNull('quick_scan_state')->orWhere('quick_scan_state', 'failed'))
-            ->update(['quick_scan_state' => 'pending', 'quick_scan_error' => null]);
+            ->update(['quick_scan_state' => 'pending', 'quick_scan_error' => null, 'quick_scan_user_id' => auth()->id()]);
 
         (new FeedQuickScans)();
 

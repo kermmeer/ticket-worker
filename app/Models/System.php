@@ -29,7 +29,7 @@ class System extends Model
     protected $fillable = [
         'name', 'kind', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
         'scan_state', 'scan_stop_requested', 'scan_log', 'scan_error', 'scan_cost_usd',
-        'scan_input_tokens', 'scan_output_tokens',
+        'scan_input_tokens', 'scan_output_tokens', 'scan_user_id',
     ];
 
     protected function casts(): array

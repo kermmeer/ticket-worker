@@ -270,7 +270,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             <FoldingSection v-if="session" title="Log" remember="ticket.log">
                 <div class="space-y-6">
                 <template v-for="turn in session.turns" :key="turn.id">
-                    <LogEntry v-if="turn.prompt" :time="short(turn.started_at ?? turn.finished_at).split(', ').pop()" author="you">
+                    <LogEntry v-if="turn.prompt" :time="short(turn.started_at ?? turn.finished_at).split(', ').pop()" :author="turn.by ?? 'you'">
                         <p class="whitespace-pre-wrap">{{ turn.prompt }}</p>
                     </LogEntry>
                     <LogEntry :time="turn.started_at ? short(turn.started_at).split(', ').pop() : '…'" author="agent">

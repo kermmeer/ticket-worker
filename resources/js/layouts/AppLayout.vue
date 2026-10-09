@@ -26,6 +26,7 @@ const env = computed(() => page.props.app?.env);
 const hyper = computed(() => page.props.hyper);
 const flash = computed(() => page.props.flash ?? {});
 const gate = computed(() => page.props.app?.gate);
+const me = computed(() => page.props.me);
 
 function toggleHyper() {
     router.post('/hyper', {}, { preserveScroll: true, preserveState: true });
@@ -54,7 +55,9 @@ function toggleHyper() {
                         {{ hyper ? 'Hyper: every minute' : 'Hyper off' }}
                     </button>
                     <ThemeSwitch />
-                    <slot name="account" />
+                    <Link v-if="me" href="/account" class="rounded-md px-2 py-1 text-xs hover:text-ink" :class="url.startsWith('/account') ? 'text-ink' : 'text-muted'">
+                        {{ me.name }}<span v-if="!me.can_run_agents" class="text-signal"> · no Claude sign-in</span>
+                    </Link>
                     <button v-if="gate" type="button" class="px-2 py-1 text-xs text-muted hover:text-ink" @click="router.post('/logout')">Sign out</button>
                 </div>
                 <nav aria-label="Main" class="-mb-px flex w-full gap-5 overflow-x-auto text-[0.8125rem] sm:w-auto">

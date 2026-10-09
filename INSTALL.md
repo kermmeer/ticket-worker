@@ -111,10 +111,26 @@ docker compose ps
 The first build takes a few minutes. All six services should be `running` (`agent` twice);
 `db` should say `healthy`. The `app` container sets up the database on its first start.
 
-**Check:** open `APP_URL`, sign in with `APP_PASSWORD`, and go to **Setup**. Every line should
-be green, except the outbox (optional) and the systems (step 6). The queue and agent lines
-can take a minute to turn green after a start. If something is red, the line says why; and
-`docker compose logs app worker agent` shows the rest.
+**Check:** open `APP_URL` (past `APP_PASSWORD` if you set one). The first visit asks you to
+make **the first account**: it is the admin, who adds everyone else. Then go to **Setup**.
+Every line should be green, except the outbox (optional) and the systems (step 6). The queue
+and agent lines can take a minute to turn green after a start. If something is red, the line
+says why; and `docker compose logs app worker agent` shows the rest.
+
+### People
+
+Everyone signs in with their own account. On **Your account** (your name, top right) an admin
+adds people and gets a link for each, good for a week, to set their own password. Each person
+then stores **their own Claude sign-in** there (a `claude setup-token` token or an API key):
+what they ask for runs on it, so it counts against their own subscription or bill. The
+instance's sign-in from step 4 is the fallback, and what automatic quick scans run on; leave it
+empty if every person brings their own and new tickets need no automatic scan.
+
+Behind a sign-in that passes the user on in a header (Authentik, an SSO proxy), set
+`AUTH_HEADER` (e.g. `X-authentik-username`) and nobody signs in twice: accounts are made on
+first sight. Only do this when the app cannot be reached around that proxy. With nginx in
+front, the header must be set in the block that proxies to the app: a `proxy_set_header` in
+a `location` that hands over with `try_files … @named` does not carry over.
 
 ## 6. A first space and a first system
 

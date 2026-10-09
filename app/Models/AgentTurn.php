@@ -20,7 +20,7 @@ class AgentTurn extends Model
     public const STOPPED = 'stopped';
 
     protected $fillable = [
-        'agent_session_id', 'kind', 'prompt', 'note', 'state', 'stop_requested', 'proposal', 'case_draft', 'patch', 'patch_meta', 'answer',
+        'agent_session_id', 'user_id', 'kind', 'prompt', 'note', 'state', 'stop_requested', 'proposal', 'case_draft', 'patch', 'patch_meta', 'answer',
         'error', 'cost_usd', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens',
         'duration_ms', 'started_at', 'finished_at',
     ];
@@ -43,6 +43,12 @@ class AgentTurn extends Model
     {
         return $this->input_tokens === null ? null
             : $this->input_tokens + (int) $this->cache_read_tokens + (int) $this->cache_write_tokens;
+    }
+
+    /** Who asked for it: their Claude sign-in runs it, when they have one. */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function session(): BelongsTo

@@ -5,6 +5,7 @@ namespace App\Agent;
 use App\Jobs\QuickScanTicket;
 use App\Models\AgentTurn;
 use App\Models\Ticket;
+use App\Models\User;
 
 /**
  * Starts the next quick scan of a batch you asked for ("pending"), one at a time, and only
@@ -15,15 +16,15 @@ class FeedQuickScans
 {
     public function __invoke(): void
     {
-        if (Instructions::credentials() === []
-            || Ticket::whereIn('quick_scan_state', ['queued', 'running'])->exists()
+        if (Ticket::whereIn('quick_scan_state', ['queued', 'running'])->exists()
             || AgentTurn::where('state', AgentTurn::QUEUED)->exists()) {
             return;
         }
 
         // Newest first: they are the ones still worth sorting.
         $next = Ticket::where('quick_scan_state', 'pending')->orderByDesc('jira_created_at')->orderByDesc('id')->first();
-        if ($next !== null) {
+        // On the sign-in of whoever asked for the batch, or the instance's.
+        if ($next !== null && Instructions::credentials($next->quick_scan_user_id ? User::find($next->quick_scan_user_id) : null) !== []) {
             QuickScanTicket::start($next);
         }
     }
