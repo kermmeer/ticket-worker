@@ -1,6 +1,7 @@
 <?php
 
 use App\Agent\FeedQuickScans;
+use App\Agent\ForgetOldWork;
 use App\Agent\StaleRuns;
 use App\Jobs\ReportHealth;
 use App\Sync\DispatchDueSyncs;
@@ -18,3 +19,6 @@ Schedule::call(new StaleRuns)->everyFiveMinutes()->name('stale-runs');
 
 // A batch of quick scans, one at a time, after whatever else waits for an agent.
 Schedule::call(new FeedQuickScans)->everyMinute()->name('feed-quick-scans')->withoutOverlapping();
+
+// Tickets' workspaces and transcripts go 30 days after their work ended (CONCEPT.md §11).
+Schedule::call(new ForgetOldWork)->dailyAt('03:17')->name('forget-old-work');

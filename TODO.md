@@ -146,3 +146,7 @@ to it, including work you finish.
       and adds people with a one-week link, each person's own Claude sign-in runs their work,
       "X is on it" on the overview, names in the log (2026-10-09)
 - [ ] On minas: pass X-authentik-username to the app (nginx @reverse_proxy), then AUTH_HEADER
+- [x] Workspaces and transcripts deleted 30 days after a ticket's work ended, daily (the promise
+      in CONCEPT.md §11, until now unkept) (2026-10-09)
+- [x] An API's stored secret is dropped when it moves to another server or sign-in (2026-10-09)
+- [x] Follow spaces: the overview starts with yours; usage per person this month (2026-10-09)
