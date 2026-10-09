@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import FoldingSection from '../components/FoldingSection.vue';
 import SpaceLabel from '../components/SpaceLabel.vue';
@@ -37,10 +37,34 @@ const folds = [
 // null: every space; 'mine': the spaces you follow; or one space's id. With spaces followed,
 // the overview starts with yours.
 const followed = computed(() => new Set(props.spaces.filter((space) => space.followed).map((space) => space.id)));
-const spaceFilter = ref(props.spaces.some((space) => space.followed) ? 'mine' : null);
+// The choice is kept in this browser, so a refresh or a new tab opens on it. A space you can
+// no longer see (removed, or no longer yours) falls back to the default.
+const stored = (key) => {
+    try {
+        return JSON.parse(localStorage.getItem(key) ?? 'null');
+    } catch {
+        return null;
+    }
+};
+const keep = (key, value) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        // Storage refused: the choice holds for this visit.
+    }
+};
+const savedSpace = stored('overview.space');
+const spaceFilter = ref(
+    savedSpace === 'all' ? null
+    : savedSpace === 'mine' && props.spaces.some((space) => space.followed) ? 'mine'
+    : typeof savedSpace === 'number' && props.spaces.some((space) => space.id === savedSpace) ? savedSpace
+    : props.spaces.some((space) => space.followed) ? 'mine' : null,
+);
+watch(spaceFilter, (value) => keep('overview.space', value ?? 'all'));
 // Assigned to you in Jira, once your account is linked to your Jira user.
 const myJira = computed(() => usePage().props.me?.jira_account_id ?? null);
-const mineOnly = ref(false);
+const mineOnly = ref(stored('overview.mine') === true);
+watch(mineOnly, (value) => keep('overview.mine', value));
 
 const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value === 'mine' ? followed.value.has(ticket.space_id) : ticket.space_id === spaceFilter.value);
 const statusFilter = ref(null);
@@ -68,7 +92,7 @@ const shown = computed(() => {
     return props.tickets.filter(
         (ticket) =>
             inSpace(ticket) &&
-            (!mineOnly.value || ticket.assignee_account_id === myJira.value) &&
+            (!mineOnly.value || ticket.mine) &&
             (statusFilter.value === null || ticket.status === statusFilter.value) &&
             (query === '' || ticket.key.toLowerCase().includes(query) || ticket.summary.toLowerCase().includes(query)),
     );
@@ -123,11 +147,14 @@ const perSpace = computed(() => {
     return counts;
 });
 
-const count = (group) => props.tickets.filter((ticket) => ticket.group === group).length;
+// The totals follow the space chosen (and Assigned to me); status and search narrow the list
+// below, not the board's count.
+const onBoard = computed(() => props.tickets.filter((ticket) => inSpace(ticket) && (!mineOnly.value || ticket.mine)));
+const count = (group) => onBoard.value.filter((ticket) => ticket.group === group).length;
 const sleepingCount = computed(() => count('sleeping'));
 const hiddenCount = computed(() => count('hidden'));
-const outboxCount = computed(() => props.tickets.filter((ticket) => ticket.outbox?.length).length);
-const awakeCount = computed(() => props.tickets.length - sleepingCount.value - hiddenCount.value);
+const outboxCount = computed(() => onBoard.value.filter((ticket) => ticket.outbox?.length).length);
+const awakeCount = computed(() => onBoard.value.length - sleepingCount.value - hiddenCount.value);
 
 // The deadlines you can still make, closest first, whatever group the ticket is in.
 // Tickets only overdue are left out: they are counted, not chased.

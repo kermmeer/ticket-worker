@@ -157,3 +157,5 @@ to it, including work you finish.
 - [ ] On minas: openssh-client and pdo_pgsql in Dockerfile.deploy (SSH pulls, PostgreSQL)
 - [x] Agents page: what works now and for whom, which Claude sign-in your work uses (the order,
       what is set, which is in use; never a token), your month, settings in force per space (2026-10-09)
+- [x] Overview: the totals follow the space chosen; the space and Assigned to me are kept in the
+      browser across refreshes and tabs (2026-10-10)
