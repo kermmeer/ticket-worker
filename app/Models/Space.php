@@ -32,13 +32,14 @@ class Space extends Model
 
     protected $fillable = [
         'project_key', 'project_id', 'name', 'label', 'colour', 'jira_type', 'type',
-        'rules', 'done_rule', 'status_colours', 'sleep_statuses', 'hidden_slas', 'quick_scan',
+        'rules', 'done_rule', 'status_colours', 'sleep_statuses', 'hidden_slas', 'quick_scan', 'settings',
         'state', 'sync_attempted_at', 'synced_at', 'sync_error',
     ];
 
     protected function casts(): array
     {
         return [
+            'settings' => 'array',
             'quick_scan' => 'boolean',
             'sync_attempted_at' => 'datetime',
             'synced_at' => 'datetime',

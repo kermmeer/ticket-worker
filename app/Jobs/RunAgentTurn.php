@@ -10,9 +10,9 @@ use App\Models\AgentEvent;
 use App\Models\AgentSession;
 use App\Models\AgentTurn;
 use App\Models\ApiConnection;
-use App\Models\Setting;
 use App\Models\System;
 use App\Models\User;
+use App\Settings\SpaceSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Collection;
@@ -78,10 +78,13 @@ class RunAgentTurn implements ShouldQueue
 
             // The systems' APIs, through the tool's MCP server, which holds the secrets.
             $hasApis = $turn->kind !== 'patch' && ApiConnection::whereIn('system_id', $systems->pluck('id'))->exists();
+            $settings = SpaceSettings::for($ticket->space);
             $command = ClaudeRun::command(
-                (float) config('agent.turn_budget_usd'),
+                (float) $settings->get('turn_budget_usd'),
                 write: $turn->kind === 'patch',
                 mcpTools: $hasApis ? ['mcp__ticket-worker__list_apis', 'mcp__ticket-worker__call_api'] : [],
+                model: $settings->get('model'),
+                effort: $settings->get('effort'),
             );
             if ($hasApis) {
                 $command = [...$command, '--mcp-config', json_encode(['mcpServers' => ['ticket-worker' => [
@@ -115,7 +118,7 @@ class RunAgentTurn implements ShouldQueue
             $run = $runner->run(
                 // The answer rules go along with every turn but the casebook draft, unsaved: the
                 // log shows what you asked, not the house rules.
-                $command, $root, $turn->kind === 'case' ? $turn->prompt : $turn->prompt.Instructions::answerRules(), $shorten,
+                $command, $root, $turn->kind === 'case' ? $turn->prompt : $turn->prompt.Instructions::answerRules($ticket->space), $shorten,
                 // What the agent says is kept whole, commands and all; tool steps are one-liners.
                 fn (string $type, string $summary) => $this->event($turn, $type, Str::limit($summary, $type === 'text' ? 15000 : 4000)),
                 fn () => (bool) $turn->fresh()->stop_requested,
@@ -194,7 +197,7 @@ class RunAgentTurn implements ShouldQueue
         }
 
         // A code fix gets its patch without being asked, unless that is switched off.
-        if ($proposal !== null && ($proposal['fix_kind'] ?? null) === 'code' && Setting::autoPatch()
+        if ($proposal !== null && ($proposal['fix_kind'] ?? null) === 'code' && SpaceSettings::for($turn->session->ticket->space)->get('auto_patch')
             && ($system = self::systemFor($proposal, $systems)) !== null) {
             self::queuePatch($turn->session, $system, $turn->user);
         }

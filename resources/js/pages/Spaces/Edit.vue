@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import SettingsFields from '../../components/SettingsFields.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
 import { ago } from '../../time.js';
@@ -15,6 +16,7 @@ const props = defineProps({
     permissions: { type: Object, required: true },
     // For admins: who may see this space. Null for everyone else.
     people: { type: Array, default: null },
+    defaults: { type: Object, required: true },
 });
 
 // Who sees this space besides those who see all of them. Saved on its own.
@@ -35,6 +37,7 @@ const form = useForm({
     sleep_statuses: props.space.sleep_statuses,
     hidden_slas: [...props.space.hidden_slas],
     quick_scan: props.space.quick_scan ?? false,
+    settings: { ...props.space.settings },
 });
 
 function setSlaShown(name, shown) {
@@ -354,6 +357,13 @@ onMounted(runPreview);
                     </span>
                 </span>
             </label>
+        </section>
+
+        <!-- Settings of its own -->
+        <section class="card p-5">
+            <h2 class="text-lg font-medium">Settings for this space</h2>
+            <p class="mt-1 mb-4 max-w-3xl text-sm text-muted">Empty is the default from Setup, shown in grey. Fill in only what this space does differently.</p>
+            <SettingsFields v-model="form.settings" :defaults="defaults" per-space />
         </section>
 
         <!-- Systems -->

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jira\JiraClient;
 use App\Models\AuditEvent;
 use App\Models\Setting;
+use App\Settings\SpaceSettings;
 use App\Setup\SetupChecks;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,8 @@ class SetupController extends Controller
             'replyRules' => Setting::replyRules(),
             'defaultReplyRules' => Setting::DEFAULT_REPLY_RULES,
             'autoPatch' => Setting::autoPatch(),
+            'defaults' => SpaceSettings::defaults(),
+            'savedDefaults' => (object) (json_decode((string) Setting::get(SpaceSettings::DEFAULTS), true) ?: []),
             'sharedClaude' => ($shared = Setting::secret(Setting::SHARED_CLAUDE)) ? $shared['kind'] : null,
             'envClaude' => filled(config('agent.claude.api_key')) || filled(config('agent.claude.oauth_token')),
             'answerRules' => Setting::answerRules(),
@@ -43,6 +46,17 @@ class SetupController extends Controller
         Setting::put(Setting::AUTO_PATCH, $data['on'] ? '1' : '0');
 
         return back();
+    }
+
+    /** The defaults every space starts from (docs/TEAM.md, item 3). */
+    public function settings(Request $request): RedirectResponse
+    {
+        $rules = collect(SpaceSettings::rules())->except(['auto_patch', 'reply_rules', 'answer_rules'])->all();
+        $data = array_filter($request->validate($rules), fn ($value) => $value !== null && $value !== '');
+        Setting::put(SpaceSettings::DEFAULTS, json_encode($data));
+        AuditEvent::record('setup.defaults', 'defaults for every space', $data === [] ? 'back to .env' : implode(', ', array_map(fn ($k, $v) => "{$k} {$v}", array_keys($data), $data)));
+
+        return back()->with('success', 'Saved. Every space without its own setting uses these.');
     }
 
     /** The shared Claude sign-in, for everyone without their own. */

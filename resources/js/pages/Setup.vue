@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
+import SettingsFields from '../components/SettingsFields.vue';
 
 const props = defineProps({
     checks: { type: Array, required: true },
@@ -11,8 +12,16 @@ const props = defineProps({
     answerRules: { type: String, required: true },
     defaultAnswerRules: { type: String, required: true },
     sharedClaude: { type: String, default: null },
+    defaults: { type: Object, required: true },
+    savedDefaults: { type: Object, default: () => ({}) },
     envClaude: { type: Boolean, default: false },
 });
+
+// The defaults as saved here; an empty field is what .env gives, shown as its placeholder.
+const defaultsValues = ref({ ...props.savedDefaults });
+function saveDefaults() {
+    router.put('/setup/settings', defaultsValues.value, { preserveScroll: true });
+}
 
 const shared = useForm({ kind: 'token', secret: '' });
 function saveShared() {
@@ -78,6 +87,15 @@ const marks = {
                 </div>
             </li>
         </ul>
+    </section>
+
+    <section class="mt-10">
+        <h2 class="eyebrow">Defaults for every space</h2>
+        <form class="card mt-3 p-5" @submit.prevent="saveDefaults">
+            <p class="mb-4 max-w-3xl text-sm text-muted">What a space uses unless it sets its own (Spaces → Set up). Empty here is what .env says, shown in grey.</p>
+            <SettingsFields v-model="defaultsValues" :defaults="defaults" />
+            <button type="submit" class="btn btn-signal mt-4">Save the defaults</button>
+        </form>
     </section>
 
     <section class="mt-10">

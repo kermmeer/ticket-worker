@@ -9,6 +9,7 @@ use App\Agent\Workspace;
 use App\Models\ApiConnection;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Settings\SpaceSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
@@ -63,10 +64,10 @@ class QuickScanTicket implements ShouldQueue
             $hasApis = ApiConnection::whereIn('system_id', $systems->pluck('id'))->exists();
             $command = [
                 ...ClaudeRun::command(
-                    (float) config('agent.quick.budget_usd'),
+                    (float) ($settings = SpaceSettings::for($ticket->space))->get('quick_budget_usd'),
                     mcpTools: $hasApis ? ['mcp__ticket-worker__list_apis', 'mcp__ticket-worker__call_api'] : [],
-                    model: config('agent.quick.model'),
-                    effort: config('agent.quick.effort'),
+                    model: $settings->get('quick_model'),
+                    effort: $settings->get('quick_effort'),
                 ),
                 // Nothing to resume: a quick scan is one look, not a conversation.
                 '--no-session-persistence',

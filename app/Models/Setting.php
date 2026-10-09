@@ -86,9 +86,9 @@ class Setting extends Model
      * The rules as the agent gets them: {first_name} becomes the first name of the Jira
      * account the app reads with, so each instance signs with its own owner's name.
      */
-    public static function replyRulesFor(?string $firstName): string
+    public static function replyRulesFor(?string $firstName, ?string $rules = null): string
     {
-        return str_replace('{first_name}', $firstName ?? 'the support team', static::replyRules());
+        return str_replace('{first_name}', $firstName ?? 'the support team', $rules ?? static::replyRules());
     }
 
     public static function answerRules(): string

@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Jira\JiraClient;
 use App\Jira\JiraException;
 use App\Jobs\SyncSpace;
+use App\Models\AuditEvent;
 use App\Models\Space;
 use App\Models\User;
+use App\Settings\SpaceSettings;
 use App\Models\System;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -124,8 +126,11 @@ class SpaceController extends Controller
                 'sleep_statuses' => $space->sleep_statuses,
                 'hidden_slas' => $space->hidden_slas ?? [],
                 'quick_scan' => $space->quick_scan,
+                'settings' => (object) ($space->settings ?? []),
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
+            // What an empty setting falls back to, shown as the placeholder.
+            'defaults' => SpaceSettings::defaults(),
             // Who may see it: for an admin to change; everyone who sees all spaces always does.
             'people' => request()->user()->is_admin ? User::query()->orderBy('name')->get()->map(fn (User $user) => [
                 'id' => $user->id, 'name' => $user->name, 'sees_all' => $user->is_admin || $user->all_spaces,
@@ -160,13 +165,19 @@ class SpaceController extends Controller
             'hidden_slas' => ['array'],
             'hidden_slas.*' => ['string', 'max:255'],
             'quick_scan' => ['boolean'],
+            'settings' => ['array'],
+            ...collect(SpaceSettings::rules())->mapWithKeys(fn ($rule, $key) => ["settings.{$key}" => $rule])->all(),
         ], [
             'rules.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',
             'done_rule.not_regex' => 'Leave out ORDER BY: the tool orders by last update itself.',
         ]);
 
+        // Only what the form may set, and nothing that is empty: empty means "the default".
+        $data['settings'] = array_filter(Arr::only($data['settings'] ?? [], array_keys(SpaceSettings::KEYS)), fn ($value) => $value !== null && $value !== '');
+        $before = $space->only(array_keys(Arr::except($data, 'system_ids')));
         $space->update(Arr::except($data, 'system_ids'));
         $space->systems()->sync($data['system_ids'] ?? []);
+        AuditEvent::record('space.update', $space->label, 'changed '.AuditEvent::changes($before, Arr::except($data, 'system_ids')));
 
         return back()->with('success', 'Saved.');
     }

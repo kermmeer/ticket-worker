@@ -8,9 +8,11 @@ use App\Models\AgentSession;
 use App\Models\ApiConnection;
 use App\Models\CasebookEntry;
 use App\Models\Setting;
+use App\Models\Space;
 use App\Models\System;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Settings\SpaceSettings;
 
 /** What the agent is told: its role and rules once, then each turn's request (CONCEPT.md §7, §10). */
 class Instructions
@@ -324,7 +326,7 @@ The commits since, with the files they touched:
 
         $hint = $matches !== '' ? "Cases that look similar, read them first:\n{$matches}" : 'No case in the casebook looks similar.';
 
-        $rules = self::replyRules();
+        $rules = self::replyRules($ticket->space);
         $apis = self::apis($ticket);
         // From the engineer, not from the reporter: a lead to follow, and to check.
         $note = $note !== null ? <<<NOTE
@@ -373,20 +375,23 @@ The commits since, with the files they touched:
      * How to answer the engineer. Sent with every turn rather than only in the system prompt,
      * which is fixed when a session starts, so a change applies to sessions already open.
      */
-    public static function answerRules(): string
+    public static function answerRules(?Space $space = null): string
     {
-        return "\n\nHow to answer me:\n".Setting::answerRules();
+        return "\n\nHow to answer me:\n".SpaceSettings::for($space)->get('answer_rules');
     }
 
     /** Sent with every turn that writes a reply draft, so a change applies at once. */
-    public static function replyRules(): string
+    public static function replyRules(?Space $space = null): string
     {
         // Signed by whoever asks for the draft; the Jira account's name when nobody is signed in.
-        return "Write the reply draft by these rules:\n".Setting::replyRulesFor(auth()->user()?->firstName() ?? app(JiraClient::class)->firstName());
+        return "Write the reply draft by these rules:\n".Setting::replyRulesFor(
+            auth()->user()?->firstName() ?? app(JiraClient::class)->firstName(),
+            SpaceSettings::for($space)->get('reply_rules'),
+        );
     }
 
-    public static function restate(): string
+    public static function restate(?Space $space = null): string
     {
-        return "Restate your current conclusion as the proposal, taking everything in this conversation into account.\n\n".self::replyRules();
+        return "Restate your current conclusion as the proposal, taking everything in this conversation into account.\n\n".self::replyRules($space);
     }
 }

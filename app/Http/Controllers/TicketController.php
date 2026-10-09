@@ -12,6 +12,7 @@ use App\Models\AgentSession;
 use App\Models\AgentTurn;
 use App\Models\Ticket;
 use App\Outbox\OutboxClient;
+use App\Settings\SpaceSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -87,7 +88,7 @@ class TicketController extends Controller
             'user_id' => auth()->id(),
             'claude_session_id' => (string) Str::uuid(),
             'reply_language' => $data['language'],
-            'model' => config('agent.claude.model'),
+            'model' => SpaceSettings::for($ticket->space)->get('model'),
         ]);
         $session->update(['reply_language' => $data['language']]);
 
@@ -106,7 +107,7 @@ class TicketController extends Controller
 
     public function restate(Ticket $ticket): RedirectResponse
     {
-        return $this->follow($ticket, 'proposal', Instructions::restate());
+        return $this->follow($ticket, 'proposal', Instructions::restate($ticket->space));
     }
 
     /** The agent drafts a casebook case; you review it in the form before it exists. */
