@@ -10,6 +10,7 @@ const page = usePage();
 // admins also the global setup and the docs.
 const allNav = [
     { href: '/', label: 'Overview', active: (url) => url === '/', role: 'member' },
+    { href: '/agents', label: 'Agents', active: (url) => url.startsWith('/agents'), role: 'member' },
     { href: '/spaces', label: 'Spaces', active: (url) => url.startsWith('/spaces'), role: 'member' },
     { href: '/casebook', label: 'Casebook', active: (url) => url.startsWith('/casebook'), role: 'member' },
     { href: '/systems', label: 'Systems', active: (url) => url.startsWith('/systems'), role: 'editor' },

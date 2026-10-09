@@ -155,3 +155,5 @@ to it, including work you finish.
       Jira, settings and budgets per space, notifications, read-only SQL, pulling, Jira sites,
       hand-over, audit trail, casebook tags. See docs/TEAM.md.
 - [ ] On minas: openssh-client and pdo_pgsql in Dockerfile.deploy (SSH pulls, PostgreSQL)
+- [x] Agents page: what works now and for whom, which Claude sign-in your work uses (the order,
+      what is set, which is in use; never a token), your month, settings in force per space (2026-10-09)

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AgentsController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CasebookController;
@@ -64,6 +65,7 @@ Route::get('/tickets/{ticket}/attachments/{attachment}', AttachmentController::c
 Route::post('/tickets/{ticket}/hide', [HiddenTicketController::class, 'store'])->name('tickets.hide');
 Route::delete('/tickets/{ticket}/hide', [HiddenTicketController::class, 'destroy'])->name('tickets.unhide');
 Route::get('/notices', NoticeController::class)->name('notices');
+Route::get('/agents', AgentsController::class)->name('agents');
 
 // Everyone may look at the spaces and follow them; changing them is for editors.
 Route::get('/spaces', [SpaceController::class, 'index'])->name('spaces.index');
