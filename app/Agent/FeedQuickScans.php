@@ -23,8 +23,18 @@ class FeedQuickScans
 
         // Newest first: they are the ones still worth sorting.
         $next = Ticket::where('quick_scan_state', 'pending')->orderByDesc('jira_created_at')->orderByDesc('id')->first();
-        // On the sign-in of whoever asked for the batch, or the instance's.
-        if ($next !== null && Instructions::credentials($next->quick_scan_user_id ? User::find($next->quick_scan_user_id) : null) !== []) {
+        if ($next === null) {
+            return;
+        }
+        $asker = $next->quick_scan_user_id ? User::find($next->quick_scan_user_id) : null;
+        // A spent budget ends the batch's turn for this ticket, saying why.
+        if (! Budget::allows($next->space, $asker)) {
+            $next->forceFill(['quick_scan_state' => 'failed', 'quick_scan_error' => Budget::check($next->space, $asker)['text']])->save();
+
+            return;
+        }
+        // On the sign-in of whoever asked for the batch, or the shared one.
+        if (Instructions::credentials($asker) !== []) {
             QuickScanTicket::start($next);
         }
     }

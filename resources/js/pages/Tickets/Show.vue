@@ -26,6 +26,7 @@ const props = defineProps({
     agentReady: { type: Boolean, required: true },
     outboxReady: { type: Boolean, required: true },
     systems: { type: Array, default: () => [] },
+    budget: { type: Object, default: null },
 });
 
 const language = ref(props.session?.reply_language ?? 'auto');
@@ -191,6 +192,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             <span class="text-muted">{{ shortName(sla.name) }}</span>
             <span class="ml-1.5 font-medium" :style="{ color: `var(--tone-${tone(sla)})` }">{{ phrase(sla) }}</span>
         </span>
+    </p>
+
+    <p v-if="budget" role="status" class="mt-6 rounded-md border px-4 py-2.5 text-sm" :class="budget.level === 'stop' ? 'border-signal/40 text-signal' : 'border-waiting/40 text-waiting'">
+        {{ budget.text }}
     </p>
 
     <!-- First, at every width: on a narrow screen it would otherwise sit below the whole ticket. -->

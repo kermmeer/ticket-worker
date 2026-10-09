@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Agent\Budget;
 use App\Agent\Instructions;
 use App\Agent\Workspace;
 use App\Jira\JiraClient;
@@ -63,6 +64,8 @@ class TicketController extends Controller
             'history' => $ticket->sessions()->where('state', 'closed')->latest('id')->get()->map->summary(),
             'languages' => self::LANGUAGES,
             'agentReady' => Instructions::credentials() !== [],
+            // A budget near or past its end: said before anyone presses a button.
+            'budget' => Budget::check($ticket->space, auth()->user()),
             // What a patch can be for.
             'systems' => app(Workspace::class)->systems($ticket)->map(fn ($system) => ['id' => $system->id, 'name' => $system->name])->values(),
             'outboxReady' => app(OutboxClient::class)->configured(),
@@ -77,6 +80,10 @@ class TicketController extends Controller
             'note' => ['nullable', 'string', 'max:8000'],
         ]);
         abort_unless(Instructions::credentials() !== [], 409, 'No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN yet: see Setup.');
+
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
 
         $session = $ticket->openSession();
         if ($session?->busy()) {
@@ -120,6 +127,9 @@ class TicketController extends Controller
     public function quickScan(Ticket $ticket): RedirectResponse
     {
         abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
         QuickScanTicket::start($ticket);
 
         return back();
@@ -128,6 +138,9 @@ class TicketController extends Controller
     /** Have the agent write its fix as a patch (CONCEPT.md §8). */
     public function patch(Request $request, Ticket $ticket, Workspace $workspace): RedirectResponse
     {
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
         $session = $ticket->openSession();
         abort_if($session === null, 409, 'Analyse first.');
         if ($session->busy()) {
@@ -214,8 +227,19 @@ class TicketController extends Controller
         return back()->with('success', 'The draft waits in the outbox.')->with('outbox_url', $url);
     }
 
+    /** The budget this work would draw on, when it is spent: the reason, else null. */
+    private function overBudget(Ticket $ticket): ?string
+    {
+        $check = Budget::check($ticket->space, auth()->user());
+
+        return ($check['level'] ?? null) === 'stop' ? $check['text'] : null;
+    }
+
     private function follow(Ticket $ticket, string $kind, string $prompt): RedirectResponse
     {
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
         $session = $ticket->openSession();
         abort_if($session === null, 409, 'Analyse first.');
         if ($session->busy()) {

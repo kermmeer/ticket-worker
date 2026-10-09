@@ -61,7 +61,7 @@ const open = ref(false);
     <p class="eyebrow">Your account</p>
     <h1 class="display mt-2 text-3xl">{{ account.name }} <span class="font-mono text-base text-muted">{{ account.username }}</span></h1>
     <p class="mt-2 text-sm text-muted">
-        This month: <span class="font-mono text-ink">${{ account.usage.cost.toFixed(2) }}</span> of agent work you asked for
+        This month: <span class="font-mono text-ink">${{ account.usage.cost.toFixed(2) }}</span><template v-if="account.budget"> of your ${{ account.budget }} budget</template> of agent work you asked for
         ({{ account.usage.turns }} turns, {{ account.usage.scans }} quick scans), priced as the API would.
     </p>
 
@@ -139,7 +139,21 @@ const open = ref(false);
                 </label>
                 <span class="text-xs" :class="person.has_claude ? 'text-done' : 'text-muted'">{{ person.has_claude ? 'own Claude sign-in' : 'no Claude sign-in of their own' }}</span>
                 <span class="text-xs text-muted">{{ person.last_seen_at ? `seen ${ago(person.last_seen_at)}` : 'not signed in yet' }}</span>
-                <span class="font-mono text-xs" :class="person.usage.cost ? 'text-ink' : 'text-muted'">${{ person.usage.cost.toFixed(2) }} this month</span>
+                <span class="font-mono text-xs" :class="person.usage.cost ? 'text-ink' : 'text-muted'">
+                    ${{ person.usage.cost.toFixed(2) }}<template v-if="person.budget"> of ${{ person.budget }}</template> this month
+                </span>
+                <label class="text-xs text-muted">
+                    <span class="sr-only">Monthly budget of {{ person.name }} in dollars</span>
+                    <input
+                        :value="person.budget ?? ''"
+                        type="number"
+                        min="1"
+                        step="10"
+                        placeholder="no budget"
+                        class="w-24 rounded-md border border-line bg-page px-1.5 py-0.5 text-xs"
+                        @change="router.put(`/people/${person.id}/budget`, { monthly_budget_usd: $event.target.value || null }, { preserveScroll: true })"
+                    />
+                </label>
                 <button v-if="person.role !== 'admin'" type="button" class="text-xs text-muted hover:text-ink" :aria-expanded="editingSpaces === person.id" @click="editSpaces(person)">
                     {{ person.all_spaces ? 'every space' : `${person.space_ids.length} space${person.space_ids.length === 1 ? '' : 's'}` }}
                 </button>

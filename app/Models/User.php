@@ -18,7 +18,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    protected $fillable = ['username', 'name', 'email', 'password', 'role', 'all_spaces', 'claude_api_key', 'claude_oauth_token', 'last_seen_at'];
+    protected $fillable = ['username', 'name', 'email', 'password', 'role', 'all_spaces', 'monthly_budget_usd', 'claude_api_key', 'claude_oauth_token', 'last_seen_at'];
 
     protected $hidden = ['password', 'remember_token', 'claude_api_key', 'claude_oauth_token'];
 
@@ -29,6 +29,7 @@ class User extends Authenticatable
             'last_seen_at' => 'datetime',
             'password' => 'hashed',
             'all_spaces' => 'boolean',
+            'monthly_budget_usd' => 'float',
             'claude_api_key' => 'encrypted',
             'claude_oauth_token' => 'encrypted',
         ];

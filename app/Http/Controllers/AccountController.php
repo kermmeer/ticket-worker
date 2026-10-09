@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Agent\Budget;
 use App\Http\Middleware\IdentifyUser;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -89,43 +90,16 @@ class AccountController extends Controller
         return to_route('account.sign-in');
     }
 
-    /**
-     * What each person's agent work cost this month, by who asked: turns, and quick scans.
-     * Prices are what the API would charge, also for work on a subscription.
-     *
-     * @return array<int, array{cost: float, turns: int, scans: int}>
-     */
-    private static function usageThisMonth(): array
-    {
-        $since = now()->startOfMonth();
-        $turns = \App\Models\AgentTurn::query()->where('created_at', '>=', $since)->whereNotNull('user_id')
-            ->selectRaw('user_id, count(*) as n, coalesce(sum(cost_usd), 0) as cost')->groupBy('user_id')->get()->keyBy('user_id');
-        $scans = \App\Models\Ticket::query()->where('quick_scan_at', '>=', $since)->whereNotNull('quick_scan_user_id')
-            ->selectRaw('quick_scan_user_id as user_id, count(*) as n, coalesce(sum(quick_scan_cost_usd), 0) as cost')->groupBy('quick_scan_user_id')->get()->keyBy('user_id');
-
-        $usage = [];
-        foreach ($turns->keys()->merge($scans->keys())->unique() as $id) {
-            $usage[$id] = [
-                'cost' => round((float) ($turns[$id]->cost ?? 0) + (float) ($scans[$id]->cost ?? 0), 2),
-                'turns' => (int) ($turns[$id]->n ?? 0),
-                'scans' => (int) ($scans[$id]->n ?? 0),
-            ];
-        }
-
-        return $usage;
-    }
-
     public function show(Request $request): Response
     {
         $user = $request->user();
-        $usage = self::usageThisMonth();
-        $none = ['cost' => 0.0, 'turns' => 0, 'scans' => 0];
 
         return Inertia::render('Account', [
             'account' => [
                 'name' => $user->name, 'username' => $user->username, 'role' => $user->role,
                 'claude' => match (true) { filled($user->claude_api_key) => 'key', filled($user->claude_oauth_token) => 'token', default => null },
-                'usage' => $usage[$user->id] ?? $none,
+                'usage' => Budget::personThisMonth($user->id),
+                'budget' => $user->monthly_budget_usd,
             ],
             'instanceClaude' => \App\Agent\Instructions::instanceCredentials() !== [],
             'viaHeader' => self::viaHeader(),
@@ -135,7 +109,8 @@ class AccountController extends Controller
                 'you' => $person->is($user),
                 'all_spaces' => $person->all_spaces,
                 'space_ids' => $person->spaceAccess()->pluck('spaces.id'),
-                'usage' => $usage[$person->id] ?? $none,
+                'usage' => Budget::personThisMonth($person->id),
+                'budget' => $person->monthly_budget_usd,
             ]) : null,
             'invite' => session('invite'),
             'spaces' => $user->is_admin ? \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']) : [],
@@ -206,6 +181,17 @@ class AccountController extends Controller
         $user->update($data);
 
         return back()->with('success', "{$user->name} is now ".($data['role'] === 'admin' ? 'an admin' : "an {$data['role']}").'.');
+    }
+
+    /** A monthly ceiling on someone's agent work; empty for none. */
+    public function budget(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->is_admin, 403);
+        $data = $request->validate(['monthly_budget_usd' => ['nullable', 'numeric', 'min:1', 'max:100000']]);
+        $user->update(['monthly_budget_usd' => $data['monthly_budget_usd'] ?? null]);
+        \App\Models\AuditEvent::record('person.budget', $user->name, isset($data['monthly_budget_usd']) ? "budget \${$data['monthly_budget_usd']} a month" : 'no budget');
+
+        return back()->with('success', "Saved {$user->name}'s budget.");
     }
 
     /** Which spaces someone sees: all of them (the default), or the ones chosen. */

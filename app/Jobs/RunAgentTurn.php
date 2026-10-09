@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Agent\Budget;
 use App\Agent\ClaudeRun;
 use App\Agent\Instructions;
 use App\Agent\ScratchCopy;
@@ -198,6 +199,7 @@ class RunAgentTurn implements ShouldQueue
 
         // A code fix gets its patch without being asked, unless that is switched off.
         if ($proposal !== null && ($proposal['fix_kind'] ?? null) === 'code' && SpaceSettings::for($turn->session->ticket->space)->get('auto_patch')
+            && Budget::allows($turn->session->ticket->space, $turn->user)
             && ($system = self::systemFor($proposal, $systems)) !== null) {
             self::queuePatch($turn->session, $system, $turn->user);
         }

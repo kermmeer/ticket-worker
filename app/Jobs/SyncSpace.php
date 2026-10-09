@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Agent\Budget;
 use App\Agent\Instructions;
 use App\Casebook\Matcher;
 use App\Jira\JiraClient;
@@ -86,7 +87,7 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
 
         // New tickets get their quick scan, if the space has it on and an agent can sign in;
         // a flood beyond the limit waits for you to press Quick scan.
-        if ($space->quick_scan && Instructions::instanceCredentials() !== []) {
+        if ($space->quick_scan && Instructions::instanceCredentials() !== [] && Budget::allows($space, null)) {
             foreach (array_slice($fresh, 0, (int) config('agent.quick.per_sync')) as $ticket) {
                 QuickScanTicket::start($ticket);
             }
