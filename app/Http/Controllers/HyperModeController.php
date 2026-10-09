@@ -13,6 +13,7 @@ class HyperModeController extends Controller
     {
         $on = ! Setting::hyper();
         Setting::put(Setting::HYPER, $on ? '1' : '0');
+        \App\Models\AuditEvent::record('hyper', null, $on ? 'hyper mode on: every minute' : 'hyper mode off');
 
         // Switching it on means "now": whatever is due by the new interval goes at once.
         if ($on) {

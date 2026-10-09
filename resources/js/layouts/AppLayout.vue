@@ -24,6 +24,7 @@ const more = [
     { href: '/docs/team', label: 'Team' },
     { href: '/docs/outbox', label: 'Outbox API' },
     { href: '/design', label: 'Design' },
+    { href: '/audit', label: 'Audit trail' },
 ];
 
 const url = computed(() => page.url.split(/[?#]/)[0]);

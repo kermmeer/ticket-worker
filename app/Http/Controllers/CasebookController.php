@@ -101,6 +101,7 @@ class CasebookController extends Controller
             $data['state'] = CasebookEntry::DRAFT;
         }
         $entry = CasebookEntry::create($data + ['written_by' => $request->user()->firstName()]);
+        \App\Models\AuditEvent::record('case.create', $entry->title, "written as {$entry->state}");
         RematchCasebook::dispatch();
 
         return $request->user()->atLeast('editor')
@@ -140,7 +141,9 @@ class CasebookController extends Controller
 
     public function update(Request $request, CasebookEntry $entry): RedirectResponse
     {
+        $before = $entry->getAttributes();
         $entry->update($this->validated($request));
+        \App\Models\AuditEvent::record('case.update', $entry->title, 'changed '.\App\Models\AuditEvent::changes($before, $entry->getAttributes()));
         RematchCasebook::dispatch();
 
         return back()->with('success', 'Saved. Open tickets are matched again.');
@@ -148,6 +151,7 @@ class CasebookController extends Controller
 
     public function destroy(CasebookEntry $entry): RedirectResponse
     {
+        \App\Models\AuditEvent::record('case.remove', $entry->title, 'removed');
         $entry->delete();
         RematchCasebook::dispatch();
 

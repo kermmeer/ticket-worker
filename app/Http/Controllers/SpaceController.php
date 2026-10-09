@@ -111,6 +111,8 @@ class SpaceController extends Controller
             'done_rule' => Space::DEFAULT_DONE_RULE,
         ]);
 
+        AuditEvent::record('space.create', $space->label, "added space {$space->project_key}");
+
         return to_route('spaces.edit', $space);
     }
 
@@ -218,12 +220,16 @@ class SpaceController extends Controller
         $space->update(['state' => Space::ACTIVE]);
         SyncSpace::dispatch($space);
 
+        AuditEvent::record('space.activate', $space->label, 'activated');
+
         return back()->with('success', 'Active. The first sync is on its way.');
     }
 
     public function pause(Space $space): RedirectResponse
     {
         $space->update(['state' => Space::PAUSED]);
+
+        AuditEvent::record('space.pause', $space->label, 'paused');
 
         return back()->with('success', 'Paused. It no longer syncs; its tickets stay as they were.');
     }
@@ -239,6 +245,8 @@ class SpaceController extends Controller
     public function destroy(Space $space): RedirectResponse
     {
         $space->delete();
+
+        AuditEvent::record('space.remove', $space->label, 'removed, with its tickets');
 
         return to_route('spaces.index')->with('success', 'Removed '.$space->label.', with its tickets.');
     }

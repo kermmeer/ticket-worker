@@ -117,7 +117,7 @@ class ScanSystemTest extends TestCase
     {
         $this->put("/systems/{$this->system->id}/context", ['context' => "## Words\nfactuur → Invoice"])->assertSessionHas('success');
 
-        $this->assertSame('you', $this->system->contexts()->first()->written_by);
+        $this->assertSame('Test', $this->system->contexts()->first()->written_by);
         $session = new AgentSession(['reply_language' => 'auto']);
         $this->assertStringContainsString('factuur → Invoice', Instructions::system($session, [$this->system->fresh()]));
     }

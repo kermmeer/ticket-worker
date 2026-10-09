@@ -36,6 +36,7 @@ class SetupController extends Controller
     {
         $data = $request->validate(['rules' => ['nullable', 'string', 'max:4000']]);
         Setting::put(Setting::ANSWER_RULES, $data['rules'] ?? null);
+        AuditEvent::record('setup.answer-rules', 'answer rules', filled($data['rules'] ?? null) ? 'changed' : 'back to the default');
 
         return back()->with('success', 'Saved. The agent answers by them from its next turn.');
     }
@@ -44,6 +45,7 @@ class SetupController extends Controller
     {
         $data = $request->validate(['on' => ['required', 'boolean']]);
         Setting::put(Setting::AUTO_PATCH, $data['on'] ? '1' : '0');
+        AuditEvent::record('setup.auto-patch', 'automatic patches', $data['on'] ? 'on' : 'off');
 
         return back();
     }
@@ -80,6 +82,7 @@ class SetupController extends Controller
     {
         $data = $request->validate(['rules' => ['nullable', 'string', 'max:4000']]);
         Setting::put(Setting::REPLY_RULES, $data['rules'] ?? null);
+        AuditEvent::record('setup.reply-rules', 'reply rules', filled($data['rules'] ?? null) ? 'changed' : 'back to the default');
 
         return back()->with('success', 'Saved. The next reply draft follows the new rules.');
     }

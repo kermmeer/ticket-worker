@@ -198,6 +198,8 @@ class AccountController extends Controller
             'email' => mb_strtolower($data['username']).'@'.(parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'localhost'),
             'password' => str()->random(64)]);
 
+        \App\Models\AuditEvent::record('person.add', $person->name, "added as {$person->role}");
+
         return back()->with('invite', ['name' => $person->name, 'url' => $this->welcomeLink($person)]);
     }
 
@@ -214,6 +216,7 @@ class AccountController extends Controller
         abort_if($user->is($request->user()), 409, 'You cannot change your own role.');
         $data = $request->validate(['role' => ['required', 'in:'.implode(',', User::ROLES)]]);
         $user->update($data);
+        \App\Models\AuditEvent::record('person.role', $user->name, "now {$data['role']}");
 
         return back()->with('success', "{$user->name} is now ".($data['role'] === 'admin' ? 'an admin' : "an {$data['role']}").'.');
     }
@@ -246,6 +249,7 @@ class AccountController extends Controller
         abort_unless($request->user()->is_admin, 403);
         abort_if($user->is($request->user()), 409, 'You cannot remove yourself.');
         $user->delete();
+        \App\Models\AuditEvent::record('person.remove', $user->name, 'removed');
 
         return back()->with('success', "Removed {$user->name}. Their work stays, without a name.");
     }

@@ -6,6 +6,7 @@ use App\Agent\Instructions;
 use App\Jobs\PrepareSystemFolder;
 use App\Jobs\ScanSystem;
 use App\Models\ApiConnection;
+use App\Models\AuditEvent;
 use App\Models\System;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -60,6 +61,7 @@ class SystemController extends Controller
             $api = $this->apiData($request->merge(['name' => 'api']), $system);
             $system->save();
             $system->apis()->create($api);
+            AuditEvent::record('project.create', $name, 'API-only project, API at '.$api['base_url']);
 
             return to_route('systems.index')->with('success', "Added {$name}. Link it to a space (Spaces → edit) and its tickets can use it.");
         }
@@ -74,7 +76,8 @@ class SystemController extends Controller
             'branch.not_regex' => 'That is not a branch name git accepts.',
         ]);
 
-        PrepareSystemFolder::dispatch(System::create($data));
+        PrepareSystemFolder::dispatch($system = System::create($data));
+        AuditEvent::record('project.create', $system->name, "code project, branch {$system->branch}");
 
         return to_route('systems.index');
     }
@@ -105,7 +108,8 @@ class SystemController extends Controller
 
     public function storeApi(Request $request, System $system): RedirectResponse
     {
-        $system->apis()->create($this->apiData($request, $system));
+        $api = $system->apis()->create($this->apiData($request, $system));
+        AuditEvent::record('api.create', "{$system->name}/{$api->name}", "at {$api->base_url}, {$api->auth} sign-in".(filled($api->secret) ? ', secret set' : ''));
 
         return back()->with('success', 'Added. The next analysis of its tickets can use it.');
     }
@@ -130,7 +134,9 @@ class SystemController extends Controller
                 unset($data['secret']);
             }
         }
+        $before = $api->getAttributes();
         $api->update($data);
+        AuditEvent::record('api.update', "{$system->name}/{$api->name}", 'changed '.AuditEvent::changes($before, $api->getAttributes(), ['secret']));
 
         return back()->with('success', $moved && ! filled($data['secret'] ?? null) && $api->auth !== 'none'
             ? "Saved {$api->name}. It moved, so its secret was dropped: enter it again."
@@ -141,6 +147,7 @@ class SystemController extends Controller
     {
         abort_unless($api->system_id === $system->id, 404);
         $api->delete();
+        AuditEvent::record('api.remove', "{$system->name}/{$api->name}", 'removed, with its secret');
 
         return back()->with('success', 'Removed.');
     }
@@ -191,7 +198,8 @@ class SystemController extends Controller
     public function updateContext(Request $request, System $system): RedirectResponse
     {
         $data = $request->validate(['context' => ['required', 'string', 'max:60000']]);
-        $system->writeContext($data['context'], $system->context_commit ?? $system->headCommit(), 'you');
+        $system->writeContext($data['context'], $system->context_commit ?? $system->headCommit(), $request->user()->firstName());
+        AuditEvent::record('project.context', $system->name, 'context edited by hand');
 
         return back()->with('success', "Saved the context of {$system->name}.");
     }
