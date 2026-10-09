@@ -7,6 +7,7 @@ use App\Jobs\PrepareSystemFolder;
 use App\Jobs\ScanSystem;
 use App\Models\ApiConnection;
 use App\Models\AuditEvent;
+use App\Models\DbConnection;
 use App\Models\System;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class SystemController extends Controller
     public function index(): Response
     {
         return Inertia::render('Systems', [
-            'systems' => System::query()->with('apis')->orderBy('name')->get()->map(fn (System $system) => [
+            'systems' => System::query()->with(['apis', 'databases'])->orderBy('name')->get()->map(fn (System $system) => [
                 'id' => $system->id,
                 'name' => $system->name,
                 'kind' => $system->kind,
@@ -39,6 +40,11 @@ class SystemController extends Controller
                 'scan_tokens_in' => $system->scan_input_tokens,
                 'scan_tokens_out' => $system->scan_output_tokens,
                 // Its APIs; a secret is only ever "set" or not.
+                'databases' => $system->databases->map(fn (DbConnection $db) => [
+                    'id' => $db->id, 'name' => $db->name, 'driver' => $db->driver, 'host' => $db->host, 'port' => $db->port,
+                    'database' => $db->database, 'username' => $db->username, 'has_password' => filled($db->password),
+                    'notes' => $db->notes, 'available' => $db->available(),
+                ]),
                 'apis' => $system->apis->map(fn (ApiConnection $api) => [
                     'id' => $api->id, 'name' => $api->name, 'base_url' => $api->base_url, 'auth' => $api->auth,
                     'username' => $api->username, 'field' => $api->field, 'has_secret' => filled($api->secret),
@@ -46,6 +52,7 @@ class SystemController extends Controller
                 ]),
             ]),
             'authKinds' => ApiConnection::AUTH,
+            'dbDrivers' => DbConnection::DRIVERS,
             'agentReady' => Instructions::credentials() !== [],
         ]);
     }
@@ -172,6 +179,70 @@ class SystemController extends Controller
         };
 
         return back()->with($answer['status'] >= 200 && $answer['status'] < 400 ? 'success' : 'error', "{$api->name}: {$verdict}");
+    }
+
+    public function storeDb(Request $request, System $system): RedirectResponse
+    {
+        $db = $system->databases()->create($this->dbData($request, $system));
+        AuditEvent::record('db.create', "{$system->name}/{$db->name}", "{$db->driver} {$db->database} on {$db->host} as {$db->username}".(filled($db->password) ? ', password set' : ''));
+
+        return back()->with('success', 'Added. Try it, then the next analysis of its tickets can query it.');
+    }
+
+    public function updateDb(Request $request, System $system, DbConnection $db): RedirectResponse
+    {
+        abort_unless($db->system_id === $system->id, 404);
+        $data = $this->dbData($request, $system, $db);
+        // As with an API: a password never follows its database to another server or account.
+        $moved = $data['host'] !== $db->host || ($data['port'] ?? null) != $db->port || $data['username'] !== $db->username || $data['driver'] !== $db->driver;
+        if (! filled($data['password'] ?? null)) {
+            if ($moved) {
+                $data['password'] = null;
+            } else {
+                unset($data['password']);
+            }
+        }
+        $before = $db->getAttributes();
+        $db->update($data);
+        AuditEvent::record('db.update', "{$system->name}/{$db->name}", 'changed '.AuditEvent::changes($before, $db->getAttributes(), ['password']));
+
+        return back()->with('success', $moved && ! filled($data['password'] ?? null) ? "Saved {$db->name}. It moved, so its password was dropped: enter it again." : "Saved {$db->name}.");
+    }
+
+    public function destroyDb(System $system, DbConnection $db): RedirectResponse
+    {
+        abort_unless($db->system_id === $system->id, 404);
+        $db->delete();
+        AuditEvent::record('db.remove', "{$system->name}/{$db->name}", 'removed, with its password');
+
+        return back()->with('success', 'Removed.');
+    }
+
+    /** SELECT 1: does the address, the account and the password work? */
+    public function tryDb(System $system, DbConnection $db): RedirectResponse
+    {
+        abort_unless($db->system_id === $system->id, 404);
+        try {
+            $db->runQuery('SELECT 1 AS ok');
+        } catch (\Throwable $e) {
+            return back()->with('error', "{$db->name}: ".$db->redact($e->getMessage()));
+        }
+
+        return back()->with('success', "{$db->name}: it answers and lets you in.");
+    }
+
+    private function dbData(Request $request, System $system, ?DbConnection $db = null): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9][a-z0-9-]*$/', Rule::unique('db_connections')->where('system_id', $system->id)->ignore($db?->id)],
+            'driver' => ['required', Rule::in(array_keys(DbConnection::DRIVERS))],
+            'host' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9.\-:\[\]]+$/'],
+            'port' => ['nullable', 'integer', 'between:1,65535'],
+            'database' => ['required', 'string', 'max:128'],
+            'username' => ['required', 'string', 'max:128'],
+            'password' => ['nullable', 'string', 'max:500'],
+            'notes' => ['nullable', 'string', 'max:4000'],
+        ], ['name.regex' => 'Lower-case letters, digits and dashes, like crm-db.']);
     }
 
     private function apiData(Request $request, System $system, ?ApiConnection $api = null): array

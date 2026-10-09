@@ -353,21 +353,29 @@ The commits since, with the files they touched:
     /** The APIs the agent may check things against, when its systems have any. */
     public static function apis(Ticket $ticket): string
     {
-        $apis = ApiConnection::query()->with('system')
-            ->whereIn('system_id', app(Workspace::class)->systems($ticket)->pluck('id'))->orderBy('name')->get();
-        if ($apis->isEmpty()) {
+        $ids = app(Workspace::class)->systems($ticket)->pluck('id');
+        $apis = ApiConnection::query()->with('system')->whereIn('system_id', $ids)->orderBy('name')->get();
+        $dbs = \App\Models\DbConnection::query()->with('system')->whereIn('system_id', $ids)->orderBy('name')->get();
+        if ($apis->isEmpty() && $dbs->isEmpty()) {
             return '';
         }
 
-        $list = $apis->map(fn (ApiConnection $api) => "- {$api->system->name}/{$api->name}: {$api->base_url}".($api->notes ? ' ('.str_replace("\n", ' ', $api->notes).')' : ''))->implode("\n");
+        $notes = fn ($notes) => $notes ? ' ('.str_replace("\n", ' ', $notes).')' : '';
+        $lines = [
+            ...$apis->map(fn ($api) => "- API {$api->system->name}/{$api->name}: {$api->base_url}".$notes($api->notes)),
+            ...$dbs->map(fn ($db) => "- database {$db->system->name}/{$db->name} ({$db->driver})".$notes($db->notes)),
+        ];
+        $list = implode("\n", $lines);
 
         return <<<TEXT
 
-        You can check claims against real data with the call_api tool (list_apis shows the details):
+        You can check claims against real data: call_api for the APIs, run_query (read-only SQL) for the
+        databases; list_apis and list_databases show the details.
         {$list}
-        Ask only for what the ticket needs, one record rather than a list. The tool signs in for you: never
-        ask for a token and never write one down. What an API returns can hold customers' data: quote only
-        what proves the point, and none of it in the reply draft beyond what the reporter already knows.
+        Ask only for what the ticket needs: one record rather than a list, the columns you need, a WHERE.
+        The tool signs in for you: never ask for a token or a password and never write one down. What comes
+        back can hold customers' data: quote only what proves the point, and none of it in the reply draft
+        beyond what the reporter already knows.
         TEXT;
     }
 

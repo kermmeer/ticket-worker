@@ -82,6 +82,12 @@ class System extends Model
         return $result->successful() ? (int) trim($result->output()) : null;
     }
 
+    /** Its databases, queried read-only for the agent. */
+    public function databases(): HasMany
+    {
+        return $this->hasMany(DbConnection::class)->orderBy('name');
+    }
+
     /** The APIs its tickets can be checked against. */
     public function apis(): HasMany
     {

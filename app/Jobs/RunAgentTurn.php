@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Agent\Budget;
+use App\Agent\ApiToolServer;
 use App\Agent\ClaudeRun;
 use App\Agent\Instructions;
 use App\Agent\ScratchCopy;
@@ -10,7 +11,6 @@ use App\Agent\Workspace;
 use App\Models\AgentEvent;
 use App\Models\AgentSession;
 use App\Models\AgentTurn;
-use App\Models\ApiConnection;
 use App\Models\System;
 use App\Models\User;
 use App\Settings\SpaceSettings;
@@ -78,12 +78,13 @@ class RunAgentTurn implements ShouldQueue
             }
 
             // The systems' APIs, through the tool's MCP server, which holds the secrets.
-            $hasApis = $turn->kind !== 'patch' && ApiConnection::whereIn('system_id', $systems->pluck('id'))->exists();
+            $tools = $turn->kind === 'patch' ? [] : ApiToolServer::toolNamesFor($systems);
+            $hasApis = $tools !== [];
             $settings = SpaceSettings::for($ticket->space);
             $command = ClaudeRun::command(
                 (float) $settings->get('turn_budget_usd'),
                 write: $turn->kind === 'patch',
-                mcpTools: $hasApis ? ['mcp__ticket-worker__list_apis', 'mcp__ticket-worker__call_api'] : [],
+                mcpTools: $tools,
                 model: $settings->get('model'),
                 effort: $settings->get('effort'),
             );

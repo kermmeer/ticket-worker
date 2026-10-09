@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Agent\ApiToolServer;
 use App\Agent\ClaudeRun;
 use App\Agent\FeedQuickScans;
 use App\Agent\Instructions;
 use App\Agent\Workspace;
-use App\Models\ApiConnection;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Notify\SpaceWebhook;
@@ -62,11 +62,12 @@ class QuickScanTicket implements ShouldQueue
             $systems = $workspace->systems($ticket);
             $root = Workspace::path($ticket);
 
-            $hasApis = ApiConnection::whereIn('system_id', $systems->pluck('id'))->exists();
+            $tools = ApiToolServer::toolNamesFor($systems);
+            $hasApis = $tools !== [];
             $command = [
                 ...ClaudeRun::command(
                     (float) ($settings = SpaceSettings::for($ticket->space))->get('quick_budget_usd'),
-                    mcpTools: $hasApis ? ['mcp__ticket-worker__list_apis', 'mcp__ticket-worker__call_api'] : [],
+                    mcpTools: $tools,
                     model: $settings->get('quick_model'),
                     effort: $settings->get('quick_effort'),
                 ),

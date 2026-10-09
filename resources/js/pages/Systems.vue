@@ -2,6 +2,7 @@
 import { onBeforeUnmount, ref, watchEffect } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import ApiConnections from '../components/ApiConnections.vue';
+import DbConnections from '../components/DbConnections.vue';
 import { reachable } from '../connection.js';
 import { tokens } from '../time.js';
 
@@ -9,6 +10,7 @@ const props = defineProps({
     systems: { type: Array, required: true },
     agentReady: { type: Boolean, default: false },
     authKinds: { type: Object, default: () => ({}) },
+    dbDrivers: { type: Object, default: () => ({}) },
 });
 
 function scan(system) {
@@ -211,6 +213,7 @@ const states = {
                     <button type="button" class="btn mt-2 px-3 py-1.5" :disabled="!(contexts[system.id] ?? '').trim()" @click="saveContext(system)">Save</button>
                 </div>
                 <ApiConnections :system="system" :auth-kinds="authKinds" />
+                <DbConnections :system="system" :drivers="dbDrivers" />
             </template>
 
             <template v-else-if="system.state === 'ready'">
@@ -282,6 +285,7 @@ const states = {
                 </div>
 
                 <ApiConnections :system="system" :auth-kinds="authKinds" />
+                <DbConnections :system="system" :drivers="dbDrivers" />
             </template>
         </li>
     </ul>

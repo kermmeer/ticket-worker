@@ -108,6 +108,10 @@ Route::middleware('role:editor')->group(function () {
         Route::put('/{system}/apis/{api}', 'updateApi')->name('apis.update');
         Route::delete('/{system}/apis/{api}', 'destroyApi')->name('apis.destroy');
         Route::post('/{system}/apis/{api}/try', 'tryApi')->name('apis.try');
+        Route::post('/{system}/databases', 'storeDb')->name('databases.store');
+        Route::put('/{system}/databases/{db}', 'updateDb')->name('databases.update');
+        Route::delete('/{system}/databases/{db}', 'destroyDb')->name('databases.destroy');
+        Route::post('/{system}/databases/{db}/try', 'tryDb')->name('databases.try');
     });
 });
 

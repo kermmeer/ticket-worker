@@ -26,8 +26,8 @@ ARG GID=1000
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends git unzip libzip-dev libonig-dev; \
-    docker-php-ext-install -j"$(nproc)" pdo_mysql zip bcmath opcache pcntl; \
+    apt-get install -y --no-install-recommends git unzip libzip-dev libonig-dev libpq-dev openssh-client; \
+    docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_pgsql zip bcmath opcache pcntl; \
     rm -rf /var/lib/apt/lists/*; \
     groupmod -o -g "${GID}" www-data; \
     usermod -o -u "${UID}" -g "${GID}" www-data
