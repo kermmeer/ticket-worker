@@ -17,6 +17,7 @@ const nav = [
 // Reference, not work: in the footer, out of the way.
 const more = [
     { href: '/docs/concept', label: 'Concept' },
+    { href: '/docs/team', label: 'Team' },
     { href: '/docs/outbox', label: 'Outbox API' },
     { href: '/design', label: 'Design' },
 ];

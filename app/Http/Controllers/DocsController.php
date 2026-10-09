@@ -16,6 +16,7 @@ class DocsController extends Controller
     private const DOCS = [
         'concept' => 'CONCEPT.md',
         'outbox' => 'docs/OUTBOX-API.md',
+        'team' => 'docs/TEAM.md',
     ];
 
     public function __invoke(string $doc): Response
