@@ -12,8 +12,13 @@ const nav = [
     { href: '/casebook', label: 'Casebook', active: (url) => url.startsWith('/casebook') },
     { href: '/systems', label: 'Systems', active: (url) => url.startsWith('/systems') },
     { href: '/setup', label: 'Setup', active: (url) => url.startsWith('/setup') },
-    { href: '/docs/concept', label: 'Concept', active: (url) => url.startsWith('/docs') },
-    { href: '/design', label: 'Design', active: (url) => url.startsWith('/design') },
+];
+
+// Reference, not work: in the footer, out of the way.
+const more = [
+    { href: '/docs/concept', label: 'Concept' },
+    { href: '/docs/outbox', label: 'Outbox API' },
+    { href: '/design', label: 'Design' },
 ];
 
 const url = computed(() => page.url.split(/[?#]/)[0]);
@@ -29,36 +34,36 @@ function toggleHyper() {
 
 <template>
     <div class="min-h-screen">
+        <!-- Slim: one quiet row. The work is the page, not the frame around it. -->
         <header class="sticky top-0 z-10 border-b border-line bg-page/90 backdrop-blur">
-            <div class="flex w-full flex-wrap items-end gap-x-10 px-4 pt-4 sm:px-6 lg:px-10">
-                <Link href="/" class="flex items-center gap-2 pb-3">
-                    <img src="/favicon.svg" alt="" class="size-6" />
-                    <span class="display text-xl leading-none">Ticket Worker</span>
+            <div class="flex w-full flex-wrap items-center gap-x-8 px-4 sm:px-6 lg:px-10">
+                <Link href="/" class="flex items-center gap-2 py-2.5">
+                    <img src="/favicon.svg" alt="" class="size-5" />
+                    <span class="text-sm font-semibold tracking-tight">Ticket Worker</span>
                     <span v-if="env && env !== 'production'" class="eyebrow">{{ env }}</span>
                 </Link>
-                <div class="ml-auto flex items-center gap-2 pb-2.5 sm:order-last">
+                <div class="ml-auto flex items-center gap-2 py-1.5 sm:order-last">
                     <!-- On, it says so in the signal colour: every minute is not something to forget about. -->
                     <button
                         type="button"
-                        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
-                        :class="hyper ? 'border-signal text-signal' : 'border-line bg-surface text-muted hover:text-ink'"
+                        class="rounded-md px-2 py-1 text-xs transition-colors"
+                        :class="hyper ? 'border border-signal font-medium text-signal' : 'text-muted hover:text-ink'"
                         :aria-pressed="hyper"
                         @click="toggleHyper"
                     >
                         {{ hyper ? 'Hyper: every minute' : 'Hyper off' }}
                     </button>
                     <ThemeSwitch />
-                    <button v-if="gate" type="button" class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-muted hover:text-ink" @click="router.post('/logout')">
-                        Sign out
-                    </button>
+                    <slot name="account" />
+                    <button v-if="gate" type="button" class="px-2 py-1 text-xs text-muted hover:text-ink" @click="router.post('/logout')">Sign out</button>
                 </div>
-                <nav aria-label="Main" class="-mb-px flex w-full gap-6 overflow-x-auto text-sm sm:w-auto">
+                <nav aria-label="Main" class="-mb-px flex w-full gap-5 overflow-x-auto text-[0.8125rem] sm:w-auto">
                     <Link
                         v-for="item in nav"
                         :key="item.href"
                         :href="item.href"
-                        class="border-b-2 pt-1 pb-3 whitespace-nowrap transition-colors"
-                        :class="item.active(url) ? 'border-signal font-medium text-ink' : 'border-transparent text-muted hover:text-ink'"
+                        class="border-b-2 py-2.5 whitespace-nowrap transition-colors"
+                        :class="item.active(url) ? 'border-signal text-ink' : 'border-transparent text-muted hover:text-ink'"
                         :aria-current="item.active(url) ? 'page' : undefined"
                     >
                         {{ item.label }}
@@ -67,7 +72,7 @@ function toggleHyper() {
             </div>
         </header>
 
-        <main class="w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-10">
+        <main class="w-full px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
             <div v-if="connection.signedOut" role="alert" class="mb-8 flex flex-wrap items-center gap-3 rounded-md border border-signal/40 bg-surface px-4 py-2.5 text-sm">
                 <span class="text-signal">Your sign-in has expired, so nothing reaches Ticket Worker until you sign in again.</span>
                 <span class="text-muted">A message you were typing to the agent is kept.</span>
@@ -84,5 +89,9 @@ function toggleHyper() {
             </p>
             <slot />
         </main>
+
+        <footer class="flex flex-wrap gap-x-5 gap-y-1 border-t border-line px-4 py-4 text-xs text-muted sm:px-6 lg:px-10">
+            <Link v-for="item in more" :key="item.href" :href="item.href" class="hover:text-ink" :class="{ 'text-ink': url.startsWith(item.href) }">{{ item.label }}</Link>
+        </footer>
     </div>
 </template>
