@@ -31,9 +31,10 @@ function savePassword() {
 function addPerson() {
     newPerson.post('/people', { preserveScroll: true, onSuccess: () => newPerson.reset() });
 }
-function setAdmin(person, on) {
-    router.put(`/people/${person.id}/admin`, { is_admin: on }, { preserveScroll: true });
+function setRole(person, role) {
+    router.put(`/people/${person.id}/role`, { role }, { preserveScroll: true });
 }
+const roles = { member: 'Member: works tickets', editor: 'Editor: also spaces, systems, casebook', admin: 'Admin: also people and setup' };
 function remove(person) {
     if (confirm(`Remove ${person.name}? Their work stays, without their name, and their Claude sign-in is deleted.`)) {
         router.delete(`/people/${person.id}`, { preserveScroll: true });
@@ -117,13 +118,18 @@ const open = ref(false);
             <li v-for="person in people" :key="person.id" class="flex flex-wrap items-center gap-x-4 gap-y-1 p-4 text-sm">
                 <span class="font-medium">{{ person.name }}</span>
                 <span class="font-mono text-xs text-muted">{{ person.username }}</span>
-                <span v-if="person.is_admin" class="text-xs text-working">admin</span>
+                <span v-if="person.you" class="text-xs text-working">{{ person.role }}</span>
+                <label v-else class="text-xs">
+                    <span class="sr-only">Role of {{ person.name }}</span>
+                    <select :value="person.role" class="rounded-md border border-line bg-page px-1.5 py-0.5 text-xs" @change="setRole(person, $event.target.value)">
+                        <option v-for="(label, value) in roles" :key="value" :value="value">{{ label }}</option>
+                    </select>
+                </label>
                 <span class="text-xs" :class="person.has_claude ? 'text-done' : 'text-muted'">{{ person.has_claude ? 'own Claude sign-in' : 'no Claude sign-in of their own' }}</span>
                 <span class="text-xs text-muted">{{ person.last_seen_at ? `seen ${ago(person.last_seen_at)}` : 'not signed in yet' }}</span>
                 <span class="font-mono text-xs" :class="person.usage.cost ? 'text-ink' : 'text-muted'">${{ person.usage.cost.toFixed(2) }} this month</span>
                 <span v-if="!person.you" class="ml-auto flex gap-3 text-xs">
                     <button v-if="!viaHeader" type="button" class="text-muted hover:text-ink" @click="router.post(`/people/${person.id}/link`, {}, { preserveScroll: true })">New link</button>
-                    <button type="button" class="text-muted hover:text-ink" @click="setAdmin(person, !person.is_admin)">{{ person.is_admin ? 'Not admin' : 'Make admin' }}</button>
                     <button type="button" class="text-muted hover:text-signal" @click="remove(person)">Remove</button>
                 </span>
                 <span v-else class="ml-auto text-xs text-muted">you</span>

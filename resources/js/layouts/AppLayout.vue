@@ -6,13 +6,17 @@ import { connection, signInAgain } from '../connection.js';
 
 const page = usePage();
 
-const nav = [
-    { href: '/', label: 'Overview', active: (url) => url === '/' },
-    { href: '/spaces', label: 'Spaces', active: (url) => url.startsWith('/spaces') },
-    { href: '/casebook', label: 'Casebook', active: (url) => url.startsWith('/casebook') },
-    { href: '/systems', label: 'Systems', active: (url) => url.startsWith('/systems') },
-    { href: '/setup', label: 'Setup', active: (url) => url.startsWith('/setup') },
+// What each role may open: members work tickets; editors also run spaces and systems;
+// admins also the global setup and the docs.
+const allNav = [
+    { href: '/', label: 'Overview', active: (url) => url === '/', role: 'member' },
+    { href: '/spaces', label: 'Spaces', active: (url) => url.startsWith('/spaces'), role: 'member' },
+    { href: '/casebook', label: 'Casebook', active: (url) => url.startsWith('/casebook'), role: 'member' },
+    { href: '/systems', label: 'Systems', active: (url) => url.startsWith('/systems'), role: 'editor' },
+    { href: '/setup', label: 'Setup', active: (url) => url.startsWith('/setup'), role: 'admin' },
 ];
+const may = (role) => role === 'member' || (role === 'editor' ? page.props.me?.is_editor : page.props.me?.is_admin);
+const nav = computed(() => allNav.filter((item) => may(item.role)));
 
 // Reference, not work: in the footer, out of the way.
 const more = [
@@ -47,6 +51,7 @@ function toggleHyper() {
                 <div class="ml-auto flex items-center gap-2 py-1.5 sm:order-last">
                     <!-- On, it says so in the signal colour: every minute is not something to forget about. -->
                     <button
+                        v-if="me?.is_editor"
                         type="button"
                         class="rounded-md px-2 py-1 text-xs transition-colors"
                         :class="hyper ? 'border border-signal font-medium text-signal' : 'text-muted hover:text-ink'"
@@ -55,6 +60,7 @@ function toggleHyper() {
                     >
                         {{ hyper ? 'Hyper: every minute' : 'Hyper off' }}
                     </button>
+                    <span v-else-if="hyper" class="rounded-md border border-signal px-2 py-1 text-xs font-medium text-signal">Hyper: every minute</span>
                     <ThemeSwitch />
                     <Link v-if="me" href="/account" class="rounded-md px-2 py-1 text-xs hover:text-ink" :class="url.startsWith('/account') ? 'text-ink' : 'text-muted'">
                         {{ me.name }}<span v-if="!me.can_run_agents" class="text-signal"> · no Claude sign-in</span>
@@ -94,7 +100,7 @@ function toggleHyper() {
             <slot />
         </main>
 
-        <footer class="flex flex-wrap gap-x-5 gap-y-1 border-t border-line px-4 py-4 text-xs text-muted sm:px-6 lg:px-10">
+        <footer v-if="me?.is_admin" class="flex flex-wrap gap-x-5 gap-y-1 border-t border-line px-4 py-4 text-xs text-muted sm:px-6 lg:px-10">
             <Link v-for="item in more" :key="item.href" :href="item.href" class="hover:text-ink" :class="{ 'text-ink': url.startsWith(item.href) }">{{ item.label }}</Link>
         </footer>
     </div>

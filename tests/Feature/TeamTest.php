@@ -31,7 +31,7 @@ class TeamTest extends TestCase
     public function test_an_admin_sees_what_each_person_used_this_month(): void
     {
         $me = auth()->user();
-        $me->update(['is_admin' => true]);
+        $me->update(['role' => 'admin']);
         $other = User::factory()->create(['username' => 'stijn', 'name' => 'Stijn']);
         $ticket = Ticket::create(['space_id' => SpacesTest::space()->id, 'jira_id' => '1', 'key' => 'SUP-1', 'summary' => 'x', 'first_seen_at' => now(), 'last_seen_at' => now(),
             'quick_scan_user_id' => $other->id, 'quick_scan_cost_usd' => 0.12, 'quick_scan_at' => now(), 'quick_scan_state' => 'done']);

@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             RequirePassword::class,
             IdentifyUser::class,
         ]);
+        $middleware->alias(['role' => \App\Http\Middleware\EnsureRole::class]);
         // Behind a reverse proxy that ends TLS, name it here so links come out as https.
         if (filled($proxies = env('TRUSTED_PROXIES'))) {
             $middleware->trustProxies(at: $proxies === '*' ? '*' : explode(',', $proxies));

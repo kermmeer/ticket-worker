@@ -80,7 +80,7 @@ function toggleHidden() {
             </p>
             <QuickScanLine v-if="ticket.quick_scan" :scan="ticket.quick_scan" />
             <p v-if="ticket.casebook" class="mt-1.5 text-sm">
-                <Link :href="`/casebook/${ticket.casebook.id}/edit`" class="text-working hover:underline">
+                <Link :href="$page.props.me?.is_editor ? `/casebook/${ticket.casebook.id}/edit` : '/casebook'" class="text-working hover:underline">
                     Looks like a known case: {{ ticket.casebook.title }}
                 </Link>
             </p>

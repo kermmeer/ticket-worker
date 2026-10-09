@@ -21,7 +21,8 @@ abstract class TestCase extends BaseTestCase
         config(['app.password' => null, 'auth.trusted_header' => null]);
 
         // Someone is signed in, unless a test says otherwise (AccountTest).
-        $this->actingAs(\App\Models\User::factory()->create(['username' => 'tester', 'name' => 'Test Person']));
+        // An admin, so a test reaches every page; RolesTest checks what the others may not.
+        $this->actingAs(\App\Models\User::factory()->create(['username' => 'tester', 'name' => 'Test Person', 'role' => 'admin']));
 
         // Tests never reach Jira: a request nobody faked fails the test instead.
         Http::preventStrayRequests();

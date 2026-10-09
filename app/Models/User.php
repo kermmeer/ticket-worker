@@ -18,7 +18,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    protected $fillable = ['username', 'name', 'email', 'password', 'is_admin', 'claude_api_key', 'claude_oauth_token', 'last_seen_at'];
+    protected $fillable = ['username', 'name', 'email', 'password', 'role', 'claude_api_key', 'claude_oauth_token', 'last_seen_at'];
 
     protected $hidden = ['password', 'remember_token', 'claude_api_key', 'claude_oauth_token'];
 
@@ -28,7 +28,6 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'password' => 'hashed',
-            'is_admin' => 'boolean',
             'claude_api_key' => 'encrypted',
             'claude_oauth_token' => 'encrypted',
         ];
@@ -38,6 +37,22 @@ class User extends Authenticatable
     public function followedSpaces(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Space::class);
+    }
+
+    public const ROLES = ['member', 'editor', 'admin'];
+
+    /**
+     * Admin: everything, people and the global setup included. Editor: spaces, systems and
+     * the casebook as well as tickets. Member: works tickets.
+     */
+    public function atLeast(string $role): bool
+    {
+        return array_search($this->role ?? 'member', self::ROLES, true) >= array_search($role, self::ROLES, true);
+    }
+
+    public function getIsAdminAttribute(): bool
+    {
+        return $this->role === 'admin';
     }
 
     /** What reply drafts are signed with: the first word of the name. */
@@ -66,7 +81,7 @@ class User extends Authenticatable
                 'email' => $email ?: $username.'@'.(parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'localhost'),
                 // Never used: a header account has no password of its own.
                 'password' => Str::random(64),
-                'is_admin' => ! static::query()->exists(),
+                'role' => static::query()->exists() ? 'member' : 'admin',
             ])->save();
         }
 

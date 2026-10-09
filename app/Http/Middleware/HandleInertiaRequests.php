@@ -38,7 +38,7 @@ class HandleInertiaRequests extends Middleware
             'hyper' => fn () => Setting::hyper(),
             // Who you are; what of it the pages need, never a secret.
             'me' => fn () => ($user = $request->user()) ? [
-                'id' => $user->id, 'name' => $user->name, 'first_name' => $user->firstName(), 'is_admin' => $user->is_admin,
+                'id' => $user->id, 'name' => $user->name, 'first_name' => $user->firstName(), 'role' => $user->role, 'is_admin' => $user->is_admin, 'is_editor' => $user->atLeast('editor'),
                 'has_claude' => $user->claudeCredentials() !== [],
                 'can_run_agents' => \App\Agent\Instructions::credentials($user) !== [],
             ] : null,

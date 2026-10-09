@@ -40,7 +40,7 @@ class AccountTest extends TestCase
             ->assertRedirect('/account');
 
         $karl = User::sole();
-        $this->assertSame(['karl', true], [$karl->username, $karl->is_admin]);
+        $this->assertSame(['karl', 'admin'], [$karl->username, $karl->role]);
         $this->assertSame($karl->id, $session->fresh()->user_id);
         $this->assertAuthenticatedAs($karl);
         $this->post('/first-account', ['username' => 'b', 'name' => 'b', 'password' => 'long enough!', 'password_confirmation' => 'long enough!'])->assertStatus(409);
@@ -48,7 +48,7 @@ class AccountTest extends TestCase
 
     public function test_an_admin_invites_someone_who_sets_their_own_password(): void
     {
-        auth()->user()->update(['is_admin' => true]);
+        auth()->user()->update(['role' => 'admin']);
 
         $this->post('/people', ['username' => 'stijn', 'name' => 'Stijn Example'])->assertSessionHas('invite');
         $stijn = User::firstWhere('username', 'stijn');
@@ -64,6 +64,7 @@ class AccountTest extends TestCase
 
     public function test_only_an_admin_adds_people(): void
     {
+        auth()->user()->update(['role' => 'editor']);
         $this->post('/people', ['username' => 'stijn', 'name' => 'Stijn'])->assertForbidden();
     }
 
@@ -97,7 +98,7 @@ class AccountTest extends TestCase
         auth()->logout();
         config(['auth.trusted_header' => 'X-authentik-username']);
 
-        $this->get('/design', ['X-authentik-username' => 'stijn'])->assertOk();
+        $this->get('/casebook', ['X-authentik-username' => 'stijn'])->assertOk();
 
         $this->assertAuthenticatedAs(User::firstWhere('username', 'stijn'));
         $this->assertFalse(User::firstWhere('username', 'stijn')->is_admin, 'Not the first account: the tester was.');

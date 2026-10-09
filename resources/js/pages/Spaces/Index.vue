@@ -34,7 +34,7 @@ function post(space, action) {
     </p>
 
     <div class="mt-8">
-        <Link href="/spaces/create" class="btn btn-signal">Add a space</Link>
+        <Link v-if="$page.props.me?.is_editor" href="/spaces/create" class="btn btn-signal">Add a space</Link>
     </div>
 
     <p v-if="spaces.length === 0" class="mt-10 text-muted">No spaces yet.</p>
@@ -68,7 +68,7 @@ function post(space, action) {
                 <span v-else-if="space.state === 'active'" class="text-muted"> · first sync on its way</span>
             </p>
 
-            <div class="mt-4 flex flex-wrap gap-2">
+            <div v-if="$page.props.me?.is_editor" class="mt-4 flex flex-wrap gap-2">
                 <Link :href="`/spaces/${space.id}/edit`" class="btn px-3 py-1.5">Set up</Link>
                 <button v-if="space.state === 'active'" type="button" class="btn px-3 py-1.5" @click="post(space, 'sync')">Sync now</button>
                 <button v-if="space.state === 'active'" type="button" class="btn px-3 py-1.5" @click="post(space, 'pause')">Pause</button>

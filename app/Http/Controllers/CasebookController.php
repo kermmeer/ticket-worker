@@ -93,10 +93,17 @@ class CasebookController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $entry = CasebookEntry::create($this->validated($request) + ['written_by' => 'you']);
+        $data = $this->validated($request);
+        // A member proposes; an editor approves. Until then the agents are not offered it.
+        if (! $request->user()->atLeast('editor')) {
+            $data['state'] = CasebookEntry::DRAFT;
+        }
+        $entry = CasebookEntry::create($data + ['written_by' => $request->user()->firstName()]);
         RematchCasebook::dispatch();
 
-        return to_route('casebook.edit', $entry)->with('success', 'Written down. Approve it to have it offered.');
+        return $request->user()->atLeast('editor')
+            ? to_route('casebook.edit', $entry)->with('success', 'Written down. Approve it to have it offered.')
+            : to_route('casebook.index')->with('success', 'Proposed. An editor approves it, and from then on the agents are offered it.');
     }
 
     public function edit(CasebookEntry $entry, JiraClient $jira): Response

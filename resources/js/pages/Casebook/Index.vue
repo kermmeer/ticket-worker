@@ -38,7 +38,7 @@ const shown = computed(() => {
     </p>
 
     <div class="mt-8 flex flex-wrap items-center gap-2">
-        <Link href="/casebook/create" class="btn btn-signal">Write a case</Link>
+        <Link href="/casebook/create" class="btn btn-signal">{{ $page.props.me?.is_editor ? 'Write a case' : 'Propose a case' }}</Link>
         <span class="mx-2 hidden h-5 border-l border-line sm:block"></span>
         <button
             v-for="(state, key) in { all: { label: 'All' }, ...states }"
@@ -65,7 +65,8 @@ const shown = computed(() => {
     <ul class="mt-8 space-y-3">
         <li v-for="entry in shown" :key="entry.id" class="card p-5">
             <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <Link :href="`/casebook/${entry.id}/edit`" class="text-lg font-medium hover:underline">{{ entry.title }}</Link>
+                <Link v-if="$page.props.me?.is_editor" :href="`/casebook/${entry.id}/edit`" class="text-lg font-medium hover:underline">{{ entry.title }}</Link>
+                <span v-else class="text-lg font-medium">{{ entry.title }}</span>
                 <span v-if="entry.system" class="font-mono text-xs text-muted">{{ entry.system }}</span>
                 <span class="ml-auto font-mono text-xs font-medium tracking-wide uppercase" :class="states[entry.state]?.tone">
                     {{ states[entry.state]?.label ?? entry.state }}

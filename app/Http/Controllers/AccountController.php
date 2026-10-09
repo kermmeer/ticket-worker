@@ -52,7 +52,7 @@ class AccountController extends Controller
         abort_if(User::query()->exists(), 409, 'There are accounts already: sign in.');
         $data = $this->validated($request);
 
-        $user = User::create([...$data, 'username' => mb_strtolower($data['username']), 'is_admin' => true,
+        $user = User::create([...$data, 'username' => mb_strtolower($data['username']), 'role' => 'admin',
             'email' => $data['username'].'@'.(parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'localhost')]);
         IdentifyUser::adoptEarlierWork($user);
         Auth::login($user, remember: true);
@@ -123,14 +123,14 @@ class AccountController extends Controller
 
         return Inertia::render('Account', [
             'account' => [
-                'name' => $user->name, 'username' => $user->username, 'is_admin' => $user->is_admin,
+                'name' => $user->name, 'username' => $user->username, 'role' => $user->role,
                 'claude' => match (true) { filled($user->claude_api_key) => 'key', filled($user->claude_oauth_token) => 'token', default => null },
                 'usage' => $usage[$user->id] ?? $none,
             ],
             'instanceClaude' => \App\Agent\Instructions::instanceCredentials() !== [],
             'viaHeader' => self::viaHeader(),
             'people' => $user->is_admin ? User::query()->orderBy('name')->get()->map(fn (User $person) => [
-                'id' => $person->id, 'name' => $person->name, 'username' => $person->username, 'is_admin' => $person->is_admin,
+                'id' => $person->id, 'name' => $person->name, 'username' => $person->username, 'role' => $person->role,
                 'has_claude' => $person->claudeCredentials() !== [], 'last_seen_at' => $person->last_seen_at?->toIso8601String(),
                 'you' => $person->is($user),
                 'usage' => $usage[$person->id] ?? $none,
@@ -195,13 +195,14 @@ class AccountController extends Controller
         return back()->with('invite', ['name' => $user->name, 'url' => $this->welcomeLink($user)]);
     }
 
-    public function admin(Request $request, User $user): RedirectResponse
+    public function role(Request $request, User $user): RedirectResponse
     {
         abort_unless($request->user()->is_admin, 403);
-        abort_if($user->is($request->user()), 409, 'You cannot change your own admin rights.');
-        $user->update(['is_admin' => $request->boolean('is_admin')]);
+        abort_if($user->is($request->user()), 409, 'You cannot change your own role.');
+        $data = $request->validate(['role' => ['required', 'in:'.implode(',', User::ROLES)]]);
+        $user->update($data);
 
-        return back();
+        return back()->with('success', "{$user->name} is now ".($data['role'] === 'admin' ? 'an admin' : "an {$data['role']}").'.');
     }
 
     public function remove(Request $request, User $user): RedirectResponse
