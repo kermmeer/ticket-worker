@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import CodeBlock from '../components/CodeBlock.vue';
+import ThemeSwitch from '../components/ThemeSwitch.vue';
 import { askForNotifications, notificationsOn, notificationsSupported } from '../notices.js';
 import { ago } from '../time.js';
 
@@ -87,6 +88,12 @@ const open = ref(false);
         This month: <span class="font-mono text-ink">${{ account.usage.cost.toFixed(2) }}</span><template v-if="account.budget"> of your ${{ account.budget }} budget</template> of agent work you asked for
         ({{ account.usage.turns }} turns, {{ account.usage.scans }} quick scans), priced as the API would.
     </p>
+
+    <!-- The header has no room for it on a phone. -->
+    <div class="mt-6 flex items-center gap-3 sm:hidden">
+        <span class="text-sm text-muted">Look</span>
+        <ThemeSwitch />
+    </div>
 
     <div class="mt-8 grid gap-6 xl:grid-cols-2">
         <!-- Claude -->

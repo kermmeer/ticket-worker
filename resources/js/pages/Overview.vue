@@ -196,6 +196,15 @@ function stopScans() {
     router.delete('/quick-scans', { preserveScroll: true, preserveState: true });
 }
 
+// A group shows its first forty, then more on request: hundreds of rows at once make a
+// phone crawl, and nobody reads past the first screens anyway. A search shows every match.
+const BATCH = 40;
+const shownCounts = ref({});
+const shownOf = (key) => (searching.value ? Infinity : (shownCounts.value[key] ?? BATCH));
+function showMore(key) {
+    shownCounts.value = { ...shownCounts.value, [key]: shownOf(key) + BATCH };
+}
+
 // While you search or show one status, every section opens, so no match stays folded away.
 const searching = computed(() => statusFilter.value !== null || search.value.trim() !== '');
 
@@ -424,10 +433,13 @@ onBeforeUnmount(() => {
             <template v-for="group in awake" :key="group.key">
                 <FoldingSection v-if="inGroup[group.key].length" :title="`${group.label} · ${inGroup[group.key].length}`" :remember="`overview.${group.key}`" :force-open="searching" flush>
                     <ul class="divide-y divide-line">
-                        <li v-for="ticket in inGroup[group.key]" :key="ticket.id">
+                        <li v-for="ticket in inGroup[group.key].slice(0, shownOf(group.key))" :key="ticket.id">
                             <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
                         </li>
                     </ul>
+                    <button v-if="inGroup[group.key].length > shownOf(group.key)" type="button" class="w-full border-t border-line py-3 text-sm text-muted hover:text-ink" @click="showMore(group.key)">
+                        Show {{ Math.min(BATCH, inGroup[group.key].length - shownOf(group.key)) }} more of {{ inGroup[group.key].length - shownOf(group.key) }}
+                    </button>
                 </FoldingSection>
             </template>
 
@@ -443,10 +455,13 @@ onBeforeUnmount(() => {
                 >
                     <template #hint>{{ fold.hint }}</template>
                     <ul class="divide-y divide-line">
-                        <li v-for="ticket in inGroup[fold.key]" :key="ticket.id">
+                        <li v-for="ticket in inGroup[fold.key].slice(0, shownOf(fold.key))" :key="ticket.id">
                             <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
                         </li>
                     </ul>
+                    <button v-if="inGroup[fold.key].length > shownOf(fold.key)" type="button" class="w-full border-t border-line py-3 text-sm text-muted hover:text-ink" @click="showMore(fold.key)">
+                        Show {{ Math.min(BATCH, inGroup[fold.key].length - shownOf(fold.key)) }} more of {{ inGroup[fold.key].length - shownOf(fold.key) }}
+                    </button>
                 </FoldingSection>
             </template>
         </div>

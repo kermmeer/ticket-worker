@@ -159,3 +159,6 @@ to it, including work you finish.
       what is set, which is in use; never a token), your month, settings in force per space (2026-10-09)
 - [x] Overview: the totals follow the space chosen; the space and Assigned to me are kept in the
       browser across refreshes and tabs (2026-10-10)
+- [x] Phones: a bottom bar (Tickets, Agents, Casebook, You), compact overview rows with real
+      buttons, forty per group then "Show more" (the overview was 205,000 px tall), the ticket
+      page in one column that never runs wide, agent first, a jump bar (2026-10-10)

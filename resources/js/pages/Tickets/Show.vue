@@ -159,6 +159,14 @@ watch(
 );
 onBeforeUnmount(() => clearInterval(scanPoll));
 
+// The jump bar's parts: only those the page has.
+const jumps = computed(() => [
+    { id: 'scan', label: 'Quick scan' },
+    { id: 'agent', label: 'Agent' },
+    ...(proposal.value ? [{ id: 'proposal', label: 'Proposal & reply' }] : []),
+    { id: 'ticket', label: 'Ticket' },
+]);
+
 const turnLabels = { analysis: 'Analysis', message: 'Your question', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
 
 // A patch is for one system: the proposal's, unless you pick another.
@@ -213,13 +221,19 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
     </p>
 
     <!-- First, at every width: on a narrow screen it would otherwise sit below the whole ticket. -->
-    <FoldingSection title="Quick scan" remember="ticket.quick-scan" class="mt-8">
+    <!-- On a phone: a jump bar to each part, under the header as you scroll. -->
+    <nav aria-label="On this page" class="sticky top-11 z-[5] -mx-4 mt-4 flex gap-1 overflow-x-auto border-b border-line bg-page/95 px-4 py-2 backdrop-blur sm:hidden">
+        <a v-for="part in jumps" :key="part.id" :href="`#${part.id}`" class="shrink-0 rounded-full border border-line px-3 py-1.5 text-sm">{{ part.label }}</a>
+    </nav>
+
+    <FoldingSection id="scan" title="Quick scan" remember="ticket.quick-scan" class="mt-8 scroll-mt-28">
         <QuickScanCard :ticket-id="ticket.id" :scan="ticket.quick_scan" :agent-ready="agentReady" />
     </FoldingSection>
 
-    <div class="mt-8 grid gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+    <!-- One column on a phone (that can never grow wider than the screen), two on a wide one. -->
+    <div class="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <!-- The ticket, as Jira has it now -->
-        <FoldingSection title="Ticket" remember="ticket.ticket" class="self-start">
+        <FoldingSection id="ticket" title="Ticket" remember="ticket.ticket" class="min-w-0 scroll-mt-28 self-start">
             <p v-if="issueError" class="text-sm text-signal">Jira did not answer: {{ issueError }}</p>
             <template v-else-if="issue">
                 <p class="text-sm text-muted">{{ issue.reporter }} · {{ short(issue.created) }} · {{ issue.type }}</p>
@@ -250,8 +264,9 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         </FoldingSection>
 
         <!-- The agent -->
-        <section class="min-w-0 space-y-6">
-            <FoldingSection title="Agent" remember="ticket.agent">
+        <!-- On a phone the agent comes first: what you act on, before the ticket's long text. -->
+        <section class="order-first min-w-0 space-y-6 xl:order-none">
+            <FoldingSection id="agent" title="Agent" remember="ticket.agent" class="scroll-mt-28">
                 <p v-if="!agentReady" class="text-sm text-signal">
                     No Anthropic sign-in yet (an API key or a subscription token), so no agent can run.
                     <Link href="/docs/concept#getting-an-anthropic-api-key" class="underline">How to get one</Link>.
@@ -340,7 +355,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </LogEntry>
                 </template>
 
-                <form v-if="!busy" class="flex flex-wrap gap-2 pt-2" @submit.prevent="send">
+                <form v-if="!busy" class="flex flex-col gap-2 pt-2 sm:flex-row" @submit.prevent="send">
                     <label for="message" class="sr-only">Message the agent</label>
                     <textarea
                         id="message"
@@ -349,7 +364,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         placeholder="Ask the agent: look at the batch job instead, the reporter says it worked last week…"
                         class="min-w-0 flex-1 rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"
                     ></textarea>
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-wrap gap-2 sm:flex-col">
                         <button type="submit" class="btn btn-signal" :disabled="message.processing || !message.text.trim()">Send</button>
                         <button type="button" class="btn" @click="post('restate')">Update proposal</button>
                         <button type="button" class="btn" @click="post('case')">Draft a case</button>
@@ -391,7 +406,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             </FoldingSection>
 
             <!-- The proposal -->
-            <FoldingSection v-if="proposal" title="Proposal" remember="ticket.proposal" class="text-sm">
+            <FoldingSection v-if="proposal" id="proposal" title="Proposal" remember="ticket.proposal" class="scroll-mt-28 text-sm">
                 <template #aside>
                     <p class="font-mono text-xs" :class="confidenceTone[proposal.confidence]">{{ proposal.confidence }} confidence</p>
                 </template>

@@ -25,6 +25,8 @@ function quickScan() {
     router.post(`/tickets/${props.ticket.id}/quick-scan`, {}, { preserveScroll: true, preserveState: true });
 }
 
+const action = 'hover:text-ink hover:underline max-lg:rounded-md max-lg:border max-lg:border-line max-lg:bg-surface max-lg:px-3 max-lg:py-1.5 max-lg:text-ink max-lg:no-underline';
+
 function toggleHidden() {
     const url = `/tickets/${props.ticket.id}/hide`;
     const options = { preserveScroll: true, preserveState: true };
@@ -53,15 +55,17 @@ function toggleHidden() {
                 </a>
             </span>
             <StatusLabel :status="ticket.status" :tone="ticket.status_tone" />
+            <!-- On a phone the badge sits up here, on the first line; on a wide screen, in its column. -->
+            <StateBadge :state="ticket.group" class="ml-auto lg:hidden" />
         </div>
 
         <div class="min-w-0">
-            <Link :href="ticket.page" class="font-medium break-words hover:underline">{{ ticket.summary }}</Link>
+            <Link :href="ticket.page" class="line-clamp-3 font-medium break-words hover:underline lg:line-clamp-none">{{ ticket.summary }}</Link>
             <p class="mt-0.5 text-sm text-muted">
                 <SpaceLabel v-if="space" :label="space.label" :colour="space.colour" />
                 <template v-if="ticket.priority"> · {{ ticket.priority }}</template>
-                <template v-if="ticket.reporter"> · {{ ticket.reporter }}</template>
-                <template v-if="ticket.created_at"> · created {{ short(ticket.created_at) }}</template>
+                <span v-if="ticket.reporter" class="max-sm:hidden"> · {{ ticket.reporter }}</span>
+                <span v-if="ticket.created_at" class="max-sm:hidden"> · created {{ short(ticket.created_at) }}</span>
                 · updated {{ ago(ticket.updated_at) }}
             </p>
             <!-- What is waiting in the outbox for this ticket, and what sending it will change. -->
@@ -88,16 +92,17 @@ function toggleHidden() {
 
         <!-- Side by side under the summary on a narrow screen, columns of their own on a wide one. -->
         <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm lg:contents">
-            <div>
-                <p class="text-xs text-muted">Assigned to</p>
+            <div class="max-sm:flex max-sm:gap-1.5">
+                <p class="text-xs text-muted max-sm:text-sm">Assigned to</p>
                 <p :class="ticket.assignee ? 'text-ink' : 'text-muted italic'">{{ ticket.assignee ?? 'nobody' }}</p>
             </div>
             <div v-if="ticket.slas?.length" class="space-y-0.5">
-                <p class="text-xs text-muted">SLA</p>
-                <p v-for="sla in ticket.slas.slice(0, 2)" :key="sla.name" class="flex flex-wrap gap-x-1.5">
+                <p class="text-xs text-muted max-sm:hidden">SLA</p>
+                <!-- On a phone, the most urgent one, without its due date. -->
+                <p v-for="(sla, index) in ticket.slas.slice(0, 2)" :key="sla.name" class="flex-wrap gap-x-1.5" :class="index ? 'hidden sm:flex' : 'flex'">
                     <span class="text-muted">{{ shortName(sla.name) }}</span>
                     <span class="font-medium" :style="{ color: `var(--tone-${tone(sla)})` }">{{ phrase(sla) }}</span>
-                    <span v-if="sla.due_at && sla.state === 'running'" class="text-xs leading-5 text-muted">due {{ short(sla.due_at) }}</span>
+                    <span v-if="sla.due_at && sla.state === 'running'" class="text-xs leading-5 text-muted max-sm:hidden">due {{ short(sla.due_at) }}</span>
                 </p>
             </div>
             <div v-else class="hidden lg:block"></div>
@@ -105,15 +110,16 @@ function toggleHidden() {
 
         <!-- A fixed width, so the columns before it line up from row to row. -->
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 lg:flex-col lg:items-end lg:pt-0.5">
-            <StateBadge :state="ticket.group" />
+            <StateBadge :state="ticket.group" class="max-lg:hidden" />
             <span v-if="ticket.on_it" class="text-xs" :class="ticket.on_it === 'you' ? 'text-muted' : 'text-working'">{{ ticket.on_it === 'you' ? 'yours' : `${ticket.on_it} is on it` }}</span>
             <!-- One per line on a wide screen, under the badge; side by side on a narrow one. -->
             <p class="flex flex-wrap gap-x-3 gap-y-1 text-sm whitespace-nowrap text-muted lg:flex-col lg:items-end lg:gap-y-0.5">
-                <button v-if="!['queued', 'running', 'pending'].includes(ticket.quick_scan?.state)" type="button" class="hover:text-ink hover:underline" @click="quickScan">
+                <!-- Real buttons on a phone, a thumb's size; quiet links on a wide screen. -->
+                <button v-if="!['queued', 'running', 'pending'].includes(ticket.quick_scan?.state)" type="button" :class="action" @click="quickScan">
                     {{ ticket.quick_scan?.result ? 'Scan again' : 'Quick scan' }}
                 </button>
-                <button type="button" class="hover:text-ink hover:underline" @click="toggleHidden">{{ ticket.group === 'hidden' ? 'Unhide' : 'Hide' }}</button>
-                <Link :href="`/casebook/create?ticket=${encodeURIComponent(ticket.key)}`" class="hover:text-ink hover:underline">Write it up</Link>
+                <button type="button" :class="action" @click="toggleHidden">{{ ticket.group === 'hidden' ? 'Unhide' : 'Hide' }}</button>
+                <Link :href="`/casebook/create?ticket=${encodeURIComponent(ticket.key)}`" class="hover:text-ink hover:underline max-lg:hidden">Write it up</Link>
             </p>
         </div>
     </div>
