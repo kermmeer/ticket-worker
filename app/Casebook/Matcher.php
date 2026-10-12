@@ -134,10 +134,32 @@ class Matcher
         return array_slice($all, 0, $limit);
     }
 
-    /** @return array{id: int, score: float}|null */
-    public function best(string $text): ?array
+    /**
+     * The best match, leaving out the cases someone said this ticket is not related to.
+     *
+     * @param  list<int>  $except
+     * @return array{id: int, score: float}|null
+     */
+    public function best(string $text, array $except = []): ?array
     {
-        return $this->ranked($text, 1)[0] ?? null;
+        foreach ($this->ranked($text, count($except) + 1) as $match) {
+            if (! in_array($match['id'], $except, true)) {
+                return $match;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Which cases each ticket was unlinked from: ticket id => list of case ids.
+     *
+     * @return array<int, list<int>>
+     */
+    public static function rejections(): array
+    {
+        return \Illuminate\Support\Facades\DB::table('casebook_rejections')->get(['ticket_id', 'casebook_entry_id'])
+            ->groupBy('ticket_id')->map(fn ($rows) => $rows->pluck('casebook_entry_id')->map(fn ($id) => (int) $id)->all())->all();
     }
 
     /** @return array{id: int, score: float}|null */

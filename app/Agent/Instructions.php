@@ -341,7 +341,9 @@ The commits since, with the files they touched:
     public static function analysis(Ticket $ticket, ?string $note = null): string
     {
         // The same matching the overview's hint uses: rare words among this space's tickets.
-        $ranked = collect(Matcher::forSpace($ticket->space)->ranked($ticket->matchText(), 3));
+        $rejected = Matcher::rejections()[$ticket->id] ?? [];
+        $ranked = collect(Matcher::forSpace($ticket->space)->ranked($ticket->matchText(), 3 + count($rejected)))
+            ->reject(fn ($match) => in_array($match['id'], $rejected, true))->take(3);
         $entries = CasebookEntry::query()->whereKey($ranked->pluck('id'))->get()->keyBy('id');
         $matches = $ranked
             ->filter(fn ($match) => isset($entries[$match['id']]))

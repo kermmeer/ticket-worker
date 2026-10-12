@@ -139,7 +139,7 @@ class CasebookTest extends TestCase
 
         $this->get("/casebook/{$entry->id}/edit")->assertInertia(fn (Assert $page) => $page
             ->component('Casebook/Form', true)
-            ->where('matches.0.key', 'SUP-1'));
+            ->where('linked.0.key', 'SUP-1'));
 
         $this->delete("/casebook/{$entry->id}");
         $this->assertNull($ticket->fresh()->casebook_entry_id);

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Casebook\Matcher;
 use App\Jira\JiraClient;
 use App\Jobs\RematchCasebook;
 use App\Models\AgentTurn;
+use App\Models\AuditEvent;
 use App\Models\CasebookEntry;
 use App\Models\System;
 use App\Models\Ticket;
@@ -109,6 +111,33 @@ class CasebookController extends Controller
             : to_route('casebook.index')->with('success', 'Proposed. An editor approves it, and from then on the agents are offered it.');
     }
 
+    /** "Not related": untie the ticket, and never tie it to this case again. */
+    public function unlink(CasebookEntry $entry, Ticket $ticket): RedirectResponse
+    {
+        \Illuminate\Support\Facades\DB::table('casebook_rejections')->insertOrIgnore([
+            'casebook_entry_id' => $entry->id, 'ticket_id' => $ticket->id, 'user_id' => auth()->id(), 'created_at' => now(),
+        ]);
+        if ($ticket->casebook_entry_id === $entry->id) {
+            // The next best case, if one fits; else none.
+            $ticket->rememberMatch(Matcher::forSpace($ticket->space)->best($ticket->matchText(), Matcher::rejections()[$ticket->id] ?? []));
+            $ticket->save();
+        }
+        AuditEvent::record('case.unlink', $entry->title, "{$ticket->key} is not related");
+
+        return back()->with('success', "{$ticket->key} is no longer tied to this case, and will not be again.");
+    }
+
+    /** Changed your mind: the ticket may match this case again. */
+    public function relink(CasebookEntry $entry, Ticket $ticket): RedirectResponse
+    {
+        \Illuminate\Support\Facades\DB::table('casebook_rejections')->where(['casebook_entry_id' => $entry->id, 'ticket_id' => $ticket->id])->delete();
+        $ticket->rememberMatch(Matcher::forSpace($ticket->space)->best($ticket->matchText(), Matcher::rejections()[$ticket->id] ?? []));
+        $ticket->save();
+        AuditEvent::record('case.relink', $entry->title, "{$ticket->key} may match it again");
+
+        return back()->with('success', $ticket->casebook_entry_id === $entry->id ? "{$ticket->key} is tied to this case again." : "{$ticket->key} may match this case again; its words do not, right now.");
+    }
+
     public function edit(CasebookEntry $entry, JiraClient $jira): Response
     {
         return Inertia::render('Casebook/Form', [
@@ -128,13 +157,19 @@ class CasebookController extends Controller
             ],
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
             'spaces' => \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']),
-            // The open tickets it matches right now: the quickest check on its words.
-            'matches' => $entry->tickets()->open()->orderByDesc('casebook_score')->limit(20)->get()
+            // Every open ticket tied to it, strongest first; and those you said are not related.
+            'linked' => $entry->tickets()->open()->visibleTo(auth()->user())->orderByDesc('casebook_score')->get()
                 ->map(fn (Ticket $ticket) => [
+                    'id' => $ticket->id,
                     'key' => $ticket->key,
                     'summary' => $ticket->summary,
                     'score' => $ticket->casebook_score,
-                    'url' => $jira->browseUrl($ticket->key),
+                    'page' => route('tickets.show', $ticket, false),
+                ]),
+            'unlinked' => Ticket::query()->visibleTo(auth()->user())
+                ->whereIn('id', \Illuminate\Support\Facades\DB::table('casebook_rejections')->where('casebook_entry_id', $entry->id)->pluck('ticket_id'))
+                ->orderBy('key')->get()->map(fn (Ticket $ticket) => [
+                    'id' => $ticket->id, 'key' => $ticket->key, 'summary' => $ticket->summary, 'page' => route('tickets.show', $ticket, false),
                 ]),
         ]);
     }

@@ -6,9 +6,21 @@ const props = defineProps({
     entry: { type: Object, required: true },
     systems: { type: Array, required: true },
     spaces: { type: Array, default: () => [] },
-    matches: { type: Array, required: true },
+    linked: { type: Array, default: () => [] },
+    unlinked: { type: Array, default: () => [] },
     fromAgent: { type: Boolean, default: false },
 });
+
+// How strong a tie is, in words: the score counts rare words in common, weighted.
+const strength = (score) => (score >= 35 ? { label: 'strong', tone: 'text-done' } : score >= 25 ? { label: 'good', tone: 'text-ink' } : { label: 'weak', tone: 'text-muted' });
+
+function unlink(ticket) {
+    router.post(`/casebook/${props.entry.id}/tickets/${ticket.id}/unlink`, {}, { preserveScroll: true });
+}
+
+function relink(ticket) {
+    router.post(`/casebook/${props.entry.id}/tickets/${ticket.id}/relink`, {}, { preserveScroll: true });
+}
 
 const form = useForm({
     title: props.entry.title,
@@ -123,15 +135,28 @@ const fieldClass = 'mt-1 w-full rounded-md border border-line bg-page px-3 py-2 
             </div>
 
             <div v-if="entry.id" class="card p-5">
-                <p class="text-sm font-medium">Open tickets it matches now</p>
-                <p v-if="entry.state !== 'approved'" class="mt-1 text-sm text-muted">None: only approved cases are matched.</p>
-                <p v-else-if="matches.length === 0" class="mt-1 text-sm text-muted">None at the moment.</p>
-                <ul v-else class="mt-2 space-y-2 text-sm">
-                    <li v-for="match in matches" :key="match.key" class="flex gap-2">
-                        <a :href="match.url" target="_blank" rel="noopener" class="shrink-0"><TicketKey :value="match.key" /></a>
-                        <span class="min-w-0 break-words text-muted">{{ match.summary }}</span>
+                <p class="text-sm font-medium">Tickets tied to it <span v-if="linked.length" class="font-normal text-muted">· {{ linked.length }}</span></p>
+                <p class="mt-1 text-xs text-muted">The open tickets whose words match it, strongest first. Not related? Untie it: it will not be tied to this case again.</p>
+                <p v-if="entry.state !== 'approved'" class="mt-2 text-sm text-muted">None: only approved cases are matched.</p>
+                <p v-else-if="linked.length === 0" class="mt-2 text-sm text-muted">None at the moment.</p>
+                <ul v-else class="mt-3 divide-y divide-line text-sm">
+                    <li v-for="ticket in linked" :key="ticket.id" class="flex flex-wrap items-start gap-x-2 gap-y-1 py-2">
+                        <Link :href="ticket.page" class="shrink-0"><TicketKey :value="ticket.key" /></Link>
+                        <Link :href="ticket.page" class="min-w-0 flex-1 break-words hover:underline">{{ ticket.summary }}</Link>
+                        <span class="shrink-0 text-xs" :class="strength(ticket.score).tone">{{ strength(ticket.score).label }}</span>
+                        <button type="button" class="shrink-0 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-signal" @click="unlink(ticket)">Not related</button>
                     </li>
                 </ul>
+                <details v-if="unlinked.length" class="mt-3 text-sm">
+                    <summary class="cursor-pointer text-muted hover:text-ink">Said to be not related · {{ unlinked.length }}</summary>
+                    <ul class="mt-2 divide-y divide-line">
+                        <li v-for="ticket in unlinked" :key="ticket.id" class="flex flex-wrap items-start gap-x-2 py-2">
+                            <Link :href="ticket.page" class="shrink-0"><TicketKey :value="ticket.key" /></Link>
+                            <span class="min-w-0 flex-1 break-words text-muted">{{ ticket.summary }}</span>
+                            <button type="button" class="shrink-0 text-xs text-muted hover:text-ink" @click="relink(ticket)">Link again</button>
+                        </li>
+                    </ul>
+                </details>
             </div>
         </aside>
     </form>

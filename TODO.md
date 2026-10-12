@@ -178,3 +178,5 @@ to it, including work you finish.
       case had matched 138 of 616 tickets on words like "boss"; now 12
 - [x] A refused or failed page action shows a message instead of Inertia's modal error page,
       which looked like a stuck page; an expired page reloads itself
+- [x] A case lists every ticket tied to it (strong / good / weak); "Not related" unties it for
+      good, remembered through every rematch; "Link again" undoes it (2026-10-13)

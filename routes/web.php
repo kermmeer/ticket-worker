@@ -98,6 +98,8 @@ Route::middleware('role:editor')->group(function () {
         Route::get('/{entry}/edit', 'edit')->name('edit');
         Route::put('/{entry}', 'update')->name('update');
         Route::delete('/{entry}', 'destroy')->name('destroy');
+        Route::post('/{entry}/tickets/{ticket}/unlink', 'unlink')->name('unlink');
+        Route::post('/{entry}/tickets/{ticket}/relink', 'relink')->name('relink');
     });
 
     Route::controller(SystemController::class)->prefix('systems')->name('systems.')->group(function () {

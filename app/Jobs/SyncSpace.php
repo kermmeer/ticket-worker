@@ -52,6 +52,7 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
         $seen = [];
         $fresh = [];
         $casebook = Matcher::forSpace($space);
+        $rejected = Matcher::rejections();
 
         // SLAs live in service spaces only. Not being able to read them is no reason to
         // stop the sync: the tickets come in without.
@@ -70,7 +71,7 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
                 foreach ($page['issues'] as $issue) {
                     $seen[] = (string) $issue['id'];
                     $ticket = Ticket::record($space, $issue, $now, $slaFields);
-                    $ticket->rememberMatch($casebook->best($ticket->matchText()));
+                    $ticket->rememberMatch($casebook->best($ticket->matchText(), $rejected[$ticket->id] ?? []));
                     if ($ticket->wasRecentlyCreated && ! $firstSync) {
                         $fresh[] = $ticket;
                     }
