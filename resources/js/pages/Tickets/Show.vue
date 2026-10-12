@@ -159,6 +159,27 @@ watch(
 );
 onBeforeUnmount(() => clearInterval(scanPoll));
 
+// A finished turn's steps, folded into one line: "23 steps: 14 files read, 6 searches, 3 API
+// calls". The raw names of the tool's own tools (mcp__…) repeat the line it logs itself, and
+// the closing JSON is no step: both are left out.
+const stepWords = { reading: ['file read', 'files read'], searching: ['search', 'searches'], listing: ['listing', 'listings'], edit: ['edit', 'edits'], write: ['file written', 'files written'], api: ['API call', 'API calls'], sql: ['query', 'queries'] };
+function steps(turn) {
+    return turn.events.filter((event) => event.type === 'tool' && !/^(mcp__|structuredoutput)/i.test(event.summary));
+}
+function stepLine(turn) {
+    const all = steps(turn);
+    const counts = {};
+    for (const event of all) {
+        const word = event.summary.split(/\s/)[0].toLowerCase();
+        counts[word] = (counts[word] ?? 0) + 1;
+    }
+    const parts = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([word, n]) => (stepWords[word] ? `${n} ${stepWords[word][n === 1 ? 0 : 1]}` : null))
+        .filter(Boolean);
+    return `${all.length} step${all.length === 1 ? '' : 's'}${parts.length ? `: ${parts.join(', ')}` : ''}`;
+}
+
 // The jump bar's parts: only those the page has.
 const jumps = computed(() => [
     { id: 'scan', label: 'Quick scan' },
@@ -321,10 +342,26 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             {{ turnLabels[turn.kind] }} · {{ turn.state }}<template v-if="turn.cost_usd != null"> · ${{ turn.cost_usd.toFixed(2) }}</template>
                             <template v-if="turn.tokens_in != null"> · {{ tokens(turn.tokens_in) }} in · {{ tokens(turn.tokens_out) }} out</template>
                         </p>
-                        <template v-for="event in turn.events" :key="event.id">
-                            <AgentText v-if="event.type === 'text'" :text="event.summary" />
-                            <p v-else-if="event.type === 'tool'" class="font-mono text-xs break-all text-muted">{{ event.summary }}</p>
-                            <p v-else class="text-sm text-signal">{{ event.summary }}</p>
+                        <!-- While it works, every step as it happens; once done, the steps fold away into
+                             one line and what it said stays. -->
+                        <template v-if="turn.state === 'running'">
+                            <template v-for="event in turn.events" :key="event.id">
+                                <AgentText v-if="event.type === 'text'" :text="event.summary" />
+                                <p v-else-if="event.type === 'tool'" class="font-mono text-xs break-all text-muted">{{ event.summary }}</p>
+                                <p v-else class="text-sm text-signal">{{ event.summary }}</p>
+                            </template>
+                        </template>
+                        <template v-else>
+                            <details v-if="steps(turn).length" class="text-xs text-muted">
+                                <summary class="cursor-pointer hover:text-ink">{{ stepLine(turn) }}</summary>
+                                <ol class="mt-1 space-y-0.5 border-l border-line pl-3 font-mono break-all">
+                                    <li v-for="event in steps(turn)" :key="event.id">{{ event.summary }}</li>
+                                </ol>
+                            </details>
+                            <template v-for="event in turn.events" :key="event.id">
+                                <AgentText v-if="event.type === 'text'" :text="event.summary" />
+                                <p v-else-if="event.type !== 'tool'" class="text-sm text-signal">{{ event.summary }}</p>
+                            </template>
                         </template>
                         <ActivityLine v-if="turn.state === 'running'" :now="lastTool" :tally="`${turn.events.filter((e) => e.type === 'tool').length} steps`" />
                         <p v-if="turn.state === 'queued'" class="text-sm text-muted">Waiting for a free agent…</p>

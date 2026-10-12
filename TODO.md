@@ -164,3 +164,5 @@ to it, including work you finish.
       page in one column that never runs wide, agent first, a jump bar (2026-10-10)
 - [x] Database servers: one read-only login for every project database on a server; a project's
       database picks the server and its database from a list (2026-10-12)
+- [x] Ticket log: a finished turn's steps fold into one line ("48 steps: 30 searches, 10 files
+      read, 6 API calls"); live while it runs (2026-10-12)
