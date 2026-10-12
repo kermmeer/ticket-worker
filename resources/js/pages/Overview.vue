@@ -61,10 +61,21 @@ const spaceFilter = ref(
     : props.spaces.some((space) => space.followed) ? 'mine' : null,
 );
 watch(spaceFilter, (value) => keep('overview.space', value ?? 'all'));
-// Assigned to you in Jira, once your account is linked to your Jira user.
-const myJira = computed(() => usePage().props.me?.jira_account_id ?? null);
-const mineOnly = ref(stored('overview.mine') === true);
-watch(mineOnly, (value) => keep('overview.mine', value));
+// Whose tickets: everyone's, mine (assigned to me or reported by me), or one person's, as
+// assignee or reporter. Kept like the space. An earlier "Assigned to me" carries over as mine.
+const me = computed(() => usePage().props.me ?? {});
+const people = computed(() =>
+    [...new Set(props.tickets.flatMap((ticket) => [ticket.assignee, ticket.reporter]).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+);
+const savedPerson = stored('overview.person') ?? (stored('overview.mine') === true ? 'me' : null);
+const personFilter = ref(savedPerson === 'me' || people.value.includes(savedPerson) ? savedPerson : null);
+watch(personFilter, (value) => keep('overview.person', value));
+const isMe = (name) => !!name && [me.value.jira_name, me.value.name].filter(Boolean).some((mine) => mine.toLowerCase() === name.toLowerCase());
+const ofPerson = (ticket) =>
+    personFilter.value === null ||
+    (personFilter.value === 'me'
+        ? ticket.mine || isMe(ticket.assignee) || isMe(ticket.reporter)
+        : ticket.assignee === personFilter.value || ticket.reporter === personFilter.value);
 
 const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value === 'mine' ? followed.value.has(ticket.space_id) : ticket.space_id === spaceFilter.value);
 const statusFilter = ref(null);
@@ -87,14 +98,22 @@ const statuses = computed(() => {
     return [...counts.values()].sort((a, b) => b.count - a.count);
 });
 
+// What the search looks through: key, summary, the people, the status, the quick scan's line
+// and the known case. Every word typed must be somewhere in it.
+const haystack = (ticket) =>
+    [ticket.key, ticket.summary, ticket.reporter, ticket.assignee, ticket.status, ticket.quick_scan?.result?.summary, ticket.casebook?.title]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
 const shown = computed(() => {
     const query = search.value.trim().toLowerCase();
     return props.tickets.filter(
         (ticket) =>
             inSpace(ticket) &&
-            (!mineOnly.value || ticket.mine) &&
+            ofPerson(ticket) &&
             (statusFilter.value === null || ticket.status === statusFilter.value) &&
-            (query === '' || ticket.key.toLowerCase().includes(query) || ticket.summary.toLowerCase().includes(query)),
+            (query === '' || query.split(/\s+/).every((word) => haystack(ticket).includes(word))),
     );
 });
 
@@ -147,9 +166,9 @@ const perSpace = computed(() => {
     return counts;
 });
 
-// The totals follow the space chosen (and Assigned to me); status and search narrow the list
+// The totals follow the space and the person chosen; status and search narrow the list
 // below, not the board's count.
-const onBoard = computed(() => props.tickets.filter((ticket) => inSpace(ticket) && (!mineOnly.value || ticket.mine)));
+const onBoard = computed(() => props.tickets.filter((ticket) => inSpace(ticket) && ofPerson(ticket)));
 const count = (group) => onBoard.value.filter((ticket) => ticket.group === group).length;
 const sleepingCount = computed(() => count('sleeping'));
 const hiddenCount = computed(() => count('hidden'));
@@ -315,17 +334,27 @@ onBeforeUnmount(() => {
             </div>
         </section>
 
-        <div class="mt-10 flex flex-wrap items-center gap-2">
-            <button
-                v-if="myJira"
-                type="button"
-                class="rounded-full border px-3 py-1 text-sm transition-colors"
-                :class="mineOnly ? 'border-signal bg-signal text-page' : 'border-line text-muted hover:text-ink'"
-                :aria-pressed="mineOnly"
-                @click="mineOnly = !mineOnly"
-            >
-                Assigned to me
-            </button>
+            <label class="mt-10 flex w-full items-center gap-2">
+                <span class="sr-only">Search the tickets</span>
+                <input
+                    ref="searchBox"
+                    v-model="search"
+                    type="search"
+                    placeholder="Search: key, summary, reporter, assignee, status…"
+                    class="w-full rounded-md border border-line bg-surface px-3 py-2 text-base placeholder:text-muted sm:text-sm"
+                />
+                <span class="kbd hidden sm:inline-block" aria-hidden="true">/</span>
+            </label>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <label class="flex items-center gap-2 text-sm">
+                <span class="text-muted">Whose</span>
+                <select v-model="personFilter" class="max-w-48 rounded-md border px-2 py-1.5 text-sm" :class="personFilter ? 'border-signal bg-surface' : 'border-line bg-surface'">
+                    <option :value="null">Everyone's</option>
+                    <option value="me">Mine: assigned to me or created by me</option>
+                    <option v-for="person in people" :key="person" :value="person">{{ person }} (assigned or created)</option>
+                </select>
+            </label>
             <button
                 v-if="followed.size"
                 type="button"
@@ -362,17 +391,7 @@ onBeforeUnmount(() => {
                     <option v-for="(label, value) in sorts" :key="value" :value="value">{{ label }}</option>
                 </select>
             </label>
-            <label class="flex w-full items-center gap-2 sm:w-80">
-                <span class="sr-only">Search by key or summary</span>
-                <input
-                    ref="searchBox"
-                    v-model="search"
-                    type="search"
-                    placeholder="Search key or summary"
-                    class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm placeholder:text-muted"
-                />
-                <span class="kbd hidden sm:inline-block" aria-hidden="true">/</span>
-            </label>
+
         </div>
 
         <!-- One status at a time: click it again, or "Every status", to see them all. -->

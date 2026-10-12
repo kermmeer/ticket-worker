@@ -18,6 +18,23 @@ class Matcher
 
     public const MIN_SCORE = 2.0;
 
+    /**
+     * Against a space's own tickets: how rare a word is among them decides its weight, and a
+     * match needs more telling words. With one case in the casebook, "rare among the cases"
+     * made every word rare, and one case matched 138 of 616 tickets on words like "boss".
+     */
+    public const MIN_SHARED_IN_SPACE = 4;
+
+    public const MIN_SCORE_IN_SPACE = 20.0;
+
+    /** A word this common among the tickets says nothing (log(N / (1 + df)) at or below it). */
+    private const COMMON = 0.7;
+
+    /** Fewer tickets than this say too little about which words are common. */
+    private const MIN_CORPUS = 20;
+
+    private bool $inSpace = false;
+
     private const WEIGHTS = ['keywords' => 3.0, 'title' => 2.0, 'symptoms' => 1.0];
 
     /** Words that say nothing about a problem, in the languages tickets come in. */
@@ -38,8 +55,11 @@ class Matcher
     /** @var array<string, float> */
     private array $rarity = [];
 
-    /** @param iterable<CasebookEntry> $entries */
-    public function __construct(iterable $entries)
+    /**
+     * @param  iterable<CasebookEntry>  $entries
+     * @param  list<string>|null  $corpus  the texts of the tickets it will match against
+     */
+    public function __construct(iterable $entries, ?array $corpus = null)
     {
         $documentFrequency = [];
 
@@ -54,6 +74,23 @@ class Matcher
             foreach (array_keys($weights) as $word) {
                 $documentFrequency[$word] = ($documentFrequency[$word] ?? 0) + 1;
             }
+        }
+
+        // Rare among the tickets, when there are enough of them to tell.
+        if ($corpus !== null && count($corpus) >= self::MIN_CORPUS) {
+            $this->inSpace = true;
+            $inTickets = [];
+            foreach ($corpus as $text) {
+                foreach (array_unique(self::words($text)) as $word) {
+                    $inTickets[$word] = ($inTickets[$word] ?? 0) + 1;
+                }
+            }
+            $total = count($corpus);
+            foreach (array_keys($documentFrequency) as $word) {
+                $this->rarity[$word] = log($total / (1 + ($inTickets[$word] ?? 0)));
+            }
+
+            return;
         }
 
         $count = max(1, count($this->words));
@@ -76,31 +113,54 @@ class Matcher
             ->when($systems->isNotEmpty(), fn ($query) => $query->where(
                 fn ($query) => $query->whereNull('system_id')->orWhereIn('system_id', $systems),
             ))
-            ->get());
+            ->get(), $space->tickets()->open()->get()->map->matchText()->all());
+    }
+
+    /**
+     * Every entry the text matches, best first, at most $limit.
+     *
+     * @return list<array{id: int, score: float}>
+     */
+    public function ranked(string $text, int $limit = 3): array
+    {
+        $all = [];
+        foreach (array_keys($this->words) as $id) {
+            if (($match = $this->score($id, array_unique(self::words($text)))) !== null) {
+                $all[] = $match;
+            }
+        }
+        usort($all, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_slice($all, 0, $limit);
     }
 
     /** @return array{id: int, score: float}|null */
     public function best(string $text): ?array
     {
-        $words = array_unique(self::words($text));
-        $best = null;
+        return $this->ranked($text, 1)[0] ?? null;
+    }
 
-        foreach ($this->words as $id => $weights) {
-            $shared = 0;
-            $score = 0.0;
-            foreach ($words as $word) {
-                if (isset($weights[$word])) {
-                    $shared++;
-                    $score += $weights[$word] * $this->rarity[$word];
-                }
+    /** @return array{id: int, score: float}|null */
+    private function score(int $id, array $words): ?array
+    {
+        $shared = 0;
+        $score = 0.0;
+        foreach ($words as $word) {
+            if (! isset($this->words[$id][$word])) {
+                continue;
             }
-
-            if ($shared >= self::MIN_SHARED && $score >= self::MIN_SCORE && ($best === null || $score > $best['score'])) {
-                $best = ['id' => $id, 'score' => round($score, 2)];
+            $rarity = $this->rarity[$word];
+            // Among the tickets, a word most of them have is no evidence at all.
+            if ($this->inSpace && $rarity <= self::COMMON) {
+                continue;
             }
+            $shared++;
+            $score += $this->words[$id][$word] * $rarity;
         }
 
-        return $best;
+        [$minShared, $minScore] = $this->inSpace ? [self::MIN_SHARED_IN_SPACE, self::MIN_SCORE_IN_SPACE] : [self::MIN_SHARED, self::MIN_SCORE];
+
+        return $shared >= $minShared && $score >= $minScore ? ['id' => $id, 'score' => round($score, 2)] : null;
     }
 
     /**

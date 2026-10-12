@@ -98,6 +98,10 @@ function toggleHyper() {
                 <span class="text-muted">A message you were typing to the agent is kept.</span>
                 <button type="button" class="btn btn-signal ml-auto px-3 py-1" @click="signInAgain">Sign in again</button>
             </div>
+            <p v-else-if="connection.problem" role="alert" class="mb-8 flex items-start gap-3 rounded-md border border-signal/40 bg-surface px-4 py-2.5 text-sm text-signal">
+                <span class="flex-1">{{ connection.problem }}</span>
+                <button type="button" class="text-muted hover:text-ink" aria-label="Dismiss" @click="connection.problem = null">✕</button>
+            </p>
             <p v-else-if="connection.offline" role="status" class="mb-8 rounded-md border border-waiting/40 bg-surface px-4 py-2.5 text-sm text-waiting">
                 Cannot reach Ticket Worker. It tries again by itself; what you typed is kept.
             </p>

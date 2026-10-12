@@ -340,12 +340,12 @@ The commits since, with the files they touched:
 
     public static function analysis(Ticket $ticket, ?string $note = null): string
     {
-        $matches = collect(CasebookEntry::query()->approved()->forSpace($ticket->space_id)->get())
-            ->map(fn ($entry) => [$entry, (new Matcher([$entry]))->best($ticket->matchText())])
-            ->filter(fn ($pair) => $pair[1] !== null)
-            ->sortByDesc(fn ($pair) => $pair[1]['score'])
-            ->take(3)
-            ->map(fn ($pair) => "- casebook/case-{$pair[0]->id}.md: {$pair[0]->title}")
+        // The same matching the overview's hint uses: rare words among this space's tickets.
+        $ranked = collect(Matcher::forSpace($ticket->space)->ranked($ticket->matchText(), 3));
+        $entries = CasebookEntry::query()->whereKey($ranked->pluck('id'))->get()->keyBy('id');
+        $matches = $ranked
+            ->filter(fn ($match) => isset($entries[$match['id']]))
+            ->map(fn ($match) => "- casebook/case-{$match['id']}.md: {$entries[$match['id']]->title}")
             ->implode("\n");
 
         $hint = $matches !== '' ? "Cases that look similar, read them first:\n{$matches}" : 'No case in the casebook looks similar.';

@@ -42,6 +42,7 @@ class HandleInertiaRequests extends Middleware
                 'has_claude' => $user->claudeCredentials() !== [],
                 'can_run_agents' => \App\Agent\Instructions::credentials($user) !== [],
                 'jira_account_id' => $user->jira_account_id,
+                'jira_name' => $user->jira_name,
             ] : null,
             // The name on the link that opens a ticket: Jira, or the app JIRA_OPEN_URL points to.
             'openLabel' => config('services.jira.open_label'),

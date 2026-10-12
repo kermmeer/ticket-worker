@@ -87,7 +87,18 @@ class OverviewController extends Controller
                 'url' => $byId[$ticket->space_id]->jira()->browseUrl($ticket->key),
                 'open_label' => $byId[$ticket->space_id]->openLabel(),
                 'page' => route('tickets.show', $ticket, false),
-                'quick_scan' => $ticket->quickScanData(),
+                // Only what the row shows: the overview refreshes every 30 seconds with every ticket,
+                // and the whole scan (its steps, its cause, its next step) made that a megabyte.
+                'quick_scan' => $ticket->quick_scan_state === null ? null : [
+                    'state' => $ticket->quick_scan_state,
+                    'cost_usd' => $ticket->quick_scan_cost_usd,
+                    'result' => $ticket->quick_scan === null ? null : [
+                        'kind' => $ticket->quick_scan['kind'] ?? null,
+                        'system' => $ticket->quick_scan['system'] ?? null,
+                        'summary' => $ticket->quick_scan['summary'] ?? null,
+                        'data_check' => isset($ticket->quick_scan['data_check']) ? ['still_present' => $ticket->quick_scan['data_check']['still_present'] ?? 'unknown'] : null,
+                    ],
+                ],
                 // Whose open session it is: "Karl is on it", so two people never work one ticket blind.
                 'on_it' => ($session = $sessions[$ticket->id] ?? null) !== null && $session->state !== 'closed' && $session->user !== null
                     ? ($session->user->is(auth()->user()) ? 'you' : $session->user->firstName())

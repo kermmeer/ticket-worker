@@ -170,3 +170,11 @@ to it, including work you finish.
       action as buttons); the full proposal folded above the reply; finished turns show only their
       answer; patch details folded. Agents: a one-line headline, limits per field, no running
       commentary, answers of about 120 words. Ticket 783: ~2,300 words on the page, now ~730.
+- [x] Overview: search over key, summary, people, status, scan line and case, every word; a
+      "Whose" filter (mine: assigned or created; or anyone seen, as assignee or reporter), kept
+      like the space (2026-10-12)
+- [x] Overview refresh: half the data (the row's scan only, no steps): 1 MB → 0.5 MB every 30 s
+- [x] Casebook matching by words rare among the space's tickets, four of them at least: one
+      case had matched 138 of 616 tickets on words like "boss"; now 12
+- [x] A refused or failed page action shows a message instead of Inertia's modal error page,
+      which looked like a stuck page; an expired page reloads itself
