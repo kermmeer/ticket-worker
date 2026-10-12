@@ -25,6 +25,22 @@ function quickScan() {
     router.post(`/tickets/${props.ticket.id}/quick-scan`, {}, { preserveScroll: true, preserveState: true });
 }
 
+// The whole row opens the ticket. A link or button in it does its own thing; a click that
+// ends a text selection selects; ctrl, cmd or the middle button open a new tab, as a link
+// would. The summary stays the real link, for the keyboard and screen readers.
+function open(event) {
+    if (event.target.closest('a, button, input, select, textarea, label, summary') || String(window.getSelection?.() ?? '').length) {
+        return;
+    }
+    if (event.button === 1 || event.ctrlKey || event.metaKey) {
+        window.open(props.ticket.page, '_blank', 'noopener');
+        return;
+    }
+    if (event.button === 0) {
+        router.visit(props.ticket.page);
+    }
+}
+
 const action = 'hover:text-ink hover:underline max-lg:rounded-md max-lg:border max-lg:border-line max-lg:bg-surface max-lg:px-3 max-lg:py-1.5 max-lg:text-ink max-lg:no-underline';
 
 function toggleHidden() {
@@ -35,7 +51,11 @@ function toggleHidden() {
 </script>
 
 <template>
-    <div class="grid gap-x-6 gap-y-2 p-4 transition-colors hover:bg-sunken/50 lg:grid-cols-[12rem_minmax(0,1fr)_11rem_17rem_11rem] lg:items-start">
+    <div
+        class="grid cursor-pointer gap-x-6 gap-y-2 p-4 transition-colors hover:bg-sunken/50 lg:grid-cols-[12rem_minmax(0,1fr)_11rem_17rem_11rem] lg:items-start"
+        @click="open"
+        @auxclick="open"
+    >
         <div class="flex flex-wrap items-start gap-1.5 lg:flex-col">
             <span class="flex items-center gap-1">
                 <Link :href="ticket.page"><TicketKey :value="ticket.key" /></Link>
