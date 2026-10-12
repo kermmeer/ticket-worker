@@ -22,7 +22,7 @@ class DbConnection extends Model
 
     public const TIMEOUT_SECONDS = 15;
 
-    protected $fillable = ['system_id', 'name', 'driver', 'host', 'port', 'database', 'username', 'password', 'notes'];
+    protected $fillable = ['system_id', 'db_server_id', 'name', 'driver', 'host', 'port', 'database', 'username', 'password', 'notes'];
 
     protected $hidden = ['password'];
 
@@ -36,9 +36,32 @@ class DbConnection extends Model
         return $this->belongsTo(System::class);
     }
 
+    /** The server whose login it uses, when it has none of its own. */
+    public function server(): BelongsTo
+    {
+        return $this->belongsTo(DbServer::class, 'db_server_id');
+    }
+
+    /**
+     * How it signs in: its server's login, or its own.
+     *
+     * @return array{driver: string, host: string, port: ?int, username: ?string, password: ?string}
+     */
+    public function login(): array
+    {
+        $from = $this->db_server_id && $this->server ? $this->server : $this;
+
+        return ['driver' => $from->driver, 'host' => (string) $from->host, 'port' => $from->port, 'username' => $from->username, 'password' => $from->password];
+    }
+
+    public function kind(): string
+    {
+        return $this->login()['driver'];
+    }
+
     public function available(): bool
     {
-        return extension_loaded($this->driver === 'pgsql' ? 'pdo_pgsql' : 'pdo_mysql');
+        return extension_loaded($this->kind() === 'pgsql' ? 'pdo_pgsql' : 'pdo_mysql');
     }
 
     /**
@@ -50,12 +73,12 @@ class DbConnection extends Model
     {
         $sql = ReadOnlySql::check($sql);
         if (! $this->available()) {
-            throw new \RuntimeException("This server has no {$this->driver} driver for PHP (pdo_{$this->driver}).");
+            throw new \RuntimeException("This server has no {$this->kind()} driver for PHP (pdo_{$this->kind()}).");
         }
 
         $pdo = $this->connect();
         $ms = self::TIMEOUT_SECONDS * 1000;
-        if ($this->driver === 'pgsql') {
+        if ($this->kind() === 'pgsql') {
             $pdo->exec("SET statement_timeout = {$ms}");
             $pdo->exec('BEGIN READ ONLY');
         } else {
@@ -87,20 +110,15 @@ class DbConnection extends Model
 
     public function redact(string $text): string
     {
-        return filled($this->password) && strlen($this->password) >= 4 ? str_replace($this->password, '[secret]', $text) : $text;
+        $password = $this->login()['password'];
+
+        return filled($password) && strlen($password) >= 4 ? str_replace($password, '[secret]', $text) : $text;
     }
 
     private function connect(): PDO
     {
-        $port = $this->port ?: ($this->driver === 'pgsql' ? 5432 : 3306);
-        $dsn = $this->driver === 'pgsql'
-            ? "pgsql:host={$this->host};port={$port};dbname={$this->database};connect_timeout=10"
-            : "mysql:host={$this->host};port={$port};dbname={$this->database};charset=utf8mb4";
+        $login = $this->login();
 
-        return new PDO($dsn, $this->username, (string) $this->password, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 10,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
+        return DbServer::open($login['driver'], $login['host'], $login['port'], $this->database, $login['username'], $login['password']);
     }
 }

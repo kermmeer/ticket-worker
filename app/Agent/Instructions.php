@@ -383,7 +383,7 @@ The commits since, with the files they touched:
         $notes = fn ($notes) => $notes ? ' ('.str_replace("\n", ' ', $notes).')' : '';
         $lines = [
             ...$apis->map(fn ($api) => "- API {$api->system->name}/{$api->name}: {$api->base_url}".$notes($api->notes)),
-            ...$dbs->map(fn ($db) => "- database {$db->system->name}/{$db->name} ({$db->driver})".$notes($db->notes)),
+            ...$dbs->map(fn ($db) => "- database {$db->system->name}/{$db->name} ({$db->kind()})".$notes($db->notes)),
         ];
         $list = implode("\n", $lines);
 

@@ -63,7 +63,7 @@ class ApiToolServer
 
     private static function dbsOf(iterable $systems): Collection
     {
-        return DbConnection::query()->with('system')->whereIn('system_id', collect($systems)->pluck('id'))->orderBy('name')->get();
+        return DbConnection::query()->with(['system', 'server'])->whereIn('system_id', collect($systems)->pluck('id'))->orderBy('name')->get();
     }
 
     private static function apisOf(iterable $systems): Collection
@@ -205,7 +205,7 @@ class ApiToolServer
         $dbs = $this->dbs ?? collect();
         if ($tool === 'list_databases') {
             return $this->text($dbs->isEmpty() ? 'No databases are set up for these systems.' : json_encode($dbs->map(fn (DbConnection $db) => [
-                'database' => $db->system->name.'/'.$db->name, 'kind' => $db->driver, 'notes' => $db->notes,
+                'database' => $db->system->name.'/'.$db->name, 'kind' => $db->kind(), 'notes' => $db->notes,
             ])->values(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         }
 

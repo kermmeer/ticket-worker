@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 
 // A project's databases: queried read-only for the agent. The password goes in and never
@@ -7,9 +7,27 @@ import { router, useForm } from '@inertiajs/vue3';
 const props = defineProps({
     system: { type: Object, required: true },
     drivers: { type: Object, required: true },
+    servers: { type: Array, default: () => [] },
 });
 
-const blank = { name: '', driver: 'mysql', host: '', port: '', database: '', username: '', password: '', notes: '' };
+// On a server: pick it, then pick the database from what its login sees.
+const serverDatabases = ref([]);
+const listing = ref(null);
+async function loadDatabases(serverId) {
+    serverDatabases.value = [];
+    listing.value = null;
+    if (!serverId) {
+        return;
+    }
+    listing.value = 'Asking the server…';
+    const response = await fetch(`/systems/db-servers/${serverId}/databases`, { headers: { Accept: 'application/json' } });
+    const data = await response.json();
+    serverDatabases.value = data.databases ?? [];
+    listing.value = data.error ? `It did not answer: ${data.error}` : serverDatabases.value.length ? null : 'Its login sees no databases.';
+}
+watch(() => form.db_server_id, loadDatabases);
+
+const blank = { name: '', db_server_id: props.servers.length ? props.servers[0].id : null, driver: 'mysql', host: '', port: '', database: '', username: '', password: '', notes: '' };
 const editing = ref(null); // a database id, 'new', or null
 const form = useForm({ ...blank });
 
@@ -18,6 +36,7 @@ function start(db = null) {
     form.defaults(db ? { ...blank, ...db, port: db.port ?? '', notes: db.notes ?? '', password: '' } : { ...blank });
     form.reset();
     editing.value = db ? db.id : 'new';
+    loadDatabases(form.db_server_id);
 }
 
 function save() {
@@ -47,7 +66,8 @@ const field = 'mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5';
             <li v-for="db in system.databases" :key="db.id" class="p-3 text-sm">
                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span class="font-mono">{{ system.name }}/{{ db.name }}</span>
-                    <span class="font-mono text-xs break-all text-muted">{{ db.driver }} {{ db.username }}@{{ db.host }}{{ db.port ? `:${db.port}` : '' }}/{{ db.database }}</span>
+                    <span v-if="db.server" class="font-mono text-xs break-all text-muted">{{ db.database }} on {{ db.server }}</span>
+                    <span v-else class="font-mono text-xs break-all text-muted">{{ db.driver }} {{ db.username }}@{{ db.host }}{{ db.port ? `:${db.port}` : '' }}/{{ db.database }}</span>
                     <span class="text-xs" :class="db.has_password ? 'text-muted' : 'text-signal'">{{ db.has_password ? 'password set' : 'no password' }}</span>
                     <span v-if="!db.available" class="text-xs text-signal">this server has no {{ db.driver }} driver</span>
                     <span class="ml-auto flex gap-3 text-xs">
@@ -62,15 +82,27 @@ const field = 'mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5';
 
         <form v-if="editing !== null" class="mt-3 grid gap-3 rounded-md border border-line p-4 text-sm sm:grid-cols-3" @submit.prevent="save">
             <label>Name<input v-model="form.name" required placeholder="crm-db" :class="field" class="font-mono" /><span v-if="form.errors.name" class="block text-signal">{{ form.errors.name }}</span></label>
-            <label>Kind<select v-model="form.driver" :class="field"><option v-for="(label, value) in drivers" :key="value" :value="value">{{ label }}</option></select></label>
-            <label>Database<input v-model="form.database" required :class="field" class="font-mono" /></label>
-            <label>Host<input v-model="form.host" required placeholder="db.internal" :class="field" class="font-mono" /><span v-if="form.errors.host" class="block text-signal">{{ form.errors.host }}</span></label>
-            <label>Port <span class="text-muted">(empty: the usual)</span><input v-model="form.port" type="number" :class="field" /></label>
-            <label>User<input v-model="form.username" required autocomplete="off" :class="field" /></label>
-            <label class="sm:col-span-3">Password
-                <input v-model="form.password" type="password" autocomplete="new-password" :placeholder="editing !== 'new' && system.databases.find((d) => d.id === editing)?.has_password ? 'set; leave empty to keep it' : ''" :class="field" class="max-w-sm font-mono" />
-                <span class="block text-xs text-muted">Stored encrypted; never shown again, never given to the agent.</span>
+            <label>Login
+                <select v-model="form.db_server_id" :class="field">
+                    <option v-for="server in servers" :key="server.id" :value="server.id">on server {{ server.name }}</option>
+                    <option :value="null">a login of its own</option>
+                </select>
             </label>
+            <label>Database
+                <input v-model="form.database" required :list="form.db_server_id ? `dbs-${system.id}` : undefined" :class="field" class="font-mono" />
+                <datalist v-if="form.db_server_id" :id="`dbs-${system.id}`"><option v-for="name in serverDatabases" :key="name" :value="name" /></datalist>
+                <span v-if="listing" class="block text-xs text-muted">{{ listing }}</span>
+            </label>
+            <template v-if="!form.db_server_id">
+                <label>Kind<select v-model="form.driver" :class="field"><option v-for="(label, value) in drivers" :key="value" :value="value">{{ label }}</option></select></label>
+                <label>Host<input v-model="form.host" required placeholder="db.internal" :class="field" class="font-mono" /><span v-if="form.errors.host" class="block text-signal">{{ form.errors.host }}</span></label>
+                <label>Port <span class="text-muted">(empty: the usual)</span><input v-model="form.port" type="number" :class="field" /></label>
+                <label>User<input v-model="form.username" required autocomplete="off" :class="field" /></label>
+                <label class="sm:col-span-2">Password
+                    <input v-model="form.password" type="password" autocomplete="new-password" :placeholder="editing !== 'new' && system.databases.find((d) => d.id === editing)?.has_password ? 'set; leave empty to keep it' : ''" :class="field" class="max-w-sm font-mono" />
+                    <span class="block text-xs text-muted">Stored encrypted; never shown again, never given to the agent.</span>
+                </label>
+            </template>
             <label class="sm:col-span-3">Notes for the agent
                 <textarea v-model="form.notes" rows="2" placeholder="What it holds: invoices (invoice, invoice_line), services (service.recurring_price)…" :class="field"></textarea>
             </label>

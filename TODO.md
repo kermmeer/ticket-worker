@@ -162,3 +162,5 @@ to it, including work you finish.
 - [x] Phones: a bottom bar (Tickets, Agents, Casebook, You), compact overview rows with real
       buttons, forty per group then "Show more" (the overview was 205,000 px tall), the ticket
       page in one column that never runs wide, agent first, a jump bar (2026-10-10)
+- [x] Database servers: one read-only login for every project database on a server; a project's
+      database picks the server and its database from a list (2026-10-12)

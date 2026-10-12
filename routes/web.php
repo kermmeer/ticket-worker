@@ -113,6 +113,11 @@ Route::middleware('role:editor')->group(function () {
         Route::put('/{system}/pull', 'pull')->name('pull');
         Route::post('/{system}/pull/key', 'pullKey')->name('pull.key');
         Route::post('/{system}/pull/now', 'pullNow')->name('pull.now');
+        Route::post('/db-servers', 'storeServer')->name('db-servers.store');
+        Route::put('/db-servers/{server}', 'updateServer')->name('db-servers.update');
+        Route::delete('/db-servers/{server}', 'destroyServer')->name('db-servers.destroy');
+        Route::post('/db-servers/{server}/try', 'tryServer')->name('db-servers.try');
+        Route::get('/db-servers/{server}/databases', 'serverDatabases')->name('db-servers.databases');
         Route::post('/{system}/databases', 'storeDb')->name('databases.store');
         Route::put('/{system}/databases/{db}', 'updateDb')->name('databases.update');
         Route::delete('/{system}/databases/{db}', 'destroyDb')->name('databases.destroy');
