@@ -166,3 +166,7 @@ to it, including work you finish.
       database picks the server and its database from a list (2026-10-12)
 - [x] Ticket log: a finished turn's steps fold into one line ("48 steps: 30 searches, 10 files
       read, 6 API calls"); live while it runs (2026-10-12)
+- [x] Readable tickets (2026-10-12): a brief at the top (one line, cause, fix, the data, the next
+      action as buttons); the full proposal folded above the reply; finished turns show only their
+      answer; patch details folded. Agents: a one-line headline, limits per field, no running
+      commentary, answers of about 120 words. Ticket 783: ~2,300 words on the page, now ~730.

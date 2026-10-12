@@ -79,23 +79,25 @@ class Instructions
 
         return [
             'type' => 'object',
-            'required' => ['problem', 'system', 'cause', 'evidence', 'fix', 'fix_kind', 'reply_draft', 'confidence', 'confidence_reason'],
+            'required' => ['headline', 'problem', 'system', 'cause', 'evidence', 'fix', 'fix_kind', 'reply_draft', 'confidence', 'confidence_reason'],
             'properties' => [
-                'problem' => $text + ['description' => 'The ticket in one or two sentences: what the reporter sees and expected.'],
+                // The engineer reads hundreds of these: the first fields must be enough on their own.
+                'headline' => $text + ['description' => 'ONE line, under 140 characters: what is wrong and what to do. The engineer may read only this.'],
+                'problem' => $text + ['description' => 'One sentence, under 200 characters: what the reporter sees.'],
                 'system' => $text + ['description' => 'Which system it is about, by name, or "unknown".'],
-                'cause' => $text + ['description' => 'The most likely cause.'],
-                'other_causes' => ['type' => 'array', 'items' => $text],
-                'evidence' => ['type' => 'array', 'items' => [
+                'cause' => $text + ['description' => 'The most likely cause, in one or two sentences, under 300 characters. Details go in evidence.'],
+                'other_causes' => ['type' => 'array', 'description' => 'At most 3, each under 120 characters.', 'items' => $text],
+                'evidence' => ['type' => 'array', 'description' => 'At most 5, the strongest first.', 'items' => [
                     'type' => 'object',
                     'required' => ['kind', 'reference', 'note'],
                     'properties' => [
                         'kind' => ['type' => 'string', 'enum' => ['code', 'commit', 'ticket', 'attachment', 'casebook']],
                         'reference' => $text + ['description' => 'system/path:line, a commit hash, or a quote.'],
-                        'note' => $text,
+                        'note' => $text + ['description' => 'Under 120 characters.'],
                     ],
                 ]],
-                'fix' => $text + ['description' => 'What to change and where: code, data or configuration. Short and concrete.'],
-                'commands' => ['type' => 'array', 'description' => 'The exact commands, SQL queries or API calls for the engineer to check or apply the fix, ready to copy and run. Read-only checks first.', 'items' => [
+                'fix' => $text + ['description' => 'What to change and where, in one or two sentences, under 300 characters. The commands carry the detail.'],
+                'commands' => ['type' => 'array', 'description' => 'At most 3: the exact commands, SQL queries or API calls for the engineer to check or apply the fix, ready to copy and run. Read-only checks first.', 'items' => [
                     'type' => 'object',
                     'required' => ['purpose', 'where', 'kind', 'command'],
                     'properties' => [
@@ -108,12 +110,12 @@ class Instructions
                 ]],
                 'fix_kind' => ['type' => 'string', 'enum' => ['code', 'data', 'configuration', 'none'],
                     'description' => 'code when the fix is a change to files in one of the systems: a patch is then prepared for it.'],
-                'workaround' => $text,
-                'questions' => ['type' => 'array', 'items' => $text],
+                'workaround' => $text + ['description' => 'Only if there is one; one sentence.'],
+                'questions' => ['type' => 'array', 'description' => 'At most 3, only what blocks the fix.', 'items' => $text],
                 'reply_draft' => $text + ['description' => 'A reply to the reporter, written by the reply rules in the request.'],
                 'reply_language' => $text,
                 'confidence' => ['type' => 'string', 'enum' => ['low', 'medium', 'high']],
-                'confidence_reason' => $text,
+                'confidence_reason' => $text + ['description' => 'One sentence, under 160 characters.'],
                 'casebook' => ['type' => 'object', 'properties' => [
                     'case' => ['type' => ['integer', 'null']],
                     'fit' => $text + ['description' => 'fits, partly, or does not fit; or new when no case applied.'],
@@ -148,6 +150,8 @@ class Instructions
         - Check the casebook first. When a case fits, confirm it in the code and build on it.
         - Regressions are the most common cause: look at the history of the files involved.
         - Cite code as system/path:line, for example boss/app/Services/Invoice.php:212.
+        - Work silently: no commentary on what you are about to do or just did. Write only the answer
+          at the end. The engineer handles hundreds of tickets and reads only conclusions.
         - Talk to the engineer in English, short and to the point, by the answer rules sent with each
           request. Give exact commands, queries and code, never open suggestions. Write reply drafts in {$language}.
         - You cannot change files or run code. Say what to change; the engineer does it.{$contexts}
@@ -187,7 +191,7 @@ class Instructions
                 'system' => $text + ['description' => 'Which system it is about, by name, or "unknown".'],
                 'kind' => ['type' => 'string', 'enum' => ['bug', 'data', 'configuration', 'question', 'feature', 'unknown'],
                     'description' => 'data: wrong, missing or stuck records rather than wrong code.'],
-                'likely_cause' => $text + ['description' => 'The most likely cause in a sentence or two, with system/path:line when you saw it.'],
+                'likely_cause' => $text + ['description' => 'The most likely cause in ONE sentence, under 200 characters, with system/path:line when you saw it.'],
                 'data_check' => [
                     'type' => 'object',
                     'description' => 'Only when the ticket is about data: whether the problem is still there now.',
@@ -195,10 +199,10 @@ class Instructions
                     'properties' => [
                         'still_present' => ['type' => 'string', 'enum' => ['yes', 'no', 'unknown'],
                             'description' => 'yes or no only from a call_api lookup you made in this scan. What the ticket or a comment says is not a check: then unknown.'],
-                        'evidence' => $text + ['description' => 'The call you made and what it showed, in a line or two; for unknown, why you could not look.'],
+                        'evidence' => $text + ['description' => 'The call you made and what it showed, in one line under 160 characters; for unknown, why you could not look, in a few words.'],
                     ],
                 ],
-                'next_step' => $text + ['description' => 'The one next step for the engineer, as an exact command, query or action.'],
+                'next_step' => $text + ['description' => 'The one next step, under 160 characters: an exact command, query or action.'],
                 'urgency' => ['type' => 'string', 'enum' => ['low', 'normal', 'high']],
                 'confidence' => ['type' => 'string', 'enum' => ['low', 'medium', 'high']],
             ],
@@ -229,7 +233,7 @@ class Instructions
           calls for the records the ticket names, never a list. Never write a token down. Without a
           lookup the answer is unknown, whatever the ticket says.
         - The next step is one exact command, query or action, not a suggestion.
-        - Short. End with the JSON.
+        - Work silently, no commentary while you look. Short. End with the JSON.
 
         {$contexts}
         TEXT;

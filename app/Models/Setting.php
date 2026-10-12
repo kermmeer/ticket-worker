@@ -17,8 +17,9 @@ class Setting extends Model
 
     /** How the agent talks to you, until you change it on the Setup page. */
     public const DEFAULT_ANSWER_RULES = <<<'TEXT'
-    - Short and to the point. Lead with the answer, then the evidence. No preamble, no restating the question, no summary at the end.
-    - A few short paragraphs or a tight list at most. Leave out what does not change the conclusion.
+    - Short and to the point: at most about 120 words, unless I ask for more. Lead with the answer, then the evidence. No preamble, no restating the question, no summary at the end.
+    - No commentary while you work ("let me check…", "now I will…"): only the answer, at the end.
+    - Leave out what does not change the conclusion.
     - Never an open suggestion ("you could check the logs", "verify the configuration"). Whatever should be checked or done, give the exact command, SQL query, API call or code change, ready to copy and run, in a code block.
     - Use real names from the code and the ticket: tables, columns, routes, IDs, file paths. Mark only what you cannot know as <placeholder>.
     - Say where each command runs (which system, which database or server) and whether it only reads or changes data. Read-only first; anything that changes data comes with how to undo it.
