@@ -250,6 +250,25 @@ claim without leaving the ticket.
 
 ---
 
+### The ticket chat
+
+Since 2026-10-13 the ticket page is a chat. **Ask** puts a question to a lighter model
+(`CLAUDE_CHAT_MODEL`, default Sonnet), which reads the ticket and the quick scan and
+investigates only as far as the question needs: most answers take a minute and cost cents.
+**Dig deeper** is the full analysis of before, on `CLAUDE_MODEL`, ending in the proposal and
+the reply draft; what is in the box goes along as the engineer's note. A patch, a case or a
+restated proposal are asked for in the same place.
+
+A chat is short-lived on purpose. Each turn of a resumed conversation re-reads all of it, and
+the prompt cache that makes that cheap is gone after a few quiet minutes, so a question an
+hour later paid for the whole history again ($2 for a one-line answer, on the ticket that
+prompted this). A chat quiet for `AGENT_CHAT_FRESH_AFTER_MINUTES` (30) therefore starts
+afresh on the next question, carrying a summary instead: the last conclusion, the last few
+exchanges, a patch made, a note left. The earlier chat stays readable, folded, above it.
+
+Claude Code reports a resumed conversation's cost as its running total; each turn keeps
+the difference from the turn before (`claude_total_usd` holds the total).
+
 ### Quick scan
 
 A space can give every new ticket a **quick scan** as soon as the sync brings it in (built
@@ -611,6 +630,8 @@ repository is on the list (§17).
 | `CLAUDE_BIN` | `claude` | path to the CLI inside the worker |
 | `CLAUDE_MODEL` | `claude-opus-5` | a space can override it |
 | `CLAUDE_EFFORT` | `high` | |
+| `CLAUDE_CHAT_MODEL`, `CLAUDE_CHAT_EFFORT` | `claude-sonnet-5`, `medium` | Ask in the ticket chat; Dig deeper uses `CLAUDE_MODEL` |
+| `AGENT_CHAT_FRESH_AFTER_MINUTES` | `30` | a chat this quiet starts afresh, with a summary of the last one |
 | `AGENT_MAX_PARALLEL` | `2` | turns running at once |
 | `AGENT_TURN_BUDGET_USD` | `3` | default ceiling per turn; a space can override it |
 | `SYSTEMS_PATH` | `shared/systems` | the folders you push the systems into |
