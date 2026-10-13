@@ -340,9 +340,10 @@ The commits since, with the files they touched:
 {$shape}";
     }
 
-    public static function analysis(Ticket $ticket, ?string $note = null): string
+    /** The cases that look like this ticket, the way the overview's hint finds them. */
+    private static function casebookHint(Ticket $ticket): string
     {
-        // The same matching the overview's hint uses: rare words among this space's tickets.
+        // Rare words among this space's tickets; cases you said are unrelated stay out.
         $rejected = Matcher::rejections()[$ticket->id] ?? [];
         $ranked = collect(Matcher::forSpace($ticket->space)->ranked($ticket->matchText(), 3 + count($rejected)))
             ->reject(fn ($match) => in_array($match['id'], $rejected, true))->take(3);
@@ -352,7 +353,82 @@ The commits since, with the files they touched:
             ->map(fn ($match) => "- casebook/case-{$match['id']}.md: {$entries[$match['id']]->title}")
             ->implode("\n");
 
-        $hint = $matches !== '' ? "Cases that look similar, read them first:\n{$matches}" : 'No case in the casebook looks similar.';
+        return $matches !== '' ? "Cases that look similar, read them first:\n{$matches}" : 'No case in the casebook looks similar.';
+    }
+
+    /**
+     * The first question of a chat: answer it, and only as far as it needs. A deep analysis
+     * is a button of its own; most questions about a ticket take a minute, not six.
+     */
+    public static function chatStart(Ticket $ticket, string $question, ?string $earlier = null): string
+    {
+        $scan = $ticket->quick_scan_state === 'done' && is_array($ticket->quick_scan) ? $ticket->quick_scan : null;
+        $scan = $scan ? "\nThe quick scan of this ticket said (a first look, check it):\n".collect([
+            'Summary' => $scan['summary'] ?? null,
+            'System' => $scan['system'] ?? null,
+            'Likely cause' => $scan['likely_cause'] ?? null,
+            'Data still wrong' => isset($scan['data_check']) ? ($scan['data_check']['still_present'] ?? '?').': '.($scan['data_check']['evidence'] ?? '') : null,
+            'Next step' => $scan['next_step'] ?? null,
+        ])->filter()->map(fn ($value, $label) => "- {$label}: {$value}")->implode("\n")."\n" : '';
+        $earlier = filled($earlier) ? "\n{$earlier}\n" : '';
+        $hint = self::casebookHint($ticket);
+        $apis = self::apis($ticket);
+        $rules = self::replyRules($ticket->space);
+
+        return <<<TEXT
+        This is a chat about ticket {$ticket->key}: the engineer asks, you answer. Read ticket.md (and the
+        attachments when they matter) first. Investigate only as far as the question needs; for a full
+        analysis the engineer has a separate button. If the question cannot be answered well without a
+        deep look, say so in one line.
+        {$scan}{$earlier}
+        {$hint}
+        {$apis}
+
+        When you write a reply to the reporter: {$rules}
+
+        The engineer's question:
+
+        {$question}
+        TEXT;
+    }
+
+    /**
+     * What an earlier chat on the ticket found, for the fresh one after it: the conclusion and
+     * the last few exchanges, a few thousand characters instead of the whole conversation.
+     */
+    public static function carryOver(AgentSession $session): ?string
+    {
+        $turns = $session->turns()->where('state', 'done')->get();
+        if ($turns->isEmpty() && blank($session->handover_note)) {
+            return null;
+        }
+
+        $parts = [];
+        if ($proposal = $turns->whereNotNull('proposal')->last()?->proposal) {
+            $parts[] = 'Its conclusion: '.collect([
+                $proposal['headline'] ?? $proposal['problem'] ?? null,
+                isset($proposal['cause']) ? 'Cause: '.$proposal['cause'] : null,
+                isset($proposal['fix']) ? 'Fix: '.$proposal['fix'] : null,
+            ])->filter()->map(fn ($line) => \Illuminate\Support\Str::limit($line, 700))->implode("\n");
+        }
+        foreach ($turns->where('kind', 'message')->take(-3) as $turn) {
+            $parts[] = 'The engineer: '.\Illuminate\Support\Str::limit((string) ($turn->note ?? $turn->prompt), 500)
+                ."\nYou: ".\Illuminate\Support\Str::limit((string) $turn->answer, 1200);
+        }
+        if ($patch = $turns->whereNotNull('patch')->last()) {
+            $parts[] = 'A patch was made: '.($patch->patch_meta['subject'] ?? 'see the earlier chat').'.';
+        }
+        if (filled($session->handover_note)) {
+            $parts[] = 'Note left at the end: '.$session->handover_note;
+        }
+
+        return "An earlier chat on this ticket (the engineer's and yours) came to this. Build on it; check what you rely on:\n\n".implode("\n\n", $parts);
+    }
+
+    public static function analysis(Ticket $ticket, ?string $note = null, ?string $earlier = null): string
+    {
+        $hint = self::casebookHint($ticket);
+        $earlier = filled($earlier) ? "\n{$earlier}\n" : '';
 
         $rules = self::replyRules($ticket->space);
         $apis = self::apis($ticket);
@@ -370,7 +446,7 @@ The commits since, with the files they touched:
         return <<<TEXT
         Analyse ticket {$ticket->key}. Read ticket.md and the attachments, check the casebook, decide which
         system it is about, investigate the code and its history, and end with the proposal.
-        {$note}
+        {$note}{$earlier}
         {$hint}
         {$apis}
 

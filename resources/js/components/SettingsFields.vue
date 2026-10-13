@@ -19,7 +19,7 @@ const field = 'mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 tex
         <option value="claude-opus-5" /><option value="claude-sonnet-5" /><option value="claude-haiku-4-5" /><option value="claude-fable-5-1" />
     </datalist>
     <div class="grid gap-4 sm:grid-cols-3">
-        <p class="text-sm font-medium sm:col-span-3">Analyses and questions</p>
+        <p class="text-sm font-medium sm:col-span-3">Deep analyses, patches and cases</p>
         <label class="text-sm">Model
             <input :value="modelValue.model ?? ''" list="claude-models" :placeholder="defaults.model" :class="field" class="font-mono" @input="set('model', $event.target.value)" />
         </label>
@@ -31,6 +31,20 @@ const field = 'mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 tex
         </label>
         <label class="text-sm">Budget per turn ($)
             <input :value="modelValue.turn_budget_usd ?? ''" type="number" step="0.5" min="0.1" :placeholder="defaults.turn_budget_usd" :class="field" @input="set('turn_budget_usd', $event.target.value)" />
+        </label>
+
+        <p class="text-sm font-medium sm:col-span-3">Chat <span class="font-normal text-muted">(Ask on a ticket; Dig deeper uses the model above)</span></p>
+        <label class="text-sm">Model
+            <input :value="modelValue.chat_model ?? ''" list="claude-models" :placeholder="defaults.chat_model" :class="field" class="font-mono" @input="set('chat_model', $event.target.value)" />
+        </label>
+        <label class="text-sm">Effort
+            <select :value="modelValue.chat_effort ?? ''" :class="field" @change="set('chat_effort', $event.target.value)">
+                <option value="">as the default ({{ defaults.chat_effort }})</option>
+                <option v-for="effort in efforts" :key="effort" :value="effort">{{ effort }}</option>
+            </select>
+        </label>
+        <label class="text-sm">Fresh chat after (minutes quiet)
+            <input :value="modelValue.fresh_after_minutes ?? ''" type="number" step="5" min="5" :placeholder="defaults.fresh_after_minutes" :class="field" @input="set('fresh_after_minutes', $event.target.value)" />
         </label>
 
         <p class="text-sm font-medium sm:col-span-3">Quick scans</p>

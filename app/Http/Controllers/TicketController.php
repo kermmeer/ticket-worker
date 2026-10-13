@@ -63,6 +63,12 @@ class TicketController extends Controller
             'issue' => $issue,
             'issueError' => $issueError,
             'session' => $session ? $this->sessionData($session) : null,
+            // The chat before this one, folded above it: a fresh chat reads on from where it left off.
+            'earlier' => ($earlier = $ticket->sessions()->where('state', 'closed')->where('closed_at', '>', now()->subDays(14))->latest('id')->first())
+                ? [...$this->sessionData($earlier), 'closed_at' => $earlier->closed_at?->toIso8601String()] : null,
+            'chatModel' => SpaceSettings::for($ticket->space)->get('chat_model'),
+            'deepModel' => SpaceSettings::for($ticket->space)->get('model'),
+            'freshAfter' => (int) SpaceSettings::for($ticket->space)->get('fresh_after_minutes'),
             // Closed sessions: what each did and what it cost, newest first.
             'history' => $ticket->sessions()->where('state', 'closed')->latest('id')->get()->map->summary(),
             'languages' => self::LANGUAGES,
@@ -75,9 +81,10 @@ class TicketController extends Controller
         ]);
     }
 
-    /** Start an analysis: a new conversation, or a fresh analysis in the open one. */
     /** What you can paste to the agent at once: a query result fits, a whole dump does not. */
     private const MAX_TEXT = 100000;
+
+    /** Dig deeper: the full analysis, on the full model, ending in a proposal. */
 
     public function analyse(Request $request, Ticket $ticket): RedirectResponse
     {
@@ -91,29 +98,58 @@ class TicketController extends Controller
             return back()->with('error', $reason);
         }
 
-        $session = $ticket->openSession();
-        if ($session?->busy()) {
+        if ($ticket->openSession()?->busy()) {
             return back()->with('error', 'The agent is still working on this ticket.');
         }
 
-        $session ??= AgentSession::create([
-            'ticket_id' => $ticket->id,
-            'user_id' => auth()->id(),
-            'claude_session_id' => (string) Str::uuid(),
-            'reply_language' => $data['language'],
-            'model' => SpaceSettings::for($ticket->space)->get('model'),
-        ]);
+        [$session, $earlier] = $this->chat($ticket, $data['language']);
         $session->update(['reply_language' => $data['language']]);
 
         $note = filled($data['note'] ?? null) ? trim($data['note']) : null;
-        $this->turn($session, 'analysis', Instructions::analysis($ticket, $note), $note);
+        $this->turn($session, 'analysis', Instructions::analysis($ticket, $note, $earlier), $note);
 
         return back();
     }
 
+    /**
+     * The chat to continue: the open one, unless it has been quiet longer than the space's
+     * fresh_after_minutes. Then, or when there is none, a new one, with what the last one found.
+     *
+     * @return array{0: AgentSession, 1: ?string} the chat, and the summary its first turn carries
+     */
+    private function chat(Ticket $ticket, ?string $language = null): array
+    {
+        $session = $ticket->openSession();
+        if ($session !== null) {
+            $last = $session->turns()->reorder()->latest('id')->first();
+            $quietSince = $last?->finished_at ?? $last?->created_at ?? $session->created_at;
+            if (! $session->busy() && $quietSince->lt(now()->subMinutes((int) SpaceSettings::for($ticket->space)->get('fresh_after_minutes')))) {
+                $session->update(['state' => 'closed', 'closed_at' => now()]);
+                $session = null;
+            }
+        }
+        if ($session !== null) {
+            return [$session, null];
+        }
+
+        $previous = $ticket->sessions()->where('state', 'closed')->where('closed_at', '>', now()->subDays(14))->latest('id')->first();
+
+        return [AgentSession::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => auth()->id(),
+            'claude_session_id' => (string) Str::uuid(),
+            'reply_language' => $language ?? 'auto',
+            'model' => SpaceSettings::for($ticket->space)->get('model'),
+        ]), $previous ? Instructions::carryOver($previous) : null];
+    }
+
+    /** A question in the chat; the first one starts it. */
     public function message(Request $request, Ticket $ticket): RedirectResponse
     {
-        $data = $request->validate(['text' => ['required', 'string', 'max:'.self::MAX_TEXT]], [
+        $data = $request->validate([
+            'text' => ['required', 'string', 'max:'.self::MAX_TEXT],
+            'language' => ['nullable', Rule::in(self::LANGUAGES)],
+        ], [
             'text.max' => 'Too long to send: at most :max characters. Leave out rows the agent does not need.',
         ]);
 
@@ -128,7 +164,21 @@ class TicketController extends Controller
             }
         }
 
-        return $this->follow($ticket, 'message', $data['text']);
+        abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
+        if ($ticket->openSession()?->busy()) {
+            return back()->with('error', 'The agent is still working; wait or stop it.');
+        }
+
+        $text = trim($data['text']);
+        [$session, $earlier] = $this->chat($ticket, $data['language'] ?? null);
+        // The first question of a chat comes with the ticket, the quick scan and what an earlier chat found.
+        $first = $session->turns()->doesntExist();
+        $this->turn($session, 'message', $first ? Instructions::chatStart($ticket, $text, $earlier) : $text, $text);
+
+        return back();
     }
 
     /** "Can you create a patch…", "make it a patch", "maak een patch": not "why did the patch fail?". */
@@ -252,7 +302,7 @@ class TicketController extends Controller
         abort_if($session?->busy(), 409, 'Stop the agent first.');
         $session?->update(['state' => 'closed', 'closed_at' => now(), 'closed_by' => auth()->id(), 'handover_note' => filled($data['note'] ?? null) ? trim($data['note']) : null]);
 
-        return back()->with('success', 'Session closed. Analyse starts a new one.');
+        return back()->with('success', 'New chat: your next question starts afresh, with a short summary of this one.');
     }
 
     /** Make someone else's open session yours: their work stays, under their name. */
@@ -347,7 +397,8 @@ class TicketController extends Controller
                 // Who asked: "you", or their first name, so a shared ticket reads as a conversation.
                 'by' => $turn->user === null ? 'you' : ($turn->user->is(auth()->user()) ? 'you' : $turn->user->firstName()),
                 // Your own words show; the long analysis instruction does not.
-                'prompt' => $turn->kind === 'message' ? $turn->prompt : $turn->note,
+                'prompt' => $turn->kind === 'message' ? ($turn->note ?? $turn->prompt) : $turn->note,
+                'model' => $turn->model,
                 'state' => $turn->state,
                 'answer' => $turn->kind === 'message' ? $turn->answer : null,
                 'error' => $turn->error,

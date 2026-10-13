@@ -81,12 +81,16 @@ class RunAgentTurn implements ShouldQueue
             $tools = $turn->kind === 'patch' ? [] : ApiToolServer::toolNamesFor($systems);
             $hasApis = $tools !== [];
             $settings = SpaceSettings::for($ticket->space);
+            // A question in the chat on the lighter model; digging deeper, patches and cases on the full one.
+            $chat = $turn->kind === 'message';
+            $model = $settings->get($chat ? 'chat_model' : 'model');
+            $turn->update(['model' => $model]);
             $command = ClaudeRun::command(
                 (float) $settings->get('turn_budget_usd'),
                 write: $turn->kind === 'patch',
                 mcpTools: $tools,
-                model: $settings->get('model'),
-                effort: $settings->get('effort'),
+                model: $model,
+                effort: $settings->get($chat ? 'chat_effort' : 'effort'),
             );
             if ($hasApis) {
                 $command = [...$command, '--mcp-config', json_encode(['mcpServers' => ['ticket-worker' => [

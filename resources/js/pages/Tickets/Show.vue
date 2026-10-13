@@ -27,7 +27,17 @@ const props = defineProps({
     outboxReady: { type: Boolean, required: true },
     systems: { type: Array, default: () => [] },
     budget: { type: Object, default: null },
+    earlier: { type: Object, default: null },
+    chatModel: { type: String, default: '' },
+    deepModel: { type: String, default: '' },
+    freshAfter: { type: Number, default: 30 },
 });
+
+// "claude-sonnet-5" reads as "Sonnet 5".
+const modelName = (id) => {
+    const words = (id ?? '').replace(/^claude-/, '').replace(/\[.*$/, '').split('-');
+    return [words[0] ? words[0][0].toUpperCase() + words[0].slice(1) : '', words.slice(1).join('.')].filter(Boolean).join(' ');
+};
 
 const language = ref(props.session?.reply_language ?? 'auto');
 // What you are typing to the agent is kept in the browser until it is sent, so a reload
@@ -43,12 +53,6 @@ const stored = (write) => {
 const message = useForm({ text: stored(() => localStorage.getItem(messageKey)) ?? '' });
 watch(() => message.text, (text) => stored(() => (text ? localStorage.setItem(messageKey, text) : localStorage.removeItem(messageKey))));
 
-// Your own notes for the next analysis: what you know that the ticket does not say. Kept the
-// same way until the analysis starts.
-const noteKey = `ticket.${props.ticket.id}.note`;
-const note = ref(stored(() => localStorage.getItem(noteKey)) ?? '');
-watch(note, (text) => stored(() => (text ? localStorage.setItem(noteKey, text) : localStorage.removeItem(noteKey))));
-
 // Closing, with a note for the next person.
 const closing = ref(false);
 const handover = ref('');
@@ -59,12 +63,17 @@ function closeSession() {
 const pageProps = usePage();
 const noteError = computed(() => pageProps.props.errors?.note ?? null);
 
+// Dig deeper: the full analysis, with whatever is in the box as your note for it.
 function analyse() {
-    router.post(`/tickets/${props.ticket.id}/analyse`, { language: language.value, note: note.value }, {
+    router.post(`/tickets/${props.ticket.id}/analyse`, { language: language.value, note: message.text }, {
         preserveScroll: true,
-        onSuccess: () => (note.value = ''),
+        onStart: () => (actionError.value = null),
+        onSuccess: () => (actionError.value = pageProps.props.flash?.error ?? null) || (message.text = ''),
     });
 }
+
+const chatBox = ref(null);
+const focusChat = () => setTimeout(() => chatBox.value?.focus(), 50);
 
 const busy = computed(() => props.session?.busy ?? false);
 const proposal = computed(() => props.session?.proposal ?? null);
@@ -85,7 +94,7 @@ function post(path, data = {}) {
 }
 
 function send() {
-    message.post(`/tickets/${props.ticket.id}/messages`, {
+    message.transform((data) => ({ ...data, language: language.value })).post(`/tickets/${props.ticket.id}/messages`, {
         preserveScroll: true,
         onStart: () => (actionError.value = null),
         // A refused message (over budget, still working) stays in the box.
@@ -213,18 +222,18 @@ function stepLine(turn) {
 // The brief: one line that says what this ticket is about and where it stands.
 const scanResult = computed(() => props.ticket.quick_scan?.result ?? null);
 const briefLine = computed(() =>
-    proposal.value?.headline ?? proposal.value?.problem ?? scanResult.value?.summary ?? 'Not looked at yet: analyse it, or give it a quick scan first.',
+    proposal.value?.headline ?? proposal.value?.problem ?? scanResult.value?.summary ?? 'Not looked at yet: ask about it below, or give it a quick scan first.',
 );
 
 // The jump bar's parts: only those the page has.
 const jumps = computed(() => [
     { id: 'scan', label: 'Quick scan' },
-    { id: 'agent', label: 'Agent' },
+    { id: 'agent', label: 'Chat' },
     ...(proposal.value ? [{ id: 'proposal', label: 'Proposal & reply' }] : []),
     { id: 'ticket', label: 'Ticket' },
 ]);
 
-const turnLabels = { analysis: 'Analysis', message: 'Your question', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
+const turnLabels = { analysis: 'Deep analysis', message: 'Answer', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
 
 // A patch is for one system: the proposal's, unless you pick another.
 const patchSystem = ref(null);
@@ -307,7 +316,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     <button v-if="outboxReady" type="button" class="btn" :disabled="draft.processing" @click="toOutbox(true)">Draft and open in the outbox ↗</button>
                     <a href="#reply-form" class="btn">Read or edit the reply</a>
                 </template>
-                <button v-if="!session && agentReady" type="button" class="btn" :class="{ 'btn-signal': !proposal }" @click="analyse">Analyse</button>
+                <a v-if="!session && agentReady" href="#chat-box" class="btn" :class="{ 'btn-signal': !proposal }" @click="focusChat">Ask about it</a>
                 <button v-if="!ticket.quick_scan && agentReady" type="button" class="btn" @click="router.post(`/tickets/${ticket.id}/quick-scan`, {}, { preserveScroll: true })">Quick scan</button>
             </template>
         </div>
@@ -358,60 +367,61 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
 
         <!-- The agent -->
         <section class="min-w-0 space-y-6">
-            <FoldingSection id="agent" title="Agent" remember="ticket.agent" class="scroll-mt-28">
+            <!-- The chat: ask, it answers; Dig deeper for the full analysis. -->
+            <FoldingSection id="agent" title="Chat" remember="ticket.agent" class="scroll-mt-28">
                 <p v-if="!agentReady" class="text-sm text-signal">
                     No Anthropic sign-in yet (an API key or a subscription token), so no agent can run.
                     <Link href="/docs/concept#getting-an-anthropic-api-key" class="underline">How to get one</Link>.
                 </p>
-                <div v-else class="flex flex-wrap items-center gap-3">
-                    <label class="flex items-center gap-2 text-sm">
-                        <span class="text-muted">Reply in</span>
-                        <select v-model="language" class="rounded-md border border-line bg-page px-2 py-1.5 text-sm" :disabled="busy">
-                            <option v-for="choice in languages" :key="choice" :value="choice">{{ choice === 'auto' ? "the ticket's language" : choice }}</option>
-                        </select>
-                    </label>
-                    <button type="button" class="btn btn-signal" :disabled="busy" @click="analyse">
-                        {{ session ? 'Analyse again' : 'Analyse' }}
-                    </button>
+                <div v-if="agentReady && session" class="mb-4 flex flex-wrap items-center gap-3 text-sm">
                     <button v-if="busy" type="button" class="btn" @click="post('stop')">Stop</button>
-                    <button v-if="session && !busy" type="button" class="btn" :aria-expanded="closing" @click="closing = !closing">Close session</button>
-                    <span v-if="session?.owner" class="text-sm text-working">
-                        {{ session.owner }}'s session
+                    <template v-if="!busy">
+                        <button type="button" class="btn" @click="post('close')">New chat</button>
+                        <button type="button" class="text-muted underline hover:text-ink" :aria-expanded="closing" @click="closing = !closing">with a note for the next person</button>
+                    </template>
+                    <span v-if="session.owner" class="text-working">
+                        {{ session.owner }}'s chat
                         <button type="button" class="ml-1 text-muted underline hover:text-ink" @click="post('take-over')">Take over</button>
                     </span>
-                    <span v-if="session" class="ml-auto text-right font-mono text-xs text-muted">
-                        ${{ session.cost_usd.toFixed(2) }} so far<br />
+                    <span class="ml-auto text-right font-mono text-xs text-muted">
+                        ${{ session.cost_usd.toFixed(2) }} this chat<br />
                         {{ tokens(session.tokens_in) }} tokens in<template v-if="session.tokens_cached"> ({{ tokens(session.tokens_cached) }} from cache)</template> · {{ tokens(session.tokens_out) }} out
                     </span>
                 </div>
-                <form v-if="closing && session && !busy" class="mt-3 space-y-2 rounded-md border border-line p-3" @submit.prevent="closeSession">
+                <form v-if="closing && session && !busy" class="mb-4 space-y-2 rounded-md border border-line p-3" @submit.prevent="closeSession">
                     <label for="handover" class="text-sm">A note for whoever picks this up <span class="text-muted">(optional)</span></label>
                     <textarea id="handover" v-model="handover" rows="2" placeholder="Where it stands, what you tried, what is left…" class="w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"></textarea>
-                    <div class="flex gap-2"><button type="submit" class="btn btn-signal">Close the session</button><button type="button" class="btn" @click="closing = false">Cancel</button></div>
+                    <div class="flex gap-2"><button type="submit" class="btn btn-signal">Start a new chat</button><button type="button" class="btn" @click="closing = false">Cancel</button></div>
                 </form>
-                <div v-if="agentReady && !busy" class="mt-3">
-                    <label for="note" class="text-sm text-muted">Your notes for the agent <span class="text-xs">(optional, goes with the analysis)</span></label>
-                    <textarea
-                        id="note"
-                        v-model="note"
-                        rows="2"
-                        placeholder="What you know that the ticket does not say: the customer's service ID, a suspicion, what to check first…"
-                        class="mt-1 w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"
-                    ></textarea>
-                    <p v-if="noteError" role="alert" class="mt-1 text-sm text-signal">{{ noteError }} Nothing was sent; your text is still here.</p>
-                </div>
-            </FoldingSection>
 
-            <!-- The log -->
-            <FoldingSection v-if="session" title="Log" remember="ticket.log">
-                <div class="space-y-6">
+                <!-- The chat before this one: what it said stays readable, and a summary of it went along. -->
+                <details v-if="earlier?.turns.length" class="mb-4 rounded-md border border-line text-sm">
+                    <summary class="cursor-pointer px-3 py-2 text-muted hover:text-ink">
+                        Earlier chat · {{ earlier.turns.length }} {{ earlier.turns.length === 1 ? 'turn' : 'turns' }} · ${{ earlier.cost_usd.toFixed(2) }}<template v-if="earlier.closed_at"> · ended {{ short(earlier.closed_at) }}</template>
+                        <span class="block text-xs">{{ session ? 'A summary of it went along with this chat.' : 'Your next question starts a new chat, with a summary of it.' }}</span>
+                    </summary>
+                    <div class="space-y-4 border-t border-line p-3">
+                        <template v-for="turn in earlier.turns" :key="turn.id">
+                            <LogEntry v-if="turn.prompt" :time="short(turn.started_at ?? turn.finished_at).split(', ').pop()" :author="turn.by ?? 'you'">
+                                <p class="line-clamp-6 whitespace-pre-wrap">{{ turn.prompt }}</p>
+                            </LogEntry>
+                            <LogEntry :time="turn.finished_at ? short(turn.finished_at).split(', ').pop() : '…'" author="agent">
+                                <p class="text-xs font-medium tracking-wide uppercase" :class="stateTone[turn.state]">{{ turnLabels[turn.kind] }} · {{ turn.state }}<template v-if="turn.model"> · {{ modelName(turn.model) }}</template></p>
+                                <AgentText v-if="answerOf(turn)" :text="answerOf(turn)" />
+                                <a v-if="turn.patch?.text" :href="`/tickets/${ticket.id}/turns/${turn.id}/patch`" class="btn self-start">Download the patch</a>
+                            </LogEntry>
+                        </template>
+                    </div>
+                </details>
+
+                <div v-if="session" class="space-y-6">
                 <template v-for="turn in session.turns" :key="turn.id">
                     <LogEntry v-if="turn.prompt" :time="short(turn.started_at ?? turn.finished_at).split(', ').pop()" :author="turn.by ?? 'you'">
                         <p class="whitespace-pre-wrap">{{ turn.prompt }}</p>
                     </LogEntry>
                     <LogEntry :time="turn.started_at ? short(turn.started_at).split(', ').pop() : '…'" author="agent">
                         <p class="text-xs font-medium tracking-wide uppercase" :class="stateTone[turn.state]">
-                            {{ turnLabels[turn.kind] }} · {{ turn.state }}<template v-if="turn.cost_usd != null"> · ${{ turn.cost_usd.toFixed(2) }}</template>
+                            {{ turnLabels[turn.kind] }} · {{ turn.state }}<template v-if="turn.model"> · {{ modelName(turn.model) }}</template><template v-if="turn.cost_usd != null"> · ${{ turn.cost_usd.toFixed(2) }}</template>
                             <template v-if="turn.tokens_in != null"> · {{ tokens(turn.tokens_in) }} in · {{ tokens(turn.tokens_out) }} out</template>
                         </p>
                         <!-- While it works, every step as it happens; once done, the steps fold away into
@@ -470,30 +480,48 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </LogEntry>
                 </template>
 
-                <p v-if="actionError" role="alert" class="pt-2 text-sm text-signal">{{ actionError }}</p>
-                <p v-if="message.errors.text" role="alert" class="pt-2 text-sm text-signal">{{ message.errors.text }} Nothing was sent; your text is still here.</p>
-                <form v-if="!busy" class="flex flex-col gap-2 pt-2 sm:flex-row" @submit.prevent="send">
-                    <label for="message" class="sr-only">Message the agent</label>
-                    <textarea
-                        id="message"
-                        v-model="message.text"
-                        rows="2"
-                        placeholder="Ask the agent: look at the batch job instead, the reporter says it worked last week…"
-                        class="min-w-0 flex-1 rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"
-                    ></textarea>
-                    <div class="flex flex-wrap gap-2 sm:flex-col">
-                        <button type="submit" class="btn btn-signal" :disabled="message.processing || !message.text.trim()">Send</button>
-                        <button type="button" class="btn" @click="post('restate')">Update proposal</button>
-                        <button type="button" class="btn" @click="post('case')">Draft a case</button>
-                        <div class="flex gap-1">
-                            <select v-if="systems.length > 1" v-model="patchSystem" class="min-w-0 rounded-md border border-line bg-page px-1.5 text-sm" aria-label="System for the patch">
-                                <option :value="null">the proposal's system</option>
-                                <option v-for="system in systems" :key="system.id" :value="system.id">{{ system.name }}</option>
+                </div>
+
+                <!-- Ask, at the bottom like any chat. -->
+                <div v-if="agentReady && !busy" id="chat-box" class="scroll-mt-28" :class="{ 'mt-6': session }">
+                    <p v-if="actionError" role="alert" class="pb-2 text-sm text-signal">{{ actionError }}</p>
+                    <p v-if="message.errors.text || noteError" role="alert" class="pb-2 text-sm text-signal">{{ message.errors.text || noteError }} Nothing was sent; your text is still here.</p>
+                    <form class="flex flex-col gap-2" @submit.prevent="send">
+                        <label for="message" class="sr-only">Ask about this ticket</label>
+                        <textarea
+                            id="message"
+                            ref="chatBox"
+                            v-model="message.text"
+                            rows="3"
+                            :placeholder="session ? 'Ask on: paste a query result, ask for a reply, “make it a patch”… (Ctrl+Enter sends)' : 'Ask about this ticket: what is it, is the data still wrong, which query shows it, draft a reply… (Ctrl+Enter sends)'"
+                            class="min-w-0 rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"
+                            @keydown.enter.ctrl.prevent="send"
+                            @keydown.enter.meta.prevent="send"
+                        ></textarea>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="submit" class="btn btn-signal" :disabled="message.processing || !message.text.trim()">Ask</button>
+                            <button type="button" class="btn" :disabled="message.processing" @click="analyse">{{ proposal ? 'Dig deeper again' : 'Dig deeper' }}</button>
+                            <select v-model="language" class="rounded-md border border-line bg-page px-2 py-1.5 text-sm" aria-label="Reply language">
+                                <option v-for="choice in languages" :key="choice" :value="choice">{{ choice === 'auto' ? "replies in the ticket's language" : `replies in ${choice}` }}</option>
                             </select>
-                            <button type="button" class="btn flex-1" @click="preparePatch">Prepare a patch</button>
+                            <template v-if="session">
+                                <button type="button" class="btn" @click="post('restate')">Update proposal</button>
+                                <button type="button" class="btn" @click="post('case')">Draft a case</button>
+                                <span class="flex gap-1">
+                                    <select v-if="systems.length > 1" v-model="patchSystem" class="min-w-0 rounded-md border border-line bg-page px-1.5 text-sm" aria-label="System for the patch">
+                                        <option :value="null">the proposal's system</option>
+                                        <option v-for="system in systems" :key="system.id" :value="system.id">{{ system.name }}</option>
+                                    </select>
+                                    <button type="button" class="btn" @click="preparePatch">Prepare a patch</button>
+                                </span>
+                            </template>
                         </div>
-                    </div>
-                </form>
+                        <p class="text-xs text-muted">
+                            <strong class="font-medium">Ask</strong>: a quick answer from {{ modelName(chatModel) }}, usually within a minute.
+                            <strong class="font-medium">Dig deeper</strong>: the full analysis with a proposal and a reply draft, by {{ modelName(deepModel) }}, a few minutes; what you typed goes along.
+                            A chat quiet for {{ freshAfter }} minutes starts afresh on the next question, with a summary of this one.
+                        </p>
+                    </form>
                 </div>
             </FoldingSection>
 

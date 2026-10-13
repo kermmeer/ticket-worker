@@ -47,6 +47,16 @@ return [
 
     'sync_every_minutes' => (int) env('SYNC_EVERY_MINUTES', 10),
 
+    // The ticket chat: questions on a lighter model, quickly; "Dig deeper" uses the model
+    // above. A chat quiet for longer than fresh_after_minutes starts afresh on the next
+    // question, with a short summary instead of the whole conversation: the cache behind a
+    // long conversation is gone after a few minutes anyway, and re-reading it all is the cost.
+    'chat' => [
+        'model' => env('CLAUDE_CHAT_MODEL', 'claude-sonnet-5'),
+        'effort' => env('CLAUDE_CHAT_EFFORT', 'medium'),
+        'fresh_after_minutes' => (int) env('AGENT_CHAT_FRESH_AFTER_MINUTES', 30),
+    ],
+
     // The quick scan of a new ticket: a lighter model, little effort and a small budget,
     // since it runs on every new ticket of a space that has it on.
     'quick' => [

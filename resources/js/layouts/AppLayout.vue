@@ -1,10 +1,29 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import ThemeSwitch from '../components/ThemeSwitch.vue';
 import { connection, signInAgain } from '../connection.js';
 
 const page = usePage();
+
+// Whatever a click is refused with, said where you are: the banners above sit at the top of
+// a page you may have scrolled far down, and a refusal nobody sees looks like a broken button.
+const toast = ref(null);
+let toastTimer = null;
+function showToast(text) {
+    if (!text) return;
+    toast.value = text;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (toast.value = null), 12000);
+}
+let stopListening = [];
+onMounted(() => {
+    stopListening = [
+        router.on('success', (event) => showToast(event.detail.page.props.flash?.error)),
+        router.on('error', (event) => showToast(Object.values(event.detail.errors ?? {})[0])),
+    ];
+});
+onBeforeUnmount(() => stopListening.forEach((stop) => stop()));
 
 // What each role may open: members work tickets; editors also run spaces and systems;
 // admins also the global setup and the docs.
@@ -113,6 +132,11 @@ function toggleHyper() {
             </p>
             <slot />
         </main>
+
+        <p v-if="toast" role="alert" class="fixed inset-x-4 bottom-20 z-30 mx-auto flex max-w-xl items-start gap-3 rounded-md border border-signal/50 bg-surface px-4 py-3 text-sm text-signal shadow-lg sm:bottom-6">
+            <span class="flex-1">{{ toast }}</span>
+            <button type="button" class="text-muted hover:text-ink" aria-label="Dismiss" @click="toast = null">✕</button>
+        </p>
 
         <!-- On a phone: what you work with, in reach of a thumb; the rest is on a wider screen. -->
         <nav aria-label="Main" class="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-line bg-page/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
