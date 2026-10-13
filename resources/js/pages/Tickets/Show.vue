@@ -56,6 +56,9 @@ function closeSession() {
     router.post(`/tickets/${props.ticket.id}/close`, { note: handover.value }, { preserveScroll: true, onSuccess: () => { closing.value = false; handover.value = ''; } });
 }
 
+const pageProps = usePage();
+const noteError = computed(() => pageProps.props.errors?.note ?? null);
+
 function analyse() {
     router.post(`/tickets/${props.ticket.id}/analyse`, { language: language.value, note: note.value }, {
         preserveScroll: true,
@@ -383,6 +386,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         placeholder="What you know that the ticket does not say: the customer's service ID, a suspicion, what to check first…"
                         class="mt-1 w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted"
                     ></textarea>
+                    <p v-if="noteError" role="alert" class="mt-1 text-sm text-signal">{{ noteError }} Nothing was sent; your text is still here.</p>
                 </div>
             </FoldingSection>
 
@@ -454,6 +458,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </LogEntry>
                 </template>
 
+                <p v-if="message.errors.text" role="alert" class="pt-2 text-sm text-signal">{{ message.errors.text }} Nothing was sent; your text is still here.</p>
                 <form v-if="!busy" class="flex flex-col gap-2 pt-2 sm:flex-row" @submit.prevent="send">
                     <label for="message" class="sr-only">Message the agent</label>
                     <textarea

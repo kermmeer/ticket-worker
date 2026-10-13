@@ -185,6 +185,18 @@ class AgentTest extends TestCase
         $this->assertContains('Ended on the turn budget ($3.12) just after answering: the answer is kept.', $turn->events()->pluck('summary')->all());
     }
 
+    public function test_a_pasted_query_result_longer_than_a_page_goes_through(): void
+    {
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000004', 'model' => 'claude-opus-5']);
+        Queue::fake();
+        $rows = str_repeat("| 2026-10-01 03:00:12 | InvoiceLine | 442070 | 38.63 |\n", 400);
+
+        $this->post("/tickets/{$this->ticket->id}/messages", ['text' => "The query gives:\n{$rows}"])->assertSessionHasNoErrors();
+        $this->assertGreaterThan(20000, strlen($session->turns()->latest('id')->value('prompt')), 'Whole, not cut off.');
+
+        $this->post("/tickets/{$this->ticket->id}/messages", ['text' => str_repeat('x', 100001)])->assertSessionHasErrors('text');
+    }
+
     public function test_a_follow_up_resumes_the_conversation(): void
     {
         $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000002', 'model' => 'claude-opus-5']);

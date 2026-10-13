@@ -76,12 +76,15 @@ class TicketController extends Controller
     }
 
     /** Start an analysis: a new conversation, or a fresh analysis in the open one. */
+    /** What you can paste to the agent at once: a query result fits, a whole dump does not. */
+    private const MAX_TEXT = 100000;
+
     public function analyse(Request $request, Ticket $ticket): RedirectResponse
     {
         $data = $request->validate([
             'language' => ['required', Rule::in(self::LANGUAGES)],
-            'note' => ['nullable', 'string', 'max:8000'],
-        ]);
+            'note' => ['nullable', 'string', 'max:'.self::MAX_TEXT],
+        ], ['note.max' => 'Too long to send: at most :max characters. Leave out rows the agent does not need.']);
         abort_unless(Instructions::credentials() !== [], 409, 'No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN yet: see Setup.');
 
         if ($reason = $this->overBudget($ticket)) {
@@ -110,7 +113,9 @@ class TicketController extends Controller
 
     public function message(Request $request, Ticket $ticket): RedirectResponse
     {
-        $data = $request->validate(['text' => ['required', 'string', 'max:8000']]);
+        $data = $request->validate(['text' => ['required', 'string', 'max:'.self::MAX_TEXT]], [
+            'text.max' => 'Too long to send: at most :max characters. Leave out rows the agent does not need.',
+        ]);
 
         return $this->follow($ticket, 'message', $data['text']);
     }
