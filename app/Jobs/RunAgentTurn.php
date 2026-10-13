@@ -142,7 +142,7 @@ class RunAgentTurn implements ShouldQueue
 
         if ($turn->stop_requested) {
             $state = AgentTurn::STOPPED;
-        } elseif ($result === null || ($result['is_error'] ?? false)) {
+        } elseif ($result === null || (($result['is_error'] ?? false) && ! is_array($result['structured_output'] ?? null))) {
             $state = AgentTurn::FAILED;
         } else {
             $state = AgentTurn::DONE;
@@ -196,6 +196,8 @@ class RunAgentTurn implements ShouldQueue
         }
         if ($state === AgentTurn::FAILED) {
             $this->event($turn, 'error', $turn->error);
+        } elseif ($state === AgentTurn::DONE && ($result['is_error'] ?? false)) {
+            $this->event($turn, 'text', 'Ended on '.self::why($result).' just after answering: the answer is kept.');
         }
 
         // A code fix gets its patch without being asked, unless that is switched off.
@@ -238,6 +240,16 @@ class RunAgentTurn implements ShouldQueue
     }
 
     /** A proposal written as JSON in the answer, fenced or not. */
+    /** Why a run ended as an error, in words. */
+    private static function why(array $result): string
+    {
+        return match ($result['subtype'] ?? null) {
+            'error_max_budget_usd' => 'the turn budget ($'.number_format((float) ($result['total_cost_usd'] ?? 0), 2).')',
+            'error_max_turns' => 'the step limit',
+            default => 'an error',
+        };
+    }
+
     private static function jsonFrom(string $text): ?array
     {
         if (preg_match('/\{.*\}/s', $text, $match)) {

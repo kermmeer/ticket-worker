@@ -16,7 +16,7 @@ class StreamReader
     /**
      * Feed raw output; get back the complete lines' events.
      *
-     * @return list<array{type: string, summary?: string, result?: array}>
+     * @return list<array{type: string, summary?: string, result?: array, input?: array}>
      */
     public function feed(string $chunk): array
     {
@@ -64,6 +64,10 @@ class StreamReader
                 $events[] = ['type' => 'text', 'summary' => trim($block['text'])];
             } elseif (($block['type'] ?? null) === 'tool_use') {
                 $events[] = ['type' => 'tool', 'summary' => $this->tool($block['name'] ?? '?', $block['input'] ?? [])];
+                // The answer itself, kept in case the result line comes without it.
+                if (($block['name'] ?? null) === 'StructuredOutput' && is_array($block['input'] ?? null)) {
+                    $events[] = ['type' => 'structured', 'input' => $block['input']];
+                }
             }
         }
 
@@ -78,6 +82,7 @@ class StreamReader
             'Read' => 'reading '.$where,
             'Grep' => 'searching "'.($input['pattern'] ?? '').'"'.($where !== '' ? ' in '.$where : ''),
             'Glob' => 'listing '.($input['pattern'] ?? '').($where !== '' ? ' in '.$where : ''),
+            'StructuredOutput' => 'handing in the answer',
             default => strtolower($name).' '.$where,
         };
     }

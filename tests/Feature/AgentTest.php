@@ -161,6 +161,30 @@ class AgentTest extends TestCase
         });
     }
 
+    public function test_an_answer_handed_in_just_before_the_budget_runs_out_is_kept(): void
+    {
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000003', 'model' => 'claude-opus-5']);
+        $turn = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'analysis', 'prompt' => 'Analyse.']);
+        $proposal = ['headline' => 'Line written twice', 'problem' => 'Billed twice', 'system' => 'billing', 'cause' => 'value += price', 'evidence' => [], 'fix' => 'Credit it', 'reply_draft' => 'Beste…', 'confidence' => 'high', 'confidence_reason' => 'Seen in code'];
+
+        // As Claude Code ends it: the answer as a tool call, then a result line without it.
+        Process::fake([
+            '*claude*' => Process::describe()
+                ->output(self::line(['type' => 'assistant', 'message' => ['content' => [['type' => 'tool_use', 'name' => 'StructuredOutput', 'input' => $proposal]]]]))
+                ->output(self::line(['type' => 'result', 'subtype' => 'error_max_budget_usd', 'is_error' => true, 'total_cost_usd' => 3.12]))
+                ->runsFor(iterations: 2),
+            '*' => Process::result(''),
+        ]);
+
+        (new RunAgentTurn($turn))->handle(app(Workspace::class), app(ClaudeRun::class));
+
+        $turn->refresh();
+        $this->assertSame(AgentTurn::DONE, $turn->state, (string) $turn->error);
+        $this->assertSame('value += price', $turn->proposal['cause']);
+        $this->assertNull($turn->error);
+        $this->assertContains('Ended on the turn budget ($3.12) just after answering: the answer is kept.', $turn->events()->pluck('summary')->all());
+    }
+
     public function test_a_follow_up_resumes_the_conversation(): void
     {
         $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000002', 'model' => 'claude-opus-5']);

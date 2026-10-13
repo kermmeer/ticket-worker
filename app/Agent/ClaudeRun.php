@@ -71,13 +71,16 @@ class ClaudeRun
             ->start();
 
         $result = null;
+        $structured = null;
         $stopped = false;
         $lastCheck = microtime(true);
 
-        $take = function (array $events) use (&$result, $onStep) {
+        $take = function (array $events) use (&$result, &$structured, $onStep) {
             foreach ($events as $event) {
                 if ($event['type'] === 'result') {
                     $result = $event['result'];
+                } elseif ($event['type'] === 'structured') {
+                    $structured = $event['input'];
                 } else {
                     $onStep($event['type'], $event['summary']);
                 }
@@ -106,6 +109,12 @@ class ClaudeRun
         $take($reader->feed($process->latestOutput()));
         $finished = $process->wait();
         $take($reader->finish());
+
+        // A run that goes over its budget just after handing in its answer ends as an error
+        // whose result line lacks the answer: it was given all the same, so keep it.
+        if ($result !== null && $structured !== null && ! isset($result['structured_output'])) {
+            $result['structured_output'] = $structured;
+        }
 
         return ['result' => $result, 'errors' => $finished->errorOutput(), 'stopped' => $stopped];
     }
