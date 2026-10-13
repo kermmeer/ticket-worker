@@ -262,12 +262,14 @@ class Instructions
     }
 
     /** Make the proposed fix as a patch, in the copy the tool prepared. */
-    public static function patchRequest(string $ticketKey, string $systemName, string $copy, string $base): string
+    public static function patchRequest(string $ticketKey, string $systemName, string $copy, string $base, ?string $request = null): string
     {
         $short = substr($base, 0, 10);
+        $asked = filled($request) ? "\n\nWhat the engineer asked for, in their words:\n\n{$request}\n" : '';
 
         return <<<TEXT
-        Make the fix you proposed for {$ticketKey} as a patch to {$systemName}.
+        Make the fix you proposed for {$ticketKey} as a patch to {$systemName}. If this conversation
+        already wrote the change out as a diff, make exactly that change.{$asked}
 
         A copy of {$systemName} at commit {$short} is in your workspace at {$copy}/. Edit files there and
         only there; the system's own folder is read-only. The tool turns whatever you change in the copy

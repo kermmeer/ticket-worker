@@ -141,6 +141,23 @@ class PatchTest extends TestCase
         Queue::assertPushed(RunAgentTurn::class);
     }
 
+    public function test_asking_for_a_patch_in_a_message_makes_one_to_download(): void
+    {
+        Queue::fake();
+
+        $this->post("/tickets/{$this->ticket->id}/messages", ['text' => 'can you create a patch to not have it billed twice'])->assertSessionHasNoErrors()->assertRedirect();
+
+        $turn = AgentTurn::query()->latest('id')->first();
+        $this->assertSame('patch', $turn->kind, 'A patch turn, which makes the file, not a chat answer with a diff in it.');
+        $this->assertSame('billing', $turn->patch_meta['system']);
+        $this->assertSame('can you create a patch to not have it billed twice', $turn->note);
+        $this->assertStringContainsString('not have it billed twice', \App\Agent\Instructions::patchRequest('SUP-1', 'billing', 'patch/billing', 'abc', $turn->note));
+
+        $turn->update(['state' => AgentTurn::DONE]);
+        $this->post("/tickets/{$this->ticket->id}/messages", ['text' => 'Why did the patch from last week not fix it?']);
+        $this->assertSame('message', AgentTurn::query()->latest('id')->value('kind'));
+    }
+
     public function test_a_patch_from_another_ticket_is_not_served(): void
     {
         $other = Ticket::create(['space_id' => $this->ticket->space_id, 'jira_id' => '2', 'key' => 'SUP-2', 'summary' => 'x', 'first_seen_at' => now(), 'last_seen_at' => now()]);

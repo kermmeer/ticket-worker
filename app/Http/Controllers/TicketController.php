@@ -117,7 +117,26 @@ class TicketController extends Controller
             'text.max' => 'Too long to send: at most :max characters. Leave out rows the agent does not need.',
         ]);
 
+        // "Make a patch" in a message: the agent would write the diff into its answer, with
+        // nothing to download. A patch turn makes the file.
+        if (self::asksForPatch($data['text']) && ($session = $ticket->openSession()) && ! $session->busy() && ! $this->overBudget($ticket)) {
+            $system = RunAgentTurn::systemFor($session->turns()->whereNotNull('proposal')->reorder()->latest('id')->first()?->proposal, app(Workspace::class)->systems($ticket->load('space')));
+            if ($system !== null) {
+                RunAgentTurn::queuePatch($session, $system, request: $data['text']);
+
+                return back();
+            }
+        }
+
         return $this->follow($ticket, 'message', $data['text']);
+    }
+
+    /** "Can you create a patch…", "make it a patch", "maak een patch": not "why did the patch fail?". */
+    public static function asksForPatch(string $text): bool
+    {
+        return (bool) preg_match('/\bpatch(es)?\b/i', $text)
+            && (bool) preg_match('/\b(make|create|write|prepare|build|generate|give|draft|turn|maak|schrijf|geef)\b/i', $text)
+            && ! preg_match('/^\s*(why|what|how|waarom|wat|hoe)\b/i', $text);
     }
 
     public function restate(Ticket $ticket): RedirectResponse
@@ -189,7 +208,7 @@ class TicketController extends Controller
         $data = $request->validate(['system' => ['nullable', 'integer']]);
         $system = isset($data['system'])
             ? $systems->firstWhere('id', $data['system'])
-            : RunAgentTurn::systemFor($session->turns()->whereNotNull('proposal')->latest('id')->first()?->proposal, $systems);
+            : RunAgentTurn::systemFor($session->turns()->whereNotNull('proposal')->reorder()->latest('id')->first()?->proposal, $systems);
 
         if ($system === null) {
             return back()->with('error', 'Which system should the patch be for? Pick one.');

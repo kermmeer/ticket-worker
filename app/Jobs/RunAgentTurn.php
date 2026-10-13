@@ -72,7 +72,7 @@ class RunAgentTurn implements ShouldQueue
                 $this->event($turn, 'tool', "copying {$system->name} to patch/{$system->name}");
                 $base = app(ScratchCopy::class)->prepare($system, $copy);
                 $turn->update([
-                    'prompt' => Instructions::patchRequest($ticket->key, $system->name, 'patch/'.$system->name, $base),
+                    'prompt' => Instructions::patchRequest($ticket->key, $system->name, 'patch/'.$system->name, $base, $turn->note),
                     'patch_meta' => ['system_id' => $system->id, 'system' => $system->name, 'base' => $base],
                 ]);
             }
@@ -219,10 +219,11 @@ class RunAgentTurn implements ShouldQueue
             ?? ($systems->count() === 1 ? $systems->first() : null);
     }
 
-    public static function queuePatch(AgentSession $session, System $system, ?User $user = null): AgentTurn
+    /** @param  ?string  $request  what you asked for in your own words, when you asked in a message */
+    public static function queuePatch(AgentSession $session, System $system, ?User $user = null, ?string $request = null): AgentTurn
     {
         $turn = AgentTurn::create([
-            'agent_session_id' => $session->id, 'kind' => 'patch', 'prompt' => '', 'user_id' => $user?->id ?? auth()->id(),
+            'agent_session_id' => $session->id, 'kind' => 'patch', 'prompt' => '', 'note' => $request, 'user_id' => $user?->id ?? auth()->id(),
             'patch_meta' => ['system_id' => $system->id, 'system' => $system->name],
         ]);
         self::dispatch($turn);
@@ -239,7 +240,6 @@ class RunAgentTurn implements ShouldQueue
         }
     }
 
-    /** A proposal written as JSON in the answer, fenced or not. */
     /** Why a run ended as an error, in words. */
     private static function why(array $result): string
     {
@@ -250,6 +250,7 @@ class RunAgentTurn implements ShouldQueue
         };
     }
 
+    /** A proposal written as JSON in the answer, fenced or not. */
     private static function jsonFrom(string $text): ?array
     {
         if (preg_match('/\{.*\}/s', $text, $match)) {
