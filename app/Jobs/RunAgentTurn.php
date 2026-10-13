@@ -215,8 +215,13 @@ class RunAgentTurn implements ShouldQueue
         // A patch needs code to change.
         $systems = $systems->filter->hasCode()->values();
 
-        return $systems->first(fn (System $system) => mb_strtolower($system->name) === $name)
-            ?? ($systems->count() === 1 ? $systems->first() : null);
+        // The agent writes "boss (billing)" as readily as "boss": a name standing on its own
+        // counts, the longest first, so "ng-boss" is not taken for "boss".
+        $named = $systems->first(fn (System $system) => mb_strtolower($system->name) === $name)
+            ?? $systems->sortByDesc(fn (System $system) => mb_strlen($system->name))
+                ->first(fn (System $system) => preg_match('/(?<![\w-])'.preg_quote(mb_strtolower($system->name), '/').'(?![\w-])/u', $name) === 1);
+
+        return $named ?? ($systems->count() === 1 ? $systems->first() : null);
     }
 
     /** @param  ?string  $request  what you asked for in your own words, when you asked in a message */

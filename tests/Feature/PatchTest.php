@@ -158,6 +158,15 @@ class PatchTest extends TestCase
         $this->assertSame('message', AgentTurn::query()->latest('id')->value('kind'));
     }
 
+    public function test_the_proposals_system_is_found_when_the_agent_says_more_than_its_name(): void
+    {
+        $systems = collect([new System(['name' => 'ng-boss']), new System(['name' => 'boss'])]);
+
+        $this->assertSame('boss', RunAgentTurn::systemFor(['system' => 'boss (billing)'], $systems)?->name);
+        $this->assertSame('ng-boss', RunAgentTurn::systemFor(['system' => 'ng-boss, the new portal'], $systems)?->name);
+        $this->assertNull(RunAgentTurn::systemFor(['system' => 'the mail server'], $systems));
+    }
+
     public function test_a_patch_from_another_ticket_is_not_served(): void
     {
         $other = Ticket::create(['space_id' => $this->ticket->space_id, 'jira_id' => '2', 'key' => 'SUP-2', 'summary' => 'x', 'first_seen_at' => now(), 'last_seen_at' => now()]);

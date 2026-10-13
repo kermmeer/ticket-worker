@@ -73,12 +73,24 @@ const lastTool = computed(() => {
     return [...events].reverse().find((event) => event.type === 'tool')?.summary ?? 'starting';
 });
 
+// A refusal (no system for the patch, over budget, still working) next to the buttons, not
+// only at the top of the page where nobody looking at the log sees it.
+const actionError = ref(null);
 function post(path, data = {}) {
-    router.post(`/tickets/${props.ticket.id}/${path}`, data, { preserveScroll: true });
+    router.post(`/tickets/${props.ticket.id}/${path}`, data, {
+        preserveScroll: true,
+        onStart: () => (actionError.value = null),
+        onFinish: () => (actionError.value = pageProps.props.flash?.error ?? null),
+    });
 }
 
 function send() {
-    message.post(`/tickets/${props.ticket.id}/messages`, { preserveScroll: true, onSuccess: () => (message.text = '') });
+    message.post(`/tickets/${props.ticket.id}/messages`, {
+        preserveScroll: true,
+        onStart: () => (actionError.value = null),
+        // A refused message (over budget, still working) stays in the box.
+        onSuccess: () => (actionError.value = pageProps.props.flash?.error ?? null) || (message.text = ''),
+    });
 }
 
 // The reply draft, editable before it goes to the outbox.
@@ -458,6 +470,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </LogEntry>
                 </template>
 
+                <p v-if="actionError" role="alert" class="pt-2 text-sm text-signal">{{ actionError }}</p>
                 <p v-if="message.errors.text" role="alert" class="pt-2 text-sm text-signal">{{ message.errors.text }} Nothing was sent; your text is still here.</p>
                 <form v-if="!busy" class="flex flex-col gap-2 pt-2 sm:flex-row" @submit.prevent="send">
                     <label for="message" class="sr-only">Message the agent</label>
