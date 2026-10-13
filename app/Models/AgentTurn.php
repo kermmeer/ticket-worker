@@ -21,7 +21,7 @@ class AgentTurn extends Model
 
     protected $fillable = [
         'agent_session_id', 'user_id', 'kind', 'prompt', 'note', 'state', 'stop_requested', 'proposal', 'case_draft', 'patch', 'patch_meta', 'answer',
-        'error', 'cost_usd', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens',
+        'error', 'cost_usd', 'claude_total_usd', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens',
         'duration_ms', 'started_at', 'finished_at',
     ];
 
@@ -33,6 +33,7 @@ class AgentTurn extends Model
             'patch_meta' => 'array',
             'stop_requested' => 'boolean',
             'cost_usd' => 'float',
+            'claude_total_usd' => 'float',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

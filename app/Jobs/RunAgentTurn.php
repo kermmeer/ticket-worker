@@ -138,7 +138,12 @@ class RunAgentTurn implements ShouldQueue
     private function finish(AgentTurn $turn, ?array $result, string $errors, ?string $copy, Collection $systems): void
     {
         $turn->refresh();
-        $cost = isset($result['total_cost_usd']) ? (float) $result['total_cost_usd'] : null;
+        // A resumed conversation reports its running total since the first turn: this turn
+        // cost the difference from the last turn's total.
+        $total = isset($result['total_cost_usd']) ? (float) $result['total_cost_usd'] : null;
+        $before = (float) AgentTurn::query()->where('agent_session_id', $turn->agent_session_id)->where('id', '<', $turn->id)
+            ->whereNotNull('claude_total_usd')->orderByDesc('id')->value('claude_total_usd');
+        $cost = $total === null ? null : round($total >= $before ? $total - $before : $total, 4);
 
         if ($turn->stop_requested) {
             $state = AgentTurn::STOPPED;
@@ -186,6 +191,7 @@ class RunAgentTurn implements ShouldQueue
             'answer' => $result['result'] ?? null,
             'error' => $state === AgentTurn::FAILED ? Str::limit(($result['result'] ?? '') ?: trim($errors) ?: 'The agent stopped without an answer.', 2000) : null,
             'cost_usd' => $cost,
+            'claude_total_usd' => $total,
             ...ClaudeRun::tokens($result),
             'duration_ms' => $result['duration_ms'] ?? null,
             'finished_at' => now(),
@@ -197,7 +203,7 @@ class RunAgentTurn implements ShouldQueue
         if ($state === AgentTurn::FAILED) {
             $this->event($turn, 'error', $turn->error);
         } elseif ($state === AgentTurn::DONE && ($result['is_error'] ?? false)) {
-            $this->event($turn, 'text', 'Ended on '.self::why($result).' just after answering: the answer is kept.');
+            $this->event($turn, 'text', 'Ended on '.self::why($result, $cost).' just after answering: the answer is kept.');
         }
 
         // A code fix gets its patch without being asked, unless that is switched off.
@@ -246,10 +252,10 @@ class RunAgentTurn implements ShouldQueue
     }
 
     /** Why a run ended as an error, in words. */
-    private static function why(array $result): string
+    private static function why(array $result, ?float $cost): string
     {
         return match ($result['subtype'] ?? null) {
-            'error_max_budget_usd' => 'the turn budget ($'.number_format((float) ($result['total_cost_usd'] ?? 0), 2).')',
+            'error_max_budget_usd' => 'the turn budget ($'.number_format((float) $cost, 2).')',
             'error_max_turns' => 'the step limit',
             default => 'an error',
         };

@@ -197,6 +197,20 @@ class AgentTest extends TestCase
         $this->post("/tickets/{$this->ticket->id}/messages", ['text' => str_repeat('x', 100001)])->assertSessionHasErrors('text');
     }
 
+    public function test_a_resumed_turn_costs_the_difference_from_the_running_total(): void
+    {
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000005', 'model' => 'claude-opus-5']);
+        foreach ([3.12, 3.39] as $total) {
+            $turn = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'message', 'prompt' => 'And?']);
+            // Claude Code reports the conversation's total so far, not this turn's.
+            Process::fake(['*claude*' => Process::describe()->output(self::line(['type' => 'result', 'result' => 'Yes.', 'total_cost_usd' => $total]))->runsFor(iterations: 1), '*' => Process::result('')]);
+            (new RunAgentTurn($turn))->handle(app(Workspace::class), app(ClaudeRun::class));
+        }
+
+        $this->assertSame(0.27, $turn->fresh()->cost_usd);
+        $this->assertSame(3.39, $session->fresh()->cost_usd);
+    }
+
     public function test_a_follow_up_resumes_the_conversation(): void
     {
         $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-000000000002', 'model' => 'claude-opus-5']);
