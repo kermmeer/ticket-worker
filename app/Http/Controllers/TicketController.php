@@ -78,6 +78,8 @@ class TicketController extends Controller
             // What a patch can be for.
             'systems' => app(Workspace::class)->systems($ticket)->map(fn ($system) => ['id' => $system->id, 'name' => $system->name])->values(),
             'outboxReady' => app(OutboxClient::class)->configured(),
+            // Your greeting and sign-off: an empty reply box fills with it, the agent's draft goes inside it.
+            'replyTemplate' => \App\Models\Setting::replyTemplateFor(auth()->user()?->firstName() ?? $jira->firstName()),
         ]);
     }
 

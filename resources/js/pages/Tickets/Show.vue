@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import ActivityLine from '../../components/ActivityLine.vue';
 import AgentText from '../../components/AgentText.vue';
@@ -31,6 +31,7 @@ const props = defineProps({
     chatModel: { type: String, default: '' },
     deepModel: { type: String, default: '' },
     freshAfter: { type: Number, default: 30 },
+    replyTemplate: { type: String, default: null },
 });
 
 // "claude-sonnet-5" reads as "Sonnet 5".
@@ -104,7 +105,23 @@ function send() {
 
 // The reply draft, editable before it goes to the outbox.
 const draft = useForm({ body: '', visibility: 'public' });
-watch(proposal, (value) => (draft.body = value?.reply_draft ?? ''), { immediate: true });
+// The agent writes only the message when there is a template; a draft that signs itself
+// already (from before the template) is left as it is.
+const signed = (text) => {
+    const last = (props.replyTemplate ?? '').trim().split('\n').pop().trim();
+    return last !== '' && text.trim().endsWith(last);
+};
+const framed = (text) => (props.replyTemplate && !signed(text) ? props.replyTemplate.replace('{reply}', text.trim()) : text);
+watch(proposal, (value) => (draft.body = value?.reply_draft ? framed(value.reply_draft) : ''), { immediate: true });
+
+// An empty box, clicked: your template, with the cursor where your text goes.
+const replyBox = ref(null);
+function startReply() {
+    if (!props.replyTemplate || draft.body.trim() !== '') return;
+    const at = props.replyTemplate.indexOf('{reply}');
+    draft.body = props.replyTemplate.replace('{reply}', '');
+    nextTick(() => replyBox.value?.setSelectionRange(at, at));
+}
 
 // Its own site's name for it: another Jira, or the outbox.
 const openLabel = props.ticket.open_label ?? usePage().props.openLabel ?? 'Jira';
@@ -229,7 +246,8 @@ const briefLine = computed(() =>
 const jumps = computed(() => [
     { id: 'scan', label: 'Quick scan' },
     { id: 'agent', label: 'Chat' },
-    ...(proposal.value ? [{ id: 'proposal', label: 'Proposal & reply' }] : []),
+    ...(proposal.value ? [{ id: 'proposal', label: 'Proposal' }] : []),
+    { id: 'reply', label: 'Reply' },
     { id: 'ticket', label: 'Ticket' },
 ]);
 
@@ -618,9 +636,13 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                     </div>
                 </details>
 
-                <form id="reply-form" class="border-t border-line pt-5" @submit.prevent="toOutbox(false)">
-                    <label for="reply" class="font-medium">Reply draft<span v-if="proposal.reply_language" class="font-normal text-muted"> · {{ proposal.reply_language }}</span></label>
-                    <textarea id="reply" v-model="draft.body" rows="8" class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 text-sm"></textarea>
+                </div>
+            </FoldingSection>
+            <!-- The reply: the agent's draft when there is one, else yours, in your own frame. -->
+            <FoldingSection id="reply" title="Reply" remember="ticket.reply" class="scroll-mt-28">
+                <form id="reply-form" class="text-sm" @submit.prevent="toOutbox(false)">
+                    <label for="reply-text" class="font-medium">{{ proposal?.reply_draft ? "The agent's reply draft" : "Your reply" }}<span v-if="proposal?.reply_language" class="font-normal text-muted"> · {{ proposal.reply_language }}</span></label>
+                    <textarea id="reply-text" ref="replyBox" v-model="draft.body" rows="8" :placeholder="replyTemplate ? 'Click to start from your template' : ''" class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted" @focus="startReply"></textarea>
                     <div class="mt-3 flex flex-wrap items-center gap-3">
                         <template v-if="outboxReady && ticket.space.type === 'service'">
                             <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="public" /> Reply to customer</label>
@@ -642,7 +664,6 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         <a :href="ticket.url" target="_blank" rel="noopener" class="underline hover:text-ink">{{ openLabel }} ↗</a>.
                     </p>
                 </form>
-                </div>
             </FoldingSection>
         </section>
     </div>

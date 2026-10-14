@@ -32,6 +32,7 @@ class SetupController extends Controller
             // The .env one is the shared one when there is one; the form is for when there is none.
             'envClaude' => ($env = \App\Agent\Instructions::envCredentials()) !== [] ? (isset($env['ANTHROPIC_API_KEY']) ? 'API key' : 'subscription token') : null,
             'answerRules' => Setting::answerRules(),
+            'replyTemplate' => (string) Setting::get(Setting::REPLY_TEMPLATE),
             'defaultAnswerRules' => Setting::DEFAULT_ANSWER_RULES,
         ]);
     }
@@ -113,6 +114,20 @@ class SetupController extends Controller
         return back()->with('success', $data['kind'] === 'none'
             ? 'Removed. Without one in .env either, only people with their own sign-in can run agents, and new tickets get no automatic quick scan.'
             : 'Saved. Everyone without their own sign-in runs on it, and automatic quick scans do.');
+    }
+
+    /** The greeting and sign-off around every reply, yours or the agent's. */
+    public function replyTemplate(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['template' => ['nullable', 'string', 'max:2000']]);
+        $template = filled($data['template'] ?? null) ? str_replace("\r\n", "\n", trim($data['template'])) : null;
+        if ($template !== null && ! str_contains($template, '{reply}')) {
+            return back()->withErrors(['template' => 'Put {reply} where your text goes.']);
+        }
+        Setting::put(Setting::REPLY_TEMPLATE, $template);
+        AuditEvent::record('setup.reply-template', 'reply template', $template ? 'changed' : 'removed');
+
+        return back()->with('success', $template ? 'Saved. An empty reply box fills with it when you click it.' : 'Removed.');
     }
 
     /** How replies to reporters are written: the agent follows these in every draft. */

@@ -496,10 +496,15 @@ The commits since, with the files they touched:
     public static function replyRules(?Space $space = null): string
     {
         // Signed by whoever asks for the draft; the Jira account's name when nobody is signed in.
-        return "Write the reply draft by these rules:\n".Setting::replyRulesFor(
+        $rules = "Write the reply draft by these rules:\n".Setting::replyRulesFor(
             auth()->user()?->firstName() ?? ($space?->jira() ?? app(JiraClient::class))->firstName(),
             SpaceSettings::for($space)->get('reply_rules'),
         );
+
+        // With a template, the greeting and the sign-off are the engineer's own: only the message.
+        return filled(Setting::get(Setting::REPLY_TEMPLATE))
+            ? $rules."\n- Write only the message itself: no greeting and no sign-off, whatever the rules above say. The engineer's own template adds them."
+            : $rules;
     }
 
     public static function restate(?Space $space = null): string

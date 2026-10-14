@@ -15,6 +15,12 @@ class Setting extends Model
 
     public const ANSWER_RULES = 'answer_rules';
 
+    /**
+     * Your own frame around every reply: greeting, sign-off. {reply} is where the text goes
+     * (and the cursor, when you write one yourself); {first_name} is who is signed in.
+     */
+    public const REPLY_TEMPLATE = 'reply_template';
+
     /** How the agent talks to you, until you change it on the Setup page. */
     public const DEFAULT_ANSWER_RULES = <<<'TEXT'
     - Short and to the point: at most about 120 words, unless I ask for more. Lead with the answer, then the evidence. No preamble, no restating the question, no summary at the end.
@@ -90,6 +96,14 @@ class Setting extends Model
     public static function replyRulesFor(?string $firstName, ?string $rules = null): string
     {
         return str_replace('{first_name}', $firstName ?? 'the support team', $rules ?? static::replyRules());
+    }
+
+    /** The template with {first_name} filled in, or null when there is none. */
+    public static function replyTemplateFor(?string $firstName): ?string
+    {
+        $template = static::get(self::REPLY_TEMPLATE);
+
+        return filled($template) ? str_replace('{first_name}', $firstName ?? '', $template) : null;
     }
 
     public static function answerRules(): string

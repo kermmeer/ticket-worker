@@ -11,6 +11,7 @@ const props = defineProps({
     firstName: { type: String, default: null },
     autoPatch: { type: Boolean, default: true },
     answerRules: { type: String, required: true },
+    replyTemplate: { type: String, default: '' },
     defaultAnswerRules: { type: String, required: true },
     sharedClaude: { type: String, default: null },
     defaults: { type: Object, required: true },
@@ -44,6 +45,11 @@ function saveShared() {
 const rules = useForm({ rules: props.replyRules });
 
 const answers = useForm({ rules: props.answerRules });
+
+const template = useForm({ template: props.replyTemplate });
+function saveTemplate() {
+    template.put('/setup/reply-template', { preserveScroll: true });
+}
 
 function saveAnswers() {
     answers.put('/setup/answer-rules', { preserveScroll: true });
@@ -214,6 +220,18 @@ const marks = {
 
     <section class="mt-10">
         <h2 class="eyebrow">Replies</h2>
+        <form class="card mt-3 p-5" @submit.prevent="saveTemplate">
+            <label for="reply-template" class="font-medium">Your greeting and sign-off</label>
+            <p class="mt-1 max-w-3xl text-sm text-muted">
+                Around every reply. Click an empty reply box on a ticket and it fills with this, the cursor where
+                <code>{reply}</code> is. The agent's drafts go inside it too, and it then leaves out its own greeting and sign-off.
+                <code>{first_name}</code> becomes the first name of whoever is signed in. Empty: no template.
+            </p>
+            <textarea id="reply-template" v-model="template.template" rows="6" placeholder="Hey @crm,&#10;&#10;{reply}&#10;&#10;Kind regards and have a great day,&#10;{first_name}" class="mt-3 w-full rounded-md border border-line bg-page px-3 py-2 font-mono text-sm placeholder:text-muted"></textarea>
+            <p v-if="template.errors.template" class="mt-1 text-sm text-signal">{{ template.errors.template }}</p>
+            <div class="mt-3"><button type="submit" class="btn btn-signal" :disabled="template.processing || !template.isDirty">Save</button></div>
+        </form>
+
         <form class="card mt-3 p-5" @submit.prevent="saveRules">
             <label for="rules" class="font-medium">How replies to reporters are written</label>
             <p class="mt-1 max-w-3xl text-sm text-muted">
