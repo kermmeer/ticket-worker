@@ -166,6 +166,19 @@ const perSpace = computed(() => {
     return counts;
 });
 
+// Each pill's open tickets, counted as the headline counts them (not sleeping, not hidden)
+// and for the person chosen, so the spaces add up to "All spaces".
+const openPerSpace = computed(() => {
+    const counts = {};
+    for (const ticket of props.tickets) {
+        if (ticket.group !== 'sleeping' && ticket.group !== 'hidden' && ofPerson(ticket)) {
+            counts[ticket.space_id] = (counts[ticket.space_id] ?? 0) + 1;
+        }
+    }
+    return counts;
+});
+const openIn = (ids) => ids.reduce((sum, id) => sum + (openPerSpace.value[id] ?? 0), 0);
+
 // The totals follow the space and the person chosen; status and search narrow the list
 // below, not the board's count.
 const onBoard = computed(() => props.tickets.filter((ticket) => inSpace(ticket) && ofPerson(ticket)));
@@ -363,7 +376,7 @@ onBeforeUnmount(() => {
                 :aria-pressed="spaceFilter === 'mine'"
                 @click="pickSpace('mine')"
             >
-                My spaces
+                My spaces<span class="ml-1.5 tabular-nums opacity-70">{{ openIn([...followed]) }}</span>
             </button>
             <button
                 type="button"
@@ -372,7 +385,7 @@ onBeforeUnmount(() => {
                 :aria-pressed="spaceFilter === null"
                 @click="pickSpace(null)"
             >
-                All spaces
+                All spaces<span class="ml-1.5 tabular-nums opacity-70">{{ openIn(spaces.map((space) => space.id)) }}</span>
             </button>
             <button
                 v-for="space in spaces"
@@ -383,7 +396,7 @@ onBeforeUnmount(() => {
                 :aria-pressed="spaceFilter === space.id"
                 @click="pickSpace(space.id)"
             >
-                <SpaceLabel :label="space.label" :colour="space.colour" />
+                <SpaceLabel :label="space.label" :colour="space.colour" /><span class="ml-1.5 tabular-nums opacity-70">{{ openPerSpace[space.id] ?? 0 }}</span>
             </button>
             <label class="ml-auto flex items-center gap-2 text-sm">
                 <span class="text-muted">Sort</span>
