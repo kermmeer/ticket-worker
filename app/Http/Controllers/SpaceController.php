@@ -212,6 +212,14 @@ class SpaceController extends Controller
         $space->systems()->sync($data['system_ids'] ?? []);
         AuditEvent::record('space.update', $space->label, 'changed '.AuditEvent::changes($before, Arr::except($data, 'system_ids')));
 
+        // New rules count at once, not at the next scheduled sync: until then the overview
+        // would go on counting what the old rules found.
+        if ($space->state === Space::ACTIVE && $space->wasChanged(['rules', 'done_rule'])) {
+            SyncSpace::dispatch($space);
+
+            return back()->with('success', 'Saved. Syncing with the new rules now: the overview follows within a minute.');
+        }
+
         return back()->with('success', 'Saved.');
     }
 

@@ -91,6 +91,19 @@ class SpacesTest extends TestCase
         $this->assertSame('project = "SUP" AND (labels = "last-line") AND NOT (statusCategory = Done) ORDER BY updated DESC', $space->jql());
     }
 
+    public function test_new_rules_on_an_active_space_sync_at_once(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $space = self::space(['state' => Space::ACTIVE]);
+        $form = ['label' => 'Support', 'colour' => 'teal', 'type' => Space::SERVICE, 'done_rule' => Space::DEFAULT_DONE_RULE];
+
+        $this->put("/spaces/{$space->id}", $form + ['colour' => 'rose']);
+        \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\SyncSpace::class);
+
+        $this->put("/spaces/{$space->id}", $form + ['rules' => 'labels = "triage-invoicing"'])->assertSessionHas('success', fn ($text) => str_contains($text, 'Syncing'));
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SyncSpace::class, 1);
+    }
+
     public function test_saving_keeps_status_colours_and_which_statuses_sleep(): void
     {
         $space = self::space();
