@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, useId } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 
 const props = defineProps({
     title: { type: String, required: true },
@@ -7,7 +7,8 @@ const props = defineProps({
     remember: { type: String, required: true },
     open: { type: Boolean, default: true },
     // Shown open whatever was chosen, for as long as this is true: while searching, say.
-    forceOpen: { type: Boolean, default: false },
+    // A string counts as true, and each new one (another search, another status) opens again.
+    forceOpen: { type: [Boolean, String], default: false },
     // flush: the body runs to the card's edges, for a list with its own dividers.
     flush: { type: Boolean, default: false },
 });
@@ -23,9 +24,17 @@ function saved() {
 
 const isOpen = ref(saved());
 const bodyId = useId();
-const shown = computed(() => isOpen.value || props.forceOpen);
+// While forced open (a search, a status picked), every section opens once, but a click
+// still folds it: that choice lasts as long as the search, and your own one comes back after.
+const whileForced = ref(true);
+watch(() => props.forceOpen, (forced) => forced && (whileForced.value = true));
+const shown = computed(() => (props.forceOpen ? whileForced.value : isOpen.value));
 
 function toggle() {
+    if (props.forceOpen) {
+        whileForced.value = !whileForced.value;
+        return;
+    }
     isOpen.value = !isOpen.value;
     try {
         localStorage.setItem(`fold.${props.remember}`, isOpen.value ? 'open' : 'folded');

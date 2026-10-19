@@ -240,6 +240,9 @@ function showMore(key) {
 // While you search or show one status, every section opens, so no match stays folded away.
 const searching = computed(() => statusFilter.value !== null || search.value.trim() !== '');
 
+// What the sections open for: each new status or search opens them all again.
+const openFor = computed(() => (searching.value ? `${statusFilter.value ?? ''}|${search.value.trim()}` : false));
+
 function pickStatus(status) {
     statusFilter.value = statusFilter.value === status ? null : status;
 }
@@ -463,7 +466,7 @@ onBeforeUnmount(() => {
 
         <div class="mt-10 space-y-6">
             <template v-for="group in awake" :key="group.key">
-                <FoldingSection v-if="inGroup[group.key].length" :title="`${group.label} · ${inGroup[group.key].length}`" :remember="`overview.${group.key}`" :force-open="searching" flush>
+                <FoldingSection v-if="inGroup[group.key].length" :title="`${group.label} · ${inGroup[group.key].length}`" :remember="`overview.${group.key}`" :force-open="openFor" flush>
                     <ul class="divide-y divide-line">
                         <li v-for="ticket in inGroup[group.key].slice(0, shownOf(group.key))" :key="ticket.id">
                             <TicketRow :ticket="ticket" :space="spacesById[ticket.space_id]" />
@@ -482,7 +485,7 @@ onBeforeUnmount(() => {
                     :title="`${fold.label} · ${inGroup[fold.key].length}`"
                     :remember="`overview.${fold.key}`"
                     :open="false"
-                    :force-open="searching"
+                    :force-open="openFor"
                     flush
                 >
                     <template #hint>{{ fold.hint }}</template>
