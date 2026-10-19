@@ -371,7 +371,10 @@ onMounted(runPreview);
         <!-- Systems -->
         <section class="card p-5">
             <h2 class="text-lg font-medium">Systems</h2>
-            <p class="mt-1 text-sm text-muted">The code this space's tickets can be about. The agent picks among these.</p>
+            <p class="mt-1 text-sm text-muted">
+                The code and APIs this space's tickets can be about; the agent picks among these. None ticked is fine: the agent
+                then works from the ticket, its attachments and the casebook alone.
+            </p>
             <p v-if="systems.length === 0" class="mt-3 text-sm text-muted">
                 No systems yet. <Link href="/systems" class="underline">Add them on the Systems page.</Link>
             </p>
@@ -386,6 +389,7 @@ onMounted(runPreview);
                     {{ system.name }}
                 </label>
             </div>
+            <p v-if="systems.length && !form.system_ids.length" class="mt-2 text-sm text-waiting">No systems: the agent sees no code and calls no APIs for this space.</p>
         </section>
 
         <div class="flex flex-wrap items-center gap-3">

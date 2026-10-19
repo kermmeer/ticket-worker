@@ -75,9 +75,9 @@ class Workspace
     /** The systems this ticket's space names, or every system when it names none. */
     public function systems(Ticket $ticket)
     {
-        $systems = $ticket->space->systems()->where('state', System::READY)->get();
-
-        return $systems->isEmpty() ? System::query()->where('state', System::READY)->get() : $systems;
+        // What the space has ticked, and nothing else: a space without systems has tickets
+        // the agent answers from the ticket, its attachments and the casebook alone.
+        return $ticket->space->systems()->where('state', System::READY)->get();
     }
 
     public static function ticketDocument(array $issue, array $skipped = []): string

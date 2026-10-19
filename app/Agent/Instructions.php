@@ -130,7 +130,7 @@ class Instructions
         $language = $session->reply_language === 'auto' ? "the ticket's own language" : $session->reply_language;
         $list = collect($systems)->map(fn ($system) => $system->hasCode()
             ? "- {$system->name}: {$system->path()} (branch {$system->branch}); its history is in systems/{$system->name}.history.txt"
-            : "- {$system->name}: no code, only APIs to call (list_apis, call_api)")->implode("\n");
+            : "- {$system->name}: no code, only APIs to call (list_apis, call_api)")->implode("\n") ?: '- none: this space has no systems. Work from the ticket, its attachments and the casebook; say what the engineer should check where you cannot.';
         $contexts = collect($systems)->filter(fn ($system) => filled($system->context))
             ->map(fn ($system) => "# Context of {$system->name}\n\n{$system->context}")->implode("\n\n");
         $contexts = $contexts !== '' ? "\n\nWhat each system is, where things live, and what users call things:\n\n{$contexts}" : '';
@@ -212,7 +212,8 @@ class Instructions
     /** The quick scan's system prompt: a triage, not an investigation. */
     public static function quickScanSystem(Ticket $ticket, iterable $systems): string
     {
-        $list = collect($systems)->map(fn ($system) => $system->hasCode() ? "- {$system->name}: {$system->path()}" : "- {$system->name}: no code, only APIs to call")->implode("\n");
+        $list = collect($systems)->map(fn ($system) => $system->hasCode() ? "- {$system->name}: {$system->path()}" : "- {$system->name}: no code, only APIs to call")->implode("\n")
+            ?: '- none: this space has no systems. Go by the ticket, its attachments and the casebook.';
         $contexts = collect($systems)->filter(fn ($system) => filled($system->context))
             ->map(fn ($system) => "# Context of {$system->name}\n\n{$system->context}")->implode("\n\n");
 
