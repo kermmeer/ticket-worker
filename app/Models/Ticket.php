@@ -177,6 +177,27 @@ class Ticket extends Model
     }
 
     /**
+     * What Jira says now, from the ticket page's own look at the issue: the sync only reads
+     * open tickets, so a resolved one would otherwise keep the last status it saw there.
+     */
+    public function takeLive(array $issue): void
+    {
+        $this->fill(array_filter([
+            'summary' => filled($issue['summary'] ?? null) ? Str::limit($issue['summary'], 990) : null,
+            'status' => $issue['status'] ?? null,
+            'status_category' => $issue['status_category'] ?? null,
+            'priority' => $issue['priority'] ?? null,
+        ], fn ($value) => $value !== null) + [
+            'assignee' => $issue['assignee'] ?? null,
+            'assignee_account_id' => $issue['assignee_account_id'] ?? null,
+            'jira_updated_at' => isset($issue['updated']) ? Carbon::parse($issue['updated'])->utc() : $this->jira_updated_at,
+        ]);
+        if ($this->isDirty()) {
+            $this->save();
+        }
+    }
+
+    /**
      * Jira's SLA fields, each reduced to what the overview shows: the running cycle if
      * there is one, otherwise how the last one ended. An SLA without either does not
      * apply to this ticket and is left out. Times left are Jira's own, in the SLA's

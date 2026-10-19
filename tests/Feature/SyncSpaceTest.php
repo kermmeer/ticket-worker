@@ -70,6 +70,7 @@ class SyncSpaceTest extends TestCase
         Http::fakeSequence('*/rest/api/3/search/jql')
             ->push(['issues' => [$this->issue('1'), $this->issue('2')], 'isLast' => true])
             ->push(['issues' => [$this->issue('1')], 'isLast' => true])
+            ->push(['issues' => [], 'isLast' => true]) // the look at the one that left
             ->push(['issues' => [$this->issue('1'), $this->issue('2')], 'isLast' => true]);
 
         $this->sync();
@@ -79,6 +80,24 @@ class SyncSpaceTest extends TestCase
 
         $this->sync();
         $this->assertNull(Ticket::firstWhere('key', 'SUP-2')->left_at);
+    }
+
+    public function test_a_ticket_that_left_takes_its_status_as_it_is_now(): void
+    {
+        $done = $this->issue('2');
+        $done['fields']['status'] = ['name' => 'Resolved', 'statusCategory' => ['key' => 'done']];
+        Http::fakeSequence('*/rest/api/3/search/jql')
+            ->push(['issues' => [$this->issue('1'), $this->issue('2')], 'isLast' => true])
+            ->push(['issues' => [$this->issue('1')], 'isLast' => true])
+            ->push(['issues' => [$done], 'isLast' => true]);
+
+        $this->sync();
+        $this->sync();
+
+        $ticket = Ticket::firstWhere('key', 'SUP-2');
+        $this->assertSame(['Resolved', 'done'], [$ticket->status, $ticket->status_category]);
+        $this->assertNotNull($ticket->left_at);
+        Http::assertSent(fn ($request) => str_contains((string) ($request['jql'] ?? ''), 'id in (2)'));
     }
 
     public function test_a_failed_sync_lets_nobody_leave(): void

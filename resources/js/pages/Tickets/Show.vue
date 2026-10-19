@@ -300,6 +300,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         <span class="mt-1 block whitespace-pre-wrap">{{ history[0].handover_note }}</span>
     </div>
 
+    <p v-if="ticket.left" role="status" class="mt-6 rounded-md border border-done/40 px-4 py-2.5 text-sm text-done">
+        {{ ticket.status ? `${ticket.status} in Jira` : 'Done in Jira' }}: no longer among the open tickets of {{ ticket.space.label }}.
+    </p>
+
     <p v-if="budget" role="status" class="mt-6 rounded-md border px-4 py-2.5 text-sm" :class="budget.level === 'stop' ? 'border-signal/40 text-signal' : 'border-waiting/40 text-waiting'">
         {{ budget.text }}
     </p>

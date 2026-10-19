@@ -86,7 +86,22 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $space->tickets()->open()->whereNotIn('jira_id', $seen)->update(['left_at' => $now]);
+        // Gone from the open tickets: say so, and take their status as it is now (resolved,
+        // mostly), which the search above no longer brings.
+        $left = $space->tickets()->open()->whereNotIn('jira_id', $seen)->get();
+        $space->tickets()->whereKey($left->modelKeys())->update(['left_at' => $now]);
+        foreach ($left->chunk(100) as $chunk) {
+            try {
+                foreach ($jira->search('id in ('.$chunk->pluck('jira_id')->map(fn ($id) => (int) $id)->implode(',').')', ['status'])['issues'] as $issue) {
+                    $space->tickets()->where('jira_id', (string) $issue['id'])->update([
+                        'status' => $issue['fields']['status']['name'] ?? null,
+                        'status_category' => $issue['fields']['status']['statusCategory']['key'] ?? null,
+                    ]);
+                }
+            } catch (JiraException) {
+                // Deleted, or out of reach: they have left either way.
+            }
+        }
         $space->update(['synced_at' => $now, 'sync_error' => null]);
 
         // New tickets get their quick scan, if the space has it on and an agent can sign in;

@@ -34,9 +34,15 @@ class TicketController extends Controller
         $ticket->load('space.site');
         $jira = $ticket->space->jira();
 
+        // Fresh from Jira on every visit and refresh; the cache is for the page's own polling
+        // while an agent works, which asks every few seconds.
+        if (! request()->hasHeader('X-Inertia-Partial-Data')) {
+            Cache::forget("ticket.issue.{$ticket->id}");
+        }
         try {
             $issue = Cache::remember("ticket.issue.{$ticket->id}", 60, fn () => $jira->issue($ticket->key));
             $issueError = null;
+            $ticket->takeLive($issue);
         } catch (JiraException $e) {
             $issue = null;
             $issueError = $e->getMessage();
@@ -59,6 +65,8 @@ class TicketController extends Controller
                 'open_label' => $ticket->space->openLabel(),
                 'space' => ['label' => $ticket->space->label, 'colour' => $ticket->space->colour, 'type' => $ticket->space->type],
                 'quick_scan' => $ticket->quickScanData(),
+                // Gone from the space's open tickets: resolved, or moved out of its rules.
+                'left' => $ticket->left_at !== null || $ticket->status_category === 'done',
             ],
             'issue' => $issue,
             'issueError' => $issueError,

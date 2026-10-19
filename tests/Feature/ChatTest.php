@@ -49,6 +49,21 @@ class ChatTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_the_page_takes_the_status_jira_has_now_also_on_a_refresh(): void
+    {
+        $this->ticket->update(['status' => 'In Progress', 'status_category' => 'indeterminate']);
+        $this->get("/tickets/{$this->ticket->id}")->assertInertia(fn (Assert $page) => $page->where('ticket.left', false));
+
+        // Resolved in Jira since: the sync no longer reads it, the page does.
+        Http::swap(new \Illuminate\Http\Client\Factory);
+        Http::fake(['*' => Http::response(['fields' => ['summary' => 'Billed twice', 'status' => ['name' => 'Resolved', 'statusCategory' => ['key' => 'done']], 'attachment' => []], 'comments' => [], 'total' => 0])]);
+
+        $this->get("/tickets/{$this->ticket->id}")->assertInertia(fn (Assert $page) => $page
+            ->where('ticket.status', 'Resolved')
+            ->where('ticket.left', true));
+        $this->assertSame(['Resolved', 'done'], [$this->ticket->fresh()->status, $this->ticket->fresh()->status_category]);
+    }
+
     public function test_a_question_starts_a_chat_with_the_ticket_and_the_quick_scan(): void
     {
         $this->post("/tickets/{$this->ticket->id}/messages", ['text' => 'Is the data still wrong?', 'language' => 'auto'])->assertSessionHasNoErrors();
