@@ -259,6 +259,10 @@ function preparePatch() {
     post('patch', patchSystem.value ? { system: patchSystem.value } : {});
 }
 
+// How to apply it: three-way, and keeping Windows line endings when a file has them, which
+// git am would otherwise strip, so those lines no longer match.
+const amCommand = (text) => `git am -3${text.includes('\r') ? ' --keep-cr' : ''} <file>`;
+
 // The diff, line by line, with its kind for colour: + added, - removed, @ position, file headers.
 function diffLines(text) {
     const start = text.indexOf('\ndiff --git ');
@@ -480,7 +484,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             </p>
                             <div class="flex flex-wrap items-center gap-2">
                                 <a :href="`/tickets/${ticket.id}/turns/${turn.id}/patch`" class="btn btn-signal">Download the patch</a>
-                                <code class="font-mono text-xs text-muted">git am -3 &lt;file&gt;</code>
+                                <code class="font-mono text-xs text-muted">{{ amCommand(turn.patch.text) }}</code>
                                 <span class="text-xs text-waiting">untested: the agent cannot run code</span>
                             </div>
                             <details class="rounded-md border border-line">
@@ -493,6 +497,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                                         Made against {{ turn.patch.meta.system }} at <code class="font-mono">{{ turn.patch.meta.base?.slice(0, 10) }}</code>, the tool's copy of it then.
                                         Your checkout may be ahead of that, on another branch, or have changes of its own: <code class="font-mono">git am -3</code>
                                         then merges it like a rebase would, and leaves real conflicts for you to resolve. Stuck halfway? <code class="font-mono">git am --abort</code>.
+                                        <template v-if="turn.patch.text.includes('\r')">
+                                            It changes a file with Windows line endings, which <code class="font-mono">git am</code> strips unless told
+                                            <code class="font-mono">--keep-cr</code> (or once: <code class="font-mono">git config am.keepcr true</code>).
+                                        </template>
                                     </p>
                                     <ul class="font-mono text-xs">
                                         <li v-for="file in turn.patch.meta.files" :key="file.path" class="break-all">{{ turn.patch.meta.system }}/{{ file.path }}</li>

@@ -305,7 +305,9 @@ makes a new version, and the earlier ones stay visible.
   file with a commit message the agent drafts: download it, `git am -3` it in your own checkout,
   test it, push it. `-3` because your checkout is rarely at exactly the commit the tool's copy
   had: the patch records each file's original version, so git merges it like a rebase instead
-  of refusing it when the lines around it moved. The agent cannot run the code, so a patch is untested until you test it,
+  of refusing it when the lines around it moved. A file with Windows line endings (some of
+  boss has them) also needs `--keep-cr`, or `git am` strips the CRs from the patch and its
+  lines match nothing; the page adds it to the command when a patch has such a file. The agent cannot run the code, so a patch is untested until you test it,
   and the page says so, with the agent's *how to test* and *risks*. A proposal says what kind
   of fix it is (`fix_kind`); when that is `code`, the patch is prepared without asking, unless
   that is switched off on the Setup page. A patch turn is not given the systems' folders at
