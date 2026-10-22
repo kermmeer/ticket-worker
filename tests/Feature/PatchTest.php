@@ -102,6 +102,28 @@ class PatchTest extends TestCase
             ->assertDownload('sup-1-bill-the-trunk-once.patch');
     }
 
+    public function test_a_patch_cut_off_by_the_budget_while_editing_still_gives_what_it_changed(): void
+    {
+        $copy = ScratchCopy::path($this->ticket, $this->system);
+        // As on a real ticket: edits, then the budget ends the run without an answer.
+        Process::fake(['*claude*' => function () use ($copy) {
+            File::put($copy.'/Invoice.php', "<?php\n\nreturn 150;\n");
+
+            return Process::result(
+                self::line(['type' => 'assistant', 'message' => ['content' => [['type' => 'tool_use', 'name' => 'Edit', 'input' => ['file_path' => $copy.'/Invoice.php']]]]])
+                .self::line(['type' => 'result', 'subtype' => 'error_max_budget_usd', 'is_error' => true, 'total_cost_usd' => 3.01])
+            );
+        }, '*' => Process::result('')]);
+
+        $turn = RunAgentTurn::queuePatch($this->session, $this->system);
+        (new RunAgentTurn($turn))->handle(app(Workspace::class), app(ClaudeRun::class));
+        $turn->refresh();
+
+        $this->assertSame(AgentTurn::DONE, $turn->state, (string) $turn->error);
+        $this->assertStringContainsString('+return 150;', $turn->patch);
+        $this->assertStringContainsString('Unfinished', $turn->patch_meta['risks']);
+    }
+
     public function test_nothing_changed_means_no_patch(): void
     {
         Process::fake(['*claude*' => Process::result(self::line(['type' => 'result', 'result' => '', 'structured_output' => ['commit_message' => 'x', 'summary' => 'Not a code change after all.', 'how_to_test' => '-']]))]);

@@ -354,6 +354,11 @@ The commits since, with the files they touched:
             ->map(fn ($match) => "- casebook/case-{$match['id']}.md: {$entries[$match['id']]->title}")
             ->implode("\n");
 
+        // A case you tied to this ticket yourself comes first, and as yours.
+        if ($ticket->casebook_manual && $ticket->casebook_entry_id && ($case = CasebookEntry::find($ticket->casebook_entry_id))) {
+            return "The engineer tied this ticket to casebook/case-{$case->id}.md ({$case->title}): read it first and build on it.";
+        }
+
         return $matches !== '' ? "Cases that look similar, read them first:\n{$matches}" : 'No case in the casebook looks similar.';
     }
 
@@ -381,6 +386,13 @@ The commits since, with the files they touched:
         attachments when they matter) first. Investigate only as far as the question needs; for a full
         analysis the engineer has a separate button. If the question cannot be answered well without a
         deep look, say so in one line.
+
+        What helps the engineer most is evidence from the real data. When the ticket is about records
+        (amounts, invoices, services, numbers, statuses) and the tools below can look them up, look them
+        up before you answer, and say what you found: the record, the value, what is wrong with it.
+
+        Keep to the answer rules below, also on length: the answer first, in a few lines; the commands
+        and queries after it. No report, no headings unless there are several commands.
         {$scan}{$earlier}
         {$hint}
         {$apis}
@@ -478,6 +490,8 @@ The commits since, with the files they touched:
         databases; list_apis and list_databases show the details.
         {$list}
         Ask only for what the ticket needs: one record rather than a list, the columns you need, a WHERE.
+        Never guess an endpoint: find it in the API's own code first (its routes or controllers, and the
+        parameters they read), then call it. A guessed path ends in a 404 or a 500 and tells you nothing.
         The tool signs in for you: never ask for a token or a password and never write one down. What comes
         back can hold customers' data: quote only what proves the point, and none of it in the reply draft
         beyond what the reporter already knows.

@@ -82,7 +82,8 @@ class RunAgentTurn implements ShouldQueue
             $hasApis = $tools !== [];
             $settings = SpaceSettings::for($ticket->space);
             // A question in the chat on the lighter model; digging deeper, patches and cases on the full one.
-            $chat = $turn->kind === 'message';
+            // A case draft writes up what the conversation found: no investigation, so the lighter model.
+            $chat = in_array($turn->kind, ['message', 'case'], true);
             $model = $settings->get($chat ? 'chat_model' : 'model');
             $turn->update(['model' => $model]);
             $command = ClaudeRun::command(
@@ -151,7 +152,7 @@ class RunAgentTurn implements ShouldQueue
 
         if ($turn->stop_requested) {
             $state = AgentTurn::STOPPED;
-        } elseif ($result === null || (($result['is_error'] ?? false) && ! is_array($result['structured_output'] ?? null))) {
+        } elseif ($result === null || (($result['is_error'] ?? false) && ! is_array($result['structured_output'] ?? null) && ! self::editedBeforeTheEnd($turn, $copy))) {
             $state = AgentTurn::FAILED;
         } else {
             $state = AgentTurn::DONE;
@@ -178,7 +179,9 @@ class RunAgentTurn implements ShouldQueue
                 'subject' => strtok($message, "\n"),
                 'summary' => $answer['summary'] ?? null,
                 'how_to_test' => $answer['how_to_test'] ?? null,
-                'risks' => $answer['risks'] ?? null,
+                'risks' => ($result['is_error'] ?? false) && $answer === []
+                    ? 'Unfinished: the agent ran out of its turn budget while still editing. Read every change before you use it.'
+                    : ($answer['risks'] ?? null),
                 'files' => $built['files'] ?? [],
             ];
             if ($built === null) {
@@ -207,7 +210,9 @@ class RunAgentTurn implements ShouldQueue
         if ($state === AgentTurn::FAILED) {
             $this->event($turn, 'error', $turn->error);
         } elseif ($state === AgentTurn::DONE && ($result['is_error'] ?? false)) {
-            $this->event($turn, 'text', 'Ended on '.self::why($result, $cost).' just after answering: the answer is kept.');
+            $this->event($turn, 'text', $turn->kind === 'patch' && ! is_array($result['structured_output'] ?? null)
+                ? 'Ended on '.self::why($result, $cost).' while still editing: the patch holds what it changed until then. Check it before you use it.'
+                : 'Ended on '.self::why($result, $cost).' just after answering: the answer is kept.');
         }
 
         // A code fix gets its patch without being asked, unless that is switched off.
@@ -253,6 +258,16 @@ class RunAgentTurn implements ShouldQueue
         if ($turn !== null && in_array($turn->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true)) {
             $turn->update(['state' => AgentTurn::FAILED, 'error' => 'Interrupted: the agent container stopped. Ask again.', 'finished_at' => now()]);
         }
+    }
+
+    /**
+     * A patch turn that ran out of budget (or steps) after it had changed files: the patch is
+     * made from the copy, not from its answer, so what it did is not lost. It says so.
+     */
+    private static function editedBeforeTheEnd(AgentTurn $turn, ?string $copy): bool
+    {
+        return $turn->kind === 'patch' && $copy !== null && $turn->events()->where('type', 'tool')
+            ->where(fn ($query) => $query->where('summary', 'like', 'edit %')->orWhere('summary', 'like', 'write %'))->exists();
     }
 
     /** Why a run ended as an error, in words. */
