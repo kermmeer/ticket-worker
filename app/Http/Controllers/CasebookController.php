@@ -112,14 +112,34 @@ class CasebookController extends Controller
     }
 
     /** "Not related": untie the ticket, and never tie it to this case again. */
+    /** Tie a ticket to this case yourself, by its key: also one whose words do not match, or one already done. */
+    public function link(\Illuminate\Http\Request $request, CasebookEntry $entry): RedirectResponse
+    {
+        $key = strtoupper(trim((string) $request->validate(['key' => ['required', 'string', 'max:40']])['key']));
+        $ticket = Ticket::query()->visibleTo(auth()->user())->where('key', $key)->latest('id')->first();
+        if ($ticket === null) {
+            return back()->withErrors(['key' => "No ticket {$key} that you can see here."]);
+        }
+
+        \Illuminate\Support\Facades\DB::table('casebook_rejections')->where(['casebook_entry_id' => $entry->id, 'ticket_id' => $ticket->id])->delete();
+        $ticket->forceFill(['casebook_entry_id' => $entry->id, 'casebook_score' => null, 'casebook_manual' => true])->save();
+        AuditEvent::record('case.link', $entry->title, "{$ticket->key} tied to it by hand");
+
+        return back()->with('success', "{$ticket->key} is tied to this case. The agent reads the case first on it.");
+    }
+
     public function unlink(CasebookEntry $entry, Ticket $ticket): RedirectResponse
     {
+        $ticket->casebook_manual = false;
         \Illuminate\Support\Facades\DB::table('casebook_rejections')->insertOrIgnore([
             'casebook_entry_id' => $entry->id, 'ticket_id' => $ticket->id, 'user_id' => auth()->id(), 'created_at' => now(),
         ]);
         if ($ticket->casebook_entry_id === $entry->id) {
             // The next best case, if one fits; else none.
             $ticket->rememberMatch(Matcher::forSpace($ticket->space)->best($ticket->matchText(), Matcher::rejections()[$ticket->id] ?? []));
+            $ticket->save();
+        }
+        if ($ticket->isDirty()) {
             $ticket->save();
         }
         AuditEvent::record('case.unlink', $entry->title, "{$ticket->key} is not related");
@@ -158,12 +178,16 @@ class CasebookController extends Controller
             'systems' => System::query()->orderBy('name')->get(['id', 'name']),
             'spaces' => \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']),
             // Every open ticket tied to it, strongest first; and those you said are not related.
-            'linked' => $entry->tickets()->open()->visibleTo(auth()->user())->orderByDesc('casebook_score')->get()
+            // Those tied by hand first, also when they are done; then the matched ones, strongest first.
+            'linked' => $entry->tickets()->where(fn ($query) => $query->whereNull('left_at')->orWhere('casebook_manual', true))
+                ->visibleTo(auth()->user())->orderByDesc('casebook_manual')->orderByDesc('casebook_score')->get()
                 ->map(fn (Ticket $ticket) => [
                     'id' => $ticket->id,
                     'key' => $ticket->key,
                     'summary' => $ticket->summary,
                     'score' => $ticket->casebook_score,
+                    'manual' => $ticket->casebook_manual,
+                    'done' => $ticket->left_at !== null,
                     'page' => route('tickets.show', $ticket, false),
                 ]),
             'unlinked' => Ticket::query()->visibleTo(auth()->user())

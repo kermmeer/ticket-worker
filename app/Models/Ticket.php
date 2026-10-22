@@ -21,7 +21,7 @@ class Ticket extends Model
         'space_id', 'site', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
         'issue_type', 'reporter', 'assignee', 'assignee_account_id', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
         'first_seen_at', 'last_seen_at', 'left_at', 'hidden_at',
-        'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id', 'sla_warned',
+        'casebook_manual', 'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id', 'sla_warned',
     ];
 
     protected function casts(): array
@@ -36,6 +36,7 @@ class Ticket extends Model
             'slas' => 'array',
             'quick_scan' => 'array',
             'quick_scan_steps' => 'array',
+            'casebook_manual' => 'boolean',
             'quick_scan_cost_usd' => 'float',
             'quick_scan_at' => 'datetime',
             'sla_warned' => 'array',
@@ -130,6 +131,10 @@ class Ticket extends Model
 
     public function rememberMatch(?array $match): void
     {
+        // Tied by hand: what the words say does not undo what you decided.
+        if ($this->casebook_manual) {
+            return;
+        }
         $this->casebook_entry_id = $match['id'] ?? null;
         $this->casebook_score = $match['score'] ?? null;
     }

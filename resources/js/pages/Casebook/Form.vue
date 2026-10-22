@@ -1,5 +1,6 @@
 <script setup>
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import TicketKey from '../../components/TicketKey.vue';
 
 const props = defineProps({
@@ -16,6 +17,14 @@ const strength = (score) => (score >= 35 ? { label: 'strong', tone: 'text-done' 
 
 function unlink(ticket) {
     router.post(`/casebook/${props.entry.id}/tickets/${ticket.id}/unlink`, {}, { preserveScroll: true });
+}
+
+// Tie a ticket to it yourself, by its key.
+const page = usePage();
+const newKey = ref('');
+function link() {
+    if (!newKey.value.trim()) return;
+    router.post(`/casebook/${props.entry.id}/tickets`, { key: newKey.value }, { preserveScroll: true, onSuccess: () => !page.props.errors?.key && (newKey.value = '') });
 }
 
 function relink(ticket) {
@@ -136,15 +145,21 @@ const fieldClass = 'mt-1 w-full rounded-md border border-line bg-page px-3 py-2 
 
             <div v-if="entry.id" class="card p-5">
                 <p class="text-sm font-medium">Tickets tied to it <span v-if="linked.length" class="font-normal text-muted">· {{ linked.length }}</span></p>
-                <p class="mt-1 text-xs text-muted">The open tickets whose words match it, strongest first. Not related? Untie it: it will not be tied to this case again.</p>
-                <p v-if="entry.state !== 'approved'" class="mt-2 text-sm text-muted">None: only approved cases are matched.</p>
-                <p v-else-if="linked.length === 0" class="mt-2 text-sm text-muted">None at the moment.</p>
+                <p class="mt-1 text-xs text-muted">Those you added, then the open tickets whose words match it, strongest first. Not related? Untie it: it will not be tied to this case again.</p>
+                <div class="mt-3 flex gap-2">
+                    <label for="link-key" class="sr-only">Ticket key</label>
+                    <input id="link-key" v-model="newKey" placeholder="Add a ticket: DEVBESUP-3218" class="min-w-0 flex-1 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm placeholder:font-sans placeholder:text-muted" @keydown.enter.prevent="link" />
+                    <button type="button" class="btn" :disabled="!newKey.trim()" @click="link">Add</button>
+                </div>
+                <p v-if="page.props.errors?.key" class="mt-1 text-sm text-signal">{{ page.props.errors.key }}</p>
+                <p v-if="linked.length === 0" class="mt-2 text-sm text-muted">{{ entry.state !== 'approved' ? 'None: only approved cases are matched by their words; add tickets yourself above.' : 'None at the moment.' }}</p>
                 <ul v-else class="mt-3 divide-y divide-line text-sm">
                     <li v-for="ticket in linked" :key="ticket.id" class="flex flex-wrap items-start gap-x-2 gap-y-1 py-2">
                         <Link :href="ticket.page" class="shrink-0"><TicketKey :value="ticket.key" /></Link>
                         <Link :href="ticket.page" class="min-w-0 flex-1 break-words hover:underline">{{ ticket.summary }}</Link>
-                        <span class="shrink-0 text-xs" :class="strength(ticket.score).tone">{{ strength(ticket.score).label }}</span>
-                        <button type="button" class="shrink-0 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-signal" @click="unlink(ticket)">Not related</button>
+                        <span v-if="ticket.manual" class="shrink-0 text-xs text-working">added by you<template v-if="ticket.done"> · done</template></span>
+                        <span v-else class="shrink-0 text-xs" :class="strength(ticket.score).tone">{{ strength(ticket.score).label }}</span>
+                        <button type="button" class="shrink-0 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-signal" @click="unlink(ticket)">{{ ticket.manual ? 'Remove' : 'Not related' }}</button>
                     </li>
                 </ul>
                 <details v-if="unlinked.length" class="mt-3 text-sm">
