@@ -480,6 +480,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             </p>
                             <div class="flex flex-wrap items-center gap-2">
                                 <a :href="`/tickets/${ticket.id}/turns/${turn.id}/patch`" class="btn btn-signal">Download the patch</a>
+                                <code class="font-mono text-xs text-muted">git am -3 &lt;file&gt;</code>
                                 <span class="text-xs text-waiting">untested: the agent cannot run code</span>
                             </div>
                             <details class="rounded-md border border-line">
@@ -489,8 +490,9 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                                     <div v-if="turn.patch.meta.how_to_test"><p class="font-medium">How to test</p><p class="mt-1 whitespace-pre-wrap">{{ turn.patch.meta.how_to_test }}</p></div>
                                     <div v-if="turn.patch.meta.risks"><p class="font-medium">Risks</p><p class="mt-1 whitespace-pre-wrap">{{ turn.patch.meta.risks }}</p></div>
                                     <p class="text-xs text-muted">
-                                        Made against {{ turn.patch.meta.system }} at {{ turn.patch.meta.base?.slice(0, 10) }}. In your checkout:
-                                        <code class="font-mono">git am &lt;file&gt;</code>
+                                        Made against {{ turn.patch.meta.system }} at <code class="font-mono">{{ turn.patch.meta.base?.slice(0, 10) }}</code>, the tool's copy of it then.
+                                        Your checkout may be ahead of that, on another branch, or have changes of its own: <code class="font-mono">git am -3</code>
+                                        then merges it like a rebase would, and leaves real conflicts for you to resolve. Stuck halfway? <code class="font-mono">git am --abort</code>.
                                     </p>
                                     <ul class="font-mono text-xs">
                                         <li v-for="file in turn.patch.meta.files" :key="file.path" class="break-all">{{ turn.patch.meta.system }}/{{ file.path }}</li>

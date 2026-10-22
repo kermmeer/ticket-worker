@@ -302,8 +302,10 @@ makes a new version, and the earlier ones stay visible.
 - **Patch.** *Prepare a patch* has the agent make the change in a scratch copy of the system
   inside the ticket's workspace (`patch/<system>`, a `git clone --shared` at the system's
   current commit), the one place it may write. The tool turns that into a `git format-patch`
-  file with a commit message the agent drafts: download it, `git am` it in your own checkout,
-  test it, push it. The agent cannot run the code, so a patch is untested until you test it,
+  file with a commit message the agent drafts: download it, `git am -3` it in your own checkout,
+  test it, push it. `-3` because your checkout is rarely at exactly the commit the tool's copy
+  had: the patch records each file's original version, so git merges it like a rebase instead
+  of refusing it when the lines around it moved. The agent cannot run the code, so a patch is untested until you test it,
   and the page says so, with the agent's *how to test* and *risks*. A proposal says what kind
   of fix it is (`fix_kind`); when that is `code`, the patch is prepared without asking, unless
   that is switched off on the Setup page. A patch turn is not given the systems' folders at

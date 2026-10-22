@@ -24,7 +24,7 @@ One instance serves a team: one person runs it, everyone signs in with their own
 - **Reply drafts** by your rules (short, friendly, signed with your Jira first name), in
   the reporter's language or one you pick (English, Dutch, French, Danish, German). Copy
   them into Jira, or hand them to an optional outbox app (`docs/OUTBOX-API.md`).
-- **Patches**: a code fix comes with a patch file you apply with `git am`, made by the agent
+- **Patches**: a code fix comes with a patch file you apply with `git am -3`, made by the agent
   in a copy of the system. It cannot run the code, so you test it.
 - **APIs per system** (a base address plus a username and token, a bearer token or a header),
   so the agent can check a ticket against real data. The app makes each call and keeps the
