@@ -100,7 +100,11 @@ class User extends Authenticatable
     /** The account a header names, made on first sight: the sign-in in front already vouched. */
     public static function fromHeader(string $username, ?string $name = null, ?string $email = null): self
     {
-        $user = static::firstOrNew(['username' => $username]);
+        // Your account here by its username, else by its email: the sign-in in front may know
+        // you by another name than the one you chose here.
+        $user = static::query()->whereRaw('lower(username) = ?', [mb_strtolower($username)])->first()
+            ?? ($email ? static::query()->whereRaw('lower(email) = ?', [mb_strtolower($email)])->first() : null)
+            ?? new static(['username' => $username]);
         if (! $user->exists) {
             $user->fill([
                 'name' => $name ?: $username,

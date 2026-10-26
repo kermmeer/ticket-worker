@@ -104,6 +104,21 @@ class AccountTest extends TestCase
         $this->assertFalse(User::firstWhere('username', 'stijn')->is_admin, 'Not the first account: the tester was.');
     }
 
+    public function test_a_trusted_header_finds_your_account_by_another_username_through_your_email(): void
+    {
+        $karl = User::factory()->create(['username' => 'kermmeer', 'email' => 'Karl@Example.com', 'role' => 'admin']);
+        auth()->logout();
+        config(['auth.trusted_header' => 'X-authentik-username', 'auth.trusted_header_email' => 'X-authentik-email']);
+
+        $this->get('/casebook', ['X-authentik-username' => 'karl', 'X-authentik-email' => 'karl@example.com'])->assertOk();
+        $this->assertAuthenticatedAs($karl);
+
+        auth()->logout();
+        $this->get('/casebook', ['X-authentik-username' => 'KERMMEER'])->assertOk();
+        $this->assertAuthenticatedAs($karl);
+        $this->assertSame(0, User::where('username', 'karl')->count(), 'No second account.');
+    }
+
     public function test_the_overview_says_who_is_on_a_ticket(): void
     {
         $other = User::factory()->create(['username' => 'stijn', 'name' => 'Stijn Example']);
