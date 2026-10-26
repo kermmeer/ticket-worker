@@ -43,6 +43,11 @@ return [
     | directly could otherwise send the header and be anyone.
     */
 
+    // Off: no sign-in at all; everyone who reaches the app is sign_in_as (by username), or the
+    // first admin. Only behind a gate of its own (Authentik, a VPN): the app then has none.
+    'sign_in' => filter_var(env('SIGN_IN', 'on'), FILTER_VALIDATE_BOOLEAN),
+    'sign_in_as' => env('SIGN_IN_AS'),
+
     'trusted_header' => env('AUTH_HEADER'),
     'trusted_header_name' => env('AUTH_HEADER_NAME'),
     'trusted_header_email' => env('AUTH_HEADER_EMAIL'),

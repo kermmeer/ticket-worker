@@ -12,8 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Who is using the app (CONCEPT.md §12). A sign-in in front of it that passes the user on
- * in a header (AUTH_HEADER, e.g. X-authentik-username) decides; otherwise you sign in here
- * with your own password. Only a proxy may set that header: the app must not be reachable
+ * in a header (AUTH_HEADER, e.g. X-authentik-username) decides; with SIGN_IN=off, everyone
+ * is one account; otherwise you sign in here with your own password. Only a proxy may set that header: the app must not be reachable
  * around it, or anyone could claim to be anyone.
  */
 class IdentifyUser
@@ -34,6 +34,11 @@ class IdentifyUser
                 Auth::login($user);
                 $request->session()->regenerate();
             }
+        }
+
+        // No sign-in on this instance: everyone is the one account it runs as.
+        if ($request->user() === null && ! config('auth.sign_in')) {
+            Auth::login(User::withoutSignIn());
         }
 
         if (($user = $request->user()) !== null) {

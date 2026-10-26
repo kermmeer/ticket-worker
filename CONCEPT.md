@@ -542,7 +542,10 @@ own work.
   serve a team: one person runs it (the first account, an admin), the others use it. Each
   person signs in with their own password, or, when a sign-in in front passes the user on
   in a header (`AUTH_HEADER`, e.g. Authentik's `X-authentik-username`), is known by that and
-  never signs in twice; such an account is made on first sight. An admin adds people on
+  never signs in twice; such an account is made on first sight. Behind a gate of its own an
+  instance can do without a sign-in altogether (`SIGN_IN=off`, built 2026-10-26): everyone is
+  then one account, `SIGN_IN_AS` or the first admin; making accounts mandatory had shut out
+  an instance that sat behind Authentik with no header passed on. An admin adds people on
   *Your account*, and each gets a link, good for a week, to set their own password.
   - **Each person's own Claude.** On *Your account* a person stores their own subscription
     token (`claude setup-token`) or API key, encrypted. What they ask for (analyses,

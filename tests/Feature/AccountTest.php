@@ -119,6 +119,36 @@ class AccountTest extends TestCase
         $this->assertSame(0, User::where('username', 'karl')->count(), 'No second account.');
     }
 
+    public function test_with_sign_in_off_everyone_is_the_first_admin_or_the_one_named(): void
+    {
+        $admin = User::query()->where('role', 'admin')->orderBy('id')->first();
+        $sam = User::factory()->create(['username' => 'sam', 'role' => 'member']);
+        auth()->logout();
+        config(['auth.sign_in' => false]);
+
+        $this->get('/casebook')->assertOk();
+        $this->assertAuthenticatedAs($admin);
+        $this->get('/sign-in')->assertRedirect(route('overview'));
+
+        auth()->logout();
+        config(['auth.sign_in_as' => 'SAM']);
+        $this->get('/casebook')->assertOk();
+        $this->assertAuthenticatedAs($sam);
+
+        // A sign-in in front that does pass someone on still decides.
+        auth()->logout();
+        config(['auth.trusted_header' => 'X-authentik-username']);
+        $this->get('/casebook', ['X-authentik-username' => $admin->username])->assertOk();
+        $this->assertAuthenticatedAs($admin);
+    }
+
+    public function test_with_sign_in_on_a_stranger_is_sent_to_sign_in(): void
+    {
+        auth()->logout();
+
+        $this->get('/casebook')->assertRedirect(route('account.sign-in'));
+    }
+
     public function test_the_overview_says_who_is_on_a_ticket(): void
     {
         $other = User::factory()->create(['username' => 'stijn', 'name' => 'Stijn Example']);

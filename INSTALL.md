@@ -137,6 +137,11 @@ first sight. Only do this when the app cannot be reached around that proxy. With
 front, the header must be set in the block that proxies to the app: a `proxy_set_header` in
 a `location` that hands over with `try_files … @named` does not carry over.
 
+Already behind a gate of its own and no need for a sign-in here at all? `SIGN_IN=off`:
+everyone who reaches the app is one account, `SIGN_IN_AS` (a username) or else the first
+admin, made on the spot on a fresh instance. A header from `AUTH_HEADER`, when it arrives,
+still decides, so per-person accounts work as soon as the proxy passes one on.
+
 ## 6. A first space and a first system
 
 **A space** is one Jira project. In the app: **Spaces → Add a space**, pick the project,

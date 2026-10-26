@@ -18,7 +18,7 @@ abstract class TestCase extends BaseTestCase
         $this->withoutVite();
 
         // The gate is this machine's choice; a test that wants it says so.
-        config(['app.password' => null, 'auth.trusted_header' => null]);
+        config(['app.password' => null, 'auth.trusted_header' => null, 'auth.sign_in' => true, 'auth.sign_in_as' => null]);
 
         // Nor is this machine's Jira: a test that wants one sets it (AGENTS.md).
         config(['services.jira.base' => '', 'services.jira.email' => null, 'services.jira.token' => null]);

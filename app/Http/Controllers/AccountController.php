@@ -33,6 +33,11 @@ class AccountController extends Controller
     /** The sign-in in front really passes the user on: not just configured, but arriving. */
     private static function viaHeader(): bool
     {
+        // Or no sign-in at all: then there is nothing to sign out of either.
+        if (! config('auth.sign_in')) {
+            return true;
+        }
+
         return filled($header = config('auth.trusted_header')) && filled(request()->header($header));
     }
 

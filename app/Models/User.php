@@ -98,6 +98,24 @@ class User extends Authenticatable
     }
 
     /** The account a header names, made on first sight: the sign-in in front already vouched. */
+    /**
+     * Who you are when the instance has no sign-in (SIGN_IN=off): SIGN_IN_AS, else the first
+     * admin; on a fresh instance, a first admin made for it.
+     */
+    public static function withoutSignIn(): self
+    {
+        $as = config('auth.sign_in_as');
+
+        return (filled($as) ? static::query()->whereRaw('lower(username) = ?', [mb_strtolower($as)])->first() : null)
+            ?? static::query()->where('role', 'admin')->orderBy('id')->first()
+            ?? static::query()->orderBy('id')->first()
+            ?? tap(new static, fn (self $user) => $user->fill([
+                'username' => filled($as) ? mb_strtolower($as) : 'admin', 'name' => filled($as) ? $as : 'Admin',
+                'email' => (filled($as) ? mb_strtolower($as) : 'admin').'@'.(parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'localhost'),
+                'password' => Str::random(64), 'role' => 'admin',
+            ])->save());
+    }
+
     public static function fromHeader(string $username, ?string $name = null, ?string $email = null): self
     {
         // Your account here by its username, else by its email: the sign-in in front may know
