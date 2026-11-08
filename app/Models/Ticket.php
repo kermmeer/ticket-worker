@@ -129,6 +129,11 @@ class Ticket extends Model
         return (string) $this->summary;
     }
 
+    public function branches(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TicketBranch::class);
+    }
+
     /** Support (an incident, a question) or development (a story, a bug to build a fix for). */
     public function kind(): string
     {

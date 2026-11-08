@@ -265,6 +265,54 @@ class Instructions
         ];
     }
 
+    /** What a build turn answers with: the commit, and a guide to go with the change. */
+    public static function buildSchema(): array
+    {
+        $text = ['type' => 'string'];
+
+        return [
+            'type' => 'object',
+            'required' => ['commit_message', 'summary', 'how_to_test', 'guide_kind', 'guide'],
+            'properties' => [
+                'commit_message' => $text + ['description' => 'A git commit message for what you changed in this turn: a subject under 72 characters starting with the ticket key, a blank line, then why.'],
+                'summary' => $text + ['description' => 'What the change does, in two or three sentences, for the engineer.'],
+                'how_to_test' => $text + ['description' => 'How to check it by hand or with a test, since you could not run it.'],
+                'risks' => $text + ['description' => 'What else this could affect, or what you were unsure of.'],
+                'guide_kind' => ['type' => 'string', 'enum' => ['user', 'technical'],
+                    'description' => 'user when people using the system will see or do something differently; technical when they will not.'],
+                'guide' => $text + ['description' => 'In Markdown, short (under 250 words). For user: what changed and how to use it, step by step, in plain words. For technical: what changed, where, configuration or migrations, how to deploy and roll back.'],
+            ],
+        ];
+    }
+
+    /** Build the ticket's change on its branch, in the copy the tool prepared. */
+    public static function buildRequest(Ticket $ticket, string $systemName, string $copy, string $branch, string $base, bool $continued, ?string $request = null): string
+    {
+        $where = $continued
+            ? "The branch {$branch} already holds earlier work on this ticket: build on it, do not start over."
+            : "The branch {$branch} is new, made from {$base}.";
+        $asked = filled($request) ? "\n\nWhat the engineer asked for, in their words (this counts most):\n\n{$request}\n" : '';
+
+        return <<<TEXT
+        Build ticket {$ticket->key} in {$systemName}: write the change it asks for, taking everything
+        said in this conversation into account. Read ticket.md if you have not yet.
+
+        A copy of {$systemName} is in your workspace at {$copy}/, on the branch {$branch}. {$where}
+        Edit files there and only there. The tool commits what you change on that branch and puts
+        it on the server, where the engineer fetches it.{$asked}
+
+        - Do what the ticket asks, completely, and nothing beside it. No refactoring around it.
+        - Follow the code around it: its structure, style, naming and error handling.
+        - Where the system has tests near the code you change, add or adjust them.
+        - Migrations, configuration, translations: include what the change needs.
+        - You cannot run anything, so read carefully: imports, types, every caller of what you change.
+        - If something in the ticket is unclear, make the sensible choice and say which in the summary.
+
+        End with the JSON: the commit message, a summary, how to test it, the risks, and a short
+        guide: a user guide if people will see the change, else a technical note.
+        TEXT;
+    }
+
     /** Make the proposed fix as a patch, in the copy the tool prepared. */
     public static function patchRequest(string $ticketKey, string $systemName, string $copy, string $base, ?string $request = null): string
     {

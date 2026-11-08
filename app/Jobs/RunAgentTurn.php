@@ -77,8 +77,22 @@ class RunAgentTurn implements ShouldQueue
                 ]);
             }
 
+            // A build works on the ticket's branch: the one published before, or a new one from its base.
+            if ($turn->kind === 'build') {
+                $meta = $turn->patch_meta ?? [];
+                $system = System::find($meta['system_id'] ?? null) ?? throw new \RuntimeException('The system for this build is gone.');
+                $copy = ScratchCopy::buildPath($ticket, $system);
+                $this->event($turn, 'tool', "copying {$system->name} to build/{$system->name} on {$meta['branch']}");
+                $prepared = app(ScratchCopy::class)->prepareBranch($system, $copy, $meta['branch'], $meta['base']);
+                $turn->update([
+                    'prompt' => Instructions::buildRequest($ticket, $system->name, 'build/'.$system->name, $meta['branch'], $meta['base'], $prepared['continued'], $turn->note),
+                    'patch_meta' => [...$meta, 'system' => $system->name, 'base_sha' => $prepared['base'], 'continued' => $prepared['continued']],
+                ]);
+            }
+
             // The systems' APIs, through the tool's MCP server, which holds the secrets.
-            $tools = $turn->kind === 'patch' ? [] : ApiToolServer::toolNamesFor($systems);
+            $writes = in_array($turn->kind, ['patch', 'build'], true);
+            $tools = $writes ? [] : ApiToolServer::toolNamesFor($systems);
             $hasApis = $tools !== [];
             $settings = SpaceSettings::for($ticket->space);
             // A question in the chat on the lighter model; digging deeper, patches and cases on the full one.
@@ -88,7 +102,7 @@ class RunAgentTurn implements ShouldQueue
             $turn->update(['model' => $model]);
             $command = ClaudeRun::command(
                 (float) $settings->get('turn_budget_usd'),
-                write: $turn->kind === 'patch',
+                write: $writes,
                 mcpTools: $tools,
                 model: $model,
                 effort: $settings->get($chat ? 'chat_effort' : 'effort'),
@@ -107,11 +121,13 @@ class RunAgentTurn implements ShouldQueue
                 $command = [...$command, '--json-schema', json_encode(Instructions::caseSchema())];
             } elseif ($turn->kind === 'patch') {
                 $command = [...$command, '--json-schema', json_encode(Instructions::patchSchema())];
+            } elseif ($turn->kind === 'build') {
+                $command = [...$command, '--json-schema', json_encode(Instructions::buildSchema())];
             }
             // A patch turn may write, and restricted mode lets it write in every folder it is
             // given: so it gets only the workspace, where its copy is. Without Docker's
             // read-only mounts, that is what keeps the systems themselves untouched.
-            if ($turn->kind !== 'patch') {
+            if (! $writes) {
                 foreach ($systems->filter->hasCode() as $system) {
                     $command = [...$command, '--add-dir', $system->path()];
                 }
@@ -169,9 +185,9 @@ class RunAgentTurn implements ShouldQueue
 
         $patch = null;
         $patchMeta = $turn->patch_meta;
-        if ($state === AgentTurn::DONE && $turn->kind === 'patch') {
+        if ($state === AgentTurn::DONE && in_array($turn->kind, ['patch', 'build'], true)) {
             $answer = $result['structured_output'] ?? self::jsonFrom((string) ($result['result'] ?? '')) ?? [];
-            $message = trim((string) ($answer['commit_message'] ?? '')) ?: "{$turn->session->ticket->key}: fix";
+            $message = trim((string) ($answer['commit_message'] ?? '')) ?: "{$turn->session->ticket->key}: ".($turn->kind === 'build' ? 'build' : 'fix');
             $built = app(ScratchCopy::class)->build($copy, $message);
             $patch = $built['patch'] ?? null;
             $patchMeta = [
@@ -183,9 +199,15 @@ class RunAgentTurn implements ShouldQueue
                     ? 'Unfinished: the agent ran out of its turn budget while still editing. Read every change before you use it.'
                     : ($answer['risks'] ?? null),
                 'files' => $built['files'] ?? [],
+                'guide_kind' => $answer['guide_kind'] ?? null,
+                'guide' => $answer['guide'] ?? null,
             ];
             if ($built === null) {
-                $this->event($turn, 'text', 'No patch: the agent changed nothing. '.($answer['summary'] ?? ''));
+                $this->event($turn, 'text', 'No '.($turn->kind === 'build' ? 'new commit' : 'patch').': the agent changed nothing. '.($answer['summary'] ?? ''));
+            }
+            // On the server, for your clones to fetch: by the worker, which may write the systems.
+            if ($built !== null && $turn->kind === 'build') {
+                $publish = true;
             }
         }
 
@@ -207,10 +229,13 @@ class RunAgentTurn implements ShouldQueue
         if ($cost !== null) {
             $turn->session->increment('cost_usd', $cost);
         }
+        if ($publish ?? false) {
+            PublishBranch::dispatch($turn->fresh());
+        }
         if ($state === AgentTurn::FAILED) {
             $this->event($turn, 'error', $turn->error);
         } elseif ($state === AgentTurn::DONE && ($result['is_error'] ?? false)) {
-            $this->event($turn, 'text', $turn->kind === 'patch' && ! is_array($result['structured_output'] ?? null)
+            $this->event($turn, 'text', in_array($turn->kind, ['patch', 'build'], true) && ! is_array($result['structured_output'] ?? null)
                 ? 'Ended on '.self::why($result, $cost).' while still editing: the patch holds what it changed until then. Check it before you use it.'
                 : 'Ended on '.self::why($result, $cost).' just after answering: the answer is kept.');
         }
@@ -237,6 +262,28 @@ class RunAgentTurn implements ShouldQueue
                 ->first(fn (System $system) => preg_match('/(?<![\w-])'.preg_quote(mb_strtolower($system->name), '/').'(?![\w-])/u', $name) === 1);
 
         return $named ?? ($systems->count() === 1 ? $systems->first() : null);
+    }
+
+    /**
+     * Build the ticket on its branch in one system. The branch is the one built before, or
+     * named after the ticket; its base the one it had, the one asked for, the space's, or the
+     * system's own branch.
+     */
+    public static function queueBuild(AgentSession $session, System $system, ?string $base = null, ?string $request = null, ?User $user = null): AgentTurn
+    {
+        $ticket = $session->ticket;
+        $existing = \App\Models\TicketBranch::query()->where(['ticket_id' => $ticket->id, 'system_id' => $system->id])->first();
+        $turn = AgentTurn::create([
+            'agent_session_id' => $session->id, 'kind' => 'build', 'prompt' => '', 'note' => $request, 'user_id' => $user?->id ?? auth()->id(),
+            'patch_meta' => [
+                'system_id' => $system->id, 'system' => $system->name,
+                'branch' => $existing?->name ?? $ticket->branchName(),
+                'base' => $existing?->base ?? (filled($base) ? $base : (SpaceSettings::for($ticket->space)->get('base_branch') ?: $system->branch)),
+            ],
+        ]);
+        self::dispatch($turn);
+
+        return $turn;
     }
 
     /** @param  ?string  $request  what you asked for in your own words, when you asked in a message */
@@ -266,7 +313,7 @@ class RunAgentTurn implements ShouldQueue
      */
     private static function editedBeforeTheEnd(AgentTurn $turn, ?string $copy): bool
     {
-        return $turn->kind === 'patch' && $copy !== null && $turn->events()->where('type', 'tool')
+        return in_array($turn->kind, ['patch', 'build'], true) && $copy !== null && $turn->events()->where('type', 'tool')
             ->where(fn ($query) => $query->where('summary', 'like', 'edit %')->orWhere('summary', 'like', 'write %'))->exists();
     }
 

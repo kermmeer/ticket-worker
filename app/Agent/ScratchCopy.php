@@ -42,6 +42,70 @@ class ScratchCopy
         return $base;
     }
 
+    /** Where a build works: beside the patch copy, so the two never meet. */
+    public static function buildPath(Ticket $ticket, System $system): string
+    {
+        return Workspace::path($ticket).'/build/'.$system->name;
+    }
+
+    /**
+     * A fresh copy on the ticket's branch: the branch as published before, to build on, or
+     * else a new one from the base branch.
+     *
+     * @return array{base: string, continued: bool} the base branch's commit, and whether the branch existed
+     */
+    public function prepareBranch(System $system, string $dir, string $branch, string $base): array
+    {
+        File::deleteDirectory($dir);
+        File::ensureDirectoryExists(dirname($dir));
+        $this->git(dirname($dir), ['clone', '--quiet', '--shared', '--no-checkout', $system->path(), $dir]);
+
+        if (! $this->has($dir, "refs/remotes/origin/{$base}")) {
+            throw new RuntimeException("{$system->name} has no branch {$base} here to build from. Push it with push-systems.sh, or pick another.");
+        }
+        $continued = $this->has($dir, "refs/remotes/origin/{$branch}");
+        $this->git($dir, ['checkout', '--quiet', '-B', $branch, $continued ? "origin/{$branch}" : "origin/{$base}"]);
+
+        return ['base' => trim($this->git($dir, ['rev-parse', "origin/{$base}"])), 'continued' => $continued];
+    }
+
+    /**
+     * How far a branch is from its base, in a repository: commits, files, lines.
+     *
+     * @return array{head: string, commits: int, files: int, added: int, removed: int}
+     */
+    public function stats(string $repo, string $branch, string $base): array
+    {
+        $added = $removed = $files = 0;
+        foreach (preg_split('/\R/', trim($this->git($repo, ['diff', '--numstat', "{$base}...{$branch}"]))) as $line) {
+            if (preg_match('/^(\d+|-)\t(\d+|-)\t/', $line, $m)) {
+                $files++;
+                $added += (int) $m[1];
+                $removed += (int) $m[2];
+            }
+        }
+
+        return [
+            'head' => trim($this->git($repo, ['rev-parse', $branch])),
+            'commits' => (int) trim($this->git($repo, ['rev-list', '--count', "{$base}..{$branch}"])),
+            'files' => $files, 'added' => $added, 'removed' => $removed,
+        ];
+    }
+
+    /** Put the copy's branch into the system's repository, where your clones fetch it. */
+    public function publish(string $dir, System $system, string $branch): void
+    {
+        $this->git($system->path(), ['fetch', '--quiet', '--no-tags', $dir, "+refs/heads/{$branch}:refs/heads/{$branch}"]);
+    }
+
+    private function has(string $dir, string $ref): bool
+    {
+        $process = new Process(['git', '-c', 'safe.directory=*', 'rev-parse', '--verify', '--quiet', $ref], $dir);
+        $process->run();
+
+        return $process->isSuccessful();
+    }
+
     /**
      * The agent's changes as one commit, and that commit as a patch. Null when it changed
      * nothing.

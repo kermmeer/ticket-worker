@@ -65,6 +65,11 @@ class TicketController extends Controller
                 'open_label' => $ticket->space->openLabel(),
                 'space' => ['label' => $ticket->space->label, 'colour' => $ticket->space->colour, 'type' => $ticket->space->type],
                 'quick_scan' => $ticket->quickScanData(),
+                'kind' => $ticket->kind(),
+                'branch_name' => $ticket->branchName(),
+                // The code built for it, per repository: branch, commits, lines.
+                'branches' => $ticket->branches()->with('system:id,name')->get()->map->summary()->values(),
+                'base_branch' => SpaceSettings::for($ticket->space)->get('base_branch'),
                 // Gone from the space's open tickets: resolved, or moved out of its rules.
                 'left' => $ticket->left_at !== null || $ticket->status_category === 'done',
             ],
@@ -84,7 +89,7 @@ class TicketController extends Controller
             // A budget near or past its end: said before anyone presses a button.
             'budget' => Budget::check($ticket->space, auth()->user()),
             // What a patch can be for.
-            'systems' => app(Workspace::class)->systems($ticket)->map(fn ($system) => ['id' => $system->id, 'name' => $system->name])->values(),
+            'systems' => app(Workspace::class)->systems($ticket)->map(fn ($system) => ['id' => $system->id, 'name' => $system->name, 'branch' => $system->branch, 'code' => $system->hasCode()])->values(),
             'outboxReady' => app(OutboxClient::class)->configured(),
             // Your greeting and sign-off: an empty reply box fills with it, the agent's draft goes inside it.
             'replyTemplate' => \App\Models\Setting::replyTemplateFor(auth()->user()?->firstName() ?? $jira->firstName()),
@@ -165,6 +170,16 @@ class TicketController extends Controller
 
         // "Make a patch" in a message: the agent would write the diff into its answer, with
         // nothing to download. A patch turn makes the file.
+        // "Build it" on a development ticket: a build on its branch, with these words along.
+        if ($ticket->isDevelopment() && (self::asksForPatch($data['text']) || self::asksForBuild($data['text']))
+            && ! $ticket->openSession()?->busy() && ! $this->overBudget($ticket)
+            && ($system = $this->buildSystem($ticket, $ticket->openSession()))) {
+            [$session] = $this->chat($ticket, $data['language'] ?? null);
+            RunAgentTurn::queueBuild($session, $system, request: trim($data['text']));
+
+            return back();
+        }
+
         if (self::asksForPatch($data['text']) && ($session = $ticket->openSession()) && ! $session->busy() && ! $this->overBudget($ticket)) {
             $system = RunAgentTurn::systemFor($session->turns()->whereNotNull('proposal')->reorder()->latest('id')->first()?->proposal, app(Workspace::class)->systems($ticket->load('space')));
             if ($system !== null) {
@@ -189,6 +204,53 @@ class TicketController extends Controller
         $this->turn($session, 'message', $first ? Instructions::chatStart($ticket, $text, $earlier) : $text, $text);
 
         return back();
+    }
+
+    /** "Build it", "implement this", "go ahead and code it", "bouw het": not "how would you build it?". */
+    public static function asksForBuild(string $text): bool
+    {
+        return (bool) preg_match('/\b(build|implement|code|bouw|implementeer)\b/i', $text)
+            && ! preg_match('/^\s*(why|what|how|which|should|would|could|waarom|wat|hoe|welke)\b/i', $text)
+            && ! str_contains($text, '?');
+    }
+
+    /** Build the ticket on its branch: from the button, with the system and base you picked. */
+    public function build(Request $request, Ticket $ticket): RedirectResponse
+    {
+        $data = $request->validate([
+            'system' => ['nullable', 'integer'],
+            'base' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._\/-]+$/'],
+            'text' => ['nullable', 'string', 'max:'.self::MAX_TEXT],
+        ]);
+        abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
+        if ($ticket->openSession()?->busy()) {
+            return back()->with('error', 'The agent is still working; wait or stop it.');
+        }
+        $system = $this->buildSystem($ticket, $ticket->openSession(), $data['system'] ?? null);
+        if ($system === null) {
+            return back()->with('error', 'Which system should it be built in? Pick one.');
+        }
+
+        [$session] = $this->chat($ticket);
+        RunAgentTurn::queueBuild($session, $system, $data['base'] ?? null, filled($data['text'] ?? null) ? trim($data['text']) : null);
+
+        return back();
+    }
+
+    /** The system to build in: the one asked for, the one built in before, the proposal's, or the only one. */
+    private function buildSystem(Ticket $ticket, ?AgentSession $session, ?int $id = null): ?\App\Models\System
+    {
+        $systems = app(Workspace::class)->systems($ticket->load('space'))->filter->hasCode()->values();
+        if ($id !== null) {
+            return $systems->firstWhere('id', $id);
+        }
+        $built = $ticket->branches()->latest('updated_at')->first();
+
+        return ($built ? $systems->firstWhere('id', $built->system_id) : null)
+            ?? RunAgentTurn::systemFor($session?->turns()->whereNotNull('proposal')->reorder()->latest('id')->first()?->proposal, $systems);
     }
 
     /** "Can you create a patch…", "make it a patch", "maak een patch": not "why did the patch fail?". */
@@ -414,7 +476,7 @@ class TicketController extends Controller
                 'error' => $turn->error,
                 'case_draft' => $turn->case_draft !== null,
                 // A patch turn: what it changed, and the patch itself for the diff view.
-                'patch' => $turn->kind === 'patch' ? [
+                'patch' => in_array($turn->kind, ['patch', 'build'], true) ? [
                     'meta' => collect($turn->patch_meta ?? [])->except('system_id'),
                     'text' => $turn->patch,
                 ] : null,
