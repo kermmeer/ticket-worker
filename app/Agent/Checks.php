@@ -27,6 +27,9 @@ class Checks
 
     public const CHECK_TIMEOUT = 900;
 
+    /** Installed dependencies: never cleaned away when the workspace moves to a build. */
+    public const KEEP = ['node_modules/', 'vendor/', '.venv/', 'venv/', '__pycache__/', '.pytest_cache/', '.angular/'];
+
     public const SETUP_TIMEOUT = 1800;
 
     public static function root(): string
@@ -57,11 +60,16 @@ class Checks
             $this->git($dir, ['fetch', '--quiet', 'origin']);
         }
         $this->git($dir, ['checkout', '--quiet', '--force', '--detach', "origin/{$system->branch}"]);
+        // What the setup installs stays, also where the system's .gitignore does not say so.
+        File::put($dir.'/.git/info/exclude', implode("\n", self::KEEP)."\n");
         $this->git($dir, ['clean', '--quiet', '-fd']);
         $log .= "Workspace at {$system->branch} (".trim($this->git($dir, ['rev-parse', '--short', 'HEAD'])).")\n";
 
         if (filled($system->checks_node)) {
             $log .= 'Node '.$this->node($system->checks_node)['version']."\n";
+        }
+        if (filled($system->checks_python)) {
+            $log .= 'Python '.$this->python($system->checks_python)['version']."\n";
         }
 
         // Private npm packages you copied here (npm pack, with the VPN on): into npm's cache,
@@ -164,14 +172,54 @@ class Checks
         return ['version' => $version, 'bin' => "{$tools}/{$name}/bin"];
     }
 
+    /**
+     * A standalone CPython build (python-build-standalone) of a version like 3.12, downloaded
+     * once into the tools folder, with pip.
+     *
+     * @return array{version: string, bin: string}
+     */
+    public function python(string $version): array
+    {
+        $version = trim($version);
+        $tools = self::root().'/tools';
+        $existing = collect(glob("{$tools}/python-{$version}.*") ?: [])->filter(fn ($dir) => is_file($dir.'/bin/python3'))->sort()->last();
+        if ($existing !== null) {
+            return ['version' => Str::after(basename($existing), 'python-'), 'bin' => $existing.'/bin'];
+        }
+
+        $release = Http::timeout(30)->get('https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest')->throw()->json();
+        $asset = collect($release['assets'] ?? [])->first(fn ($asset) => preg_match('/^cpython-'.preg_quote($version, '/').'\.\d+\+\d+-x86_64-unknown-linux-gnu-install_only\.tar\.gz$/', $asset['name'] ?? ''))
+            ?? throw new RuntimeException("No Python {$version} build to download.");
+        $full = Str::between($asset['name'], 'cpython-', '+');
+        File::ensureDirectoryExists($tools);
+        $gz = "{$tools}/{$asset['name']}";
+        Http::timeout(600)->sink($gz)->get($asset['browser_download_url'])->throw();
+        $tar = substr($gz, 0, -3);
+        copy('compress.zlib://'.$gz, $tar);
+        $unpack = "{$tools}/python-unpack-".uniqid();
+        File::ensureDirectoryExists($unpack);
+        (new Process(['tar', '-xf', $tar, '-C', $unpack]))->setTimeout(600)->mustRun();
+        File::moveDirectory("{$unpack}/python", "{$tools}/python-{$full}");
+        File::deleteDirectory($unpack);
+        @unlink($gz);
+        @unlink($tar);
+
+        return ['version' => $full, 'bin' => "{$tools}/python-{$full}/bin"];
+    }
+
     /** A command in the workspace, with the system's runtime on the PATH and its redirects for git. */
     private function shell(System $system, string $dir, string $command, int $timeout, bool $tolerateTimeout = false): Process
     {
-        $path = (filled($system->checks_node) ? $this->node($system->checks_node)['bin'].':' : '').(getenv('PATH') ?: '/usr/local/bin:/usr/bin:/bin');
+        $path = (filled($system->checks_node) ? $this->node($system->checks_node)['bin'].':' : '')
+            .(filled($system->checks_python) ? $this->python($system->checks_python)['bin'].':' : '')
+            .(getenv('PATH') ?: '/usr/local/bin:/usr/bin:/bin');
         $env = [
             'PATH' => $path, 'CI' => 'true', 'HOME' => self::root().'/home', 'NG_CLI_ANALYTICS' => 'false',
             'COMPOSER_HOME' => self::root().'/home/.composer', 'npm_config_cache' => self::root().'/home/.npm',
             'npm_config_prefer_offline' => 'true',
+            // Python: the virtualenv in the workspace, where it stays; nothing asks.
+            'PIPENV_VENV_IN_PROJECT' => '1', 'PIPENV_YES' => '1', 'PIPENV_NOSPIN' => '1', 'PIP_CACHE_DIR' => self::root().'/home/.pip',
+            'PIP_DISABLE_PIP_VERSION_CHECK' => '1',
             'GIT_TERMINAL_PROMPT' => '0',
         ] + $this->redirects($system);
         File::ensureDirectoryExists(self::root().'/home');

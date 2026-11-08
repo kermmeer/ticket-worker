@@ -99,6 +99,21 @@ const states = {
     ready: { label: 'Ready', tone: 'text-done' },
     failed: { label: 'Failed', tone: 'text-signal' },
 };
+
+// Renaming, or following another branch.
+const editing = ref(null);
+const edit = useForm({ name: '', branch: '' });
+function startEdit(system) {
+    editing.value = editing.value === system.id ? null : system.id;
+    edit.defaults({ name: system.name, branch: system.kind === 'api' ? '' : system.branch });
+    edit.reset();
+}
+function saveEdit(system) {
+    edit.put(`/systems/${system.id}`, { preserveScroll: true, onSuccess: () => (editing.value = null) });
+}
+function follow(system, branch) {
+    router.put(`/systems/${system.id}`, { name: system.name, branch }, { preserveScroll: true });
+}
 </script>
 
 <template>
@@ -202,7 +217,22 @@ const states = {
                 <span class="ml-auto font-mono text-xs font-medium tracking-wide uppercase" :class="states[system.state]?.tone">
                     {{ states[system.state]?.label ?? system.state }}
                 </span>
+                <button type="button" class="text-xs text-muted underline hover:text-ink" :aria-expanded="editing === system.id" @click="startEdit(system)">Edit</button>
             </div>
+            <form v-if="editing === system.id" class="mt-3 flex flex-wrap items-end gap-3 rounded-md border border-line p-3" @submit.prevent="saveEdit(system)">
+                <label class="text-sm">Name
+                    <input v-model="edit.name" class="mt-1 block w-48 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm" />
+                </label>
+                <label v-if="system.kind !== 'api'" class="text-sm">Branch it follows
+                    <input v-model="edit.branch" class="mt-1 block w-40 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm" />
+                </label>
+                <button type="submit" class="btn btn-signal" :disabled="edit.processing || !edit.isDirty">Save</button>
+                <button type="button" class="btn" @click="editing = null">Cancel</button>
+                <p v-if="edit.errors.name || edit.errors.branch" class="w-full text-sm text-signal">{{ edit.errors.name || edit.errors.branch }}</p>
+                <p v-if="system.kind !== 'api' && edit.name !== system.name" class="w-full text-xs text-muted">
+                    A new name is a new folder here: your clone's ticket-worker remote changes with it; the page says how after saving.
+                </p>
+            </form>
 
             <p v-if="system.state === 'failed'" class="mt-3 text-sm break-words text-signal">{{ system.error }}</p>
 
@@ -230,7 +260,27 @@ const states = {
                     {{ system.head.subject }}
                     <span class="text-muted">· committed {{ when(system.head.committed_at) }}</span>
                 </p>
-                <p v-else class="mt-3 text-sm text-muted">Nothing pushed yet.</p>
+                <!-- Nothing arrived on the branch it follows: say what did arrive, and how to push. -->
+                <div v-else class="mt-3 space-y-1 text-sm">
+                    <template v-if="system.branches_here.length">
+                        <p class="text-waiting">
+                            Nothing on <code class="font-mono">{{ system.branch }}</code>, the branch it follows, but
+                            <code class="font-mono">{{ system.branches_here.join(', ') }}</code> arrived.
+                        </p>
+                        <p class="flex flex-wrap gap-2">
+                            <button v-for="branch in system.branches_here" :key="branch" type="button" class="btn px-3 py-1" @click="follow(system, branch)">Follow {{ branch }}</button>
+                        </p>
+                    </template>
+                    <template v-else>
+                        <p class="text-waiting">Nothing has arrived here yet.</p>
+                        <p class="text-muted">
+                            Check in your clone that <code class="font-mono">git remote get-url ticket-worker</code> ends in
+                            <code class="font-mono">/{{ system.name }}</code>, and that the push sent <code class="font-mono">{{ system.branch }}</code>:
+                            push-systems.sh pushes <code class="font-mono">main</code> unless <code class="font-mono">git config ticket-worker.branch {{ system.branch }}</code> says otherwise.
+                        </p>
+                    </template>
+                    <button type="button" class="text-muted underline hover:text-ink" @click="router.reload({ only: ['systems'] })">Look again</button>
+                </div>
 
                 <div class="mt-4">
                     <div class="flex items-center justify-between gap-3">

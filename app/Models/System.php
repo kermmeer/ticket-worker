@@ -29,7 +29,7 @@ class System extends Model
     protected $hidden = ['pull_secret'];
 
     protected $fillable = [
-        'checks_node', 'checks_setup', 'checks_redirects', 'checks_state', 'checks_log', 'checks_prepared_at',
+        'checks_node', 'checks_python', 'checks_setup', 'checks_redirects', 'checks_state', 'checks_log', 'checks_prepared_at',
         'name', 'kind', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
         'scan_state', 'scan_stop_requested', 'scan_log', 'scan_error', 'scan_cost_usd',
         'scan_input_tokens', 'scan_output_tokens', 'scan_user_id',
@@ -121,6 +121,23 @@ class System extends Model
     public function path(): string
     {
         return config('agent.systems_path').'/'.$this->name;
+    }
+
+    /**
+     * The branches that arrived in its folder, besides the one it follows: what was pushed
+     * when the page says nothing was (another branch name, say). Ticket branches left out.
+     *
+     * @return list<string>
+     */
+    public function branchesHere(): array
+    {
+        if (! $this->hasCode() || ! is_dir($this->path().'/.git')) {
+            return [];
+        }
+        $result = Process::path($this->path())->run(['git', '-c', 'safe.directory=*', 'for-each-ref', '--format=%(refname:short)', 'refs/heads']);
+
+        return collect(preg_split('/\R/', trim($result->output())))->filter()
+            ->reject(fn ($name) => preg_match('#^(feature|fix)/#', $name))->values()->all();
     }
 
     /** The address to push to from your own machine, when SYSTEMS_PUSH_BASE says where this is. */

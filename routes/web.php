@@ -110,6 +110,7 @@ Route::middleware('role:editor')->group(function () {
         Route::post('/', 'store')->name('store');
         Route::post('/{system}/scan', 'scan')->name('scan');
         Route::post('/{system}/scan/stop', 'stopScan')->name('scan.stop');
+        Route::put('/{system}', 'update')->name('update');
         Route::put('/{system}/context', 'updateContext')->name('context');
         Route::put('/{system}/checks', 'updateChecks')->name('checks');
         Route::post('/{system}/checks/prepare', 'prepareChecks')->name('checks.prepare');

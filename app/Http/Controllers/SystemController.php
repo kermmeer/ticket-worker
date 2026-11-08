@@ -33,6 +33,7 @@ class SystemController extends Controller
                 'path' => $system->hasCode() ? $system->path() : null,
                 'remote' => $system->hasCode() ? $system->pushRemote() : null,
                 'head' => $system->state === System::READY ? $system->head() : null,
+                'branches_here' => $system->state === System::READY ? $system->branchesHere() : [],
                 'context' => $system->context,
                 'context_written_at' => $system->context_written_at?->toIso8601String(),
                 'commits_behind' => $system->commitsBehind(),
@@ -49,7 +50,7 @@ class SystemController extends Controller
                 ] : null,
                 // What a build can check before it is handed in, and the workspace for that.
                 'checks' => $system->hasCode() ? [
-                    'node' => $system->checks_node, 'setup' => $system->checks_setup, 'redirects' => $system->checks_redirects,
+                    'node' => $system->checks_node, 'python' => $system->checks_python, 'setup' => $system->checks_setup, 'redirects' => $system->checks_redirects,
                     'state' => $system->checks_state, 'log' => $system->checks_log, 'prepared_at' => $system->checks_prepared_at?->toIso8601String(),
                     'list' => $system->checks->map(fn ($check) => $check->only(['id', 'name', 'command', 'enabled', 'note']))->values(),
                     // Private npm packages copied here, and where to copy them to, as your machine sees it.
@@ -113,6 +114,51 @@ class SystemController extends Controller
         AuditEvent::record('project.create', $system->name, "code project, branch {$system->branch}");
 
         return to_route('systems.index');
+    }
+
+    /**
+     * A new name, or another branch to follow. A new name is a new folder: the code, its
+     * checks workspace and private packages move along, and your clone's remote changes.
+     */
+    public function update(Request $request, System $system): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9][a-z0-9-]*$/', Rule::unique('systems', 'name')->ignore($system->id)],
+            'branch' => [$system->hasCode() ? 'required' : 'nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/', 'not_regex:/\.\.|\/\/|\.lock$|\/$/'],
+        ], ['name.regex' => 'Lower-case letters, digits and dashes only, starting with a letter or digit.', 'branch.regex' => 'That is not a branch name git accepts.', 'branch.not_regex' => 'That is not a branch name git accepts.']);
+
+        $old = $system->name;
+        $renamed = $data['name'] !== $old;
+        if ($renamed && $system->hasCode()) {
+            if ($system->scan_state === 'running' || $system->checks_state === 'preparing') {
+                return back()->with('error', 'It is being scanned or prepared: rename it when that is done.');
+            }
+            $moves = [
+                [config('agent.systems_path').'/'.$old, config('agent.systems_path').'/'.$data['name']],
+                [\App\Agent\Checks::root().'/checks/'.$old, \App\Agent\Checks::root().'/checks/'.$data['name']],
+                [\App\Agent\Checks::root().'/checks/packages/'.$old, \App\Agent\Checks::root().'/checks/packages/'.$data['name']],
+            ];
+            foreach ($moves as [$from, $to]) {
+                if (is_dir($from) && ! file_exists($to) && ! @rename($from, $to)) {
+                    return back()->with('error', "Could not move {$from}: nothing was renamed.");
+                }
+            }
+            // A private-repository redirect to the old name follows it.
+            System::query()->whereNotNull('checks_redirects')->each(fn (System $other) => $other->update([
+                'checks_redirects' => preg_replace('/=\s*'.preg_quote($old, '/').'\s*$/m', '= '.$data['name'], $other->checks_redirects),
+            ]));
+        }
+        $system->update(['name' => $data['name'], 'branch' => $system->hasCode() ? $data['branch'] : $system->branch]);
+        if ($system->hasCode() && $system->wasChanged('branch')) {
+            PrepareSystemFolder::dispatch($system);
+        }
+        AuditEvent::record('system.update', $system->name, ($renamed ? "renamed from {$old}" : 'kept its name').($system->wasChanged('branch') ? ", now follows {$system->branch}" : ''));
+
+        $remote = $system->pushRemote();
+
+        return back()->with('success', $renamed && $remote
+            ? "Renamed. In your clone: git remote set-url ticket-worker {$remote}"
+            : 'Saved.');
     }
 
     /** Write or refresh the system's context with an agent (CONCEPT.md §5). */
@@ -437,6 +483,7 @@ class SystemController extends Controller
         abort_unless($system->hasCode(), 404);
         $data = $request->validate([
             'node' => ['nullable', 'regex:/^v?\d{1,2}$/'],
+            'python' => ['nullable', 'regex:/^3\.\d{1,2}$/'],
             'setup' => ['nullable', 'string', 'max:4000'],
             'redirects' => ['nullable', 'string', 'max:2000'],
             'list' => ['array', 'max:20'],
@@ -444,9 +491,9 @@ class SystemController extends Controller
             'list.*.command' => ['required', 'string', 'max:2000'],
             'list.*.enabled' => ['boolean'],
             'list.*.note' => ['nullable', 'string', 'max:255'],
-        ], ['node.regex' => 'A major version, like 20.']);
+        ], ['node.regex' => 'A major version, like 20.', 'python.regex' => 'A version like 3.12.']);
 
-        $setup = ['checks_node' => filled($data['node'] ?? null) ? ltrim($data['node'], 'v') : null, 'checks_setup' => $data['setup'] ?? null, 'checks_redirects' => $data['redirects'] ?? null];
+        $setup = ['checks_node' => filled($data['node'] ?? null) ? ltrim($data['node'], 'v') : null, 'checks_python' => $data['python'] ?? null, 'checks_setup' => $data['setup'] ?? null, 'checks_redirects' => $data['redirects'] ?? null];
         $system->fill($setup);
         $prepareAgain = $system->isDirty() || ($system->checks_state === null && filled($setup['checks_setup'] ?? null));
         $system->save();

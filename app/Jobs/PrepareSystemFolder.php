@@ -35,6 +35,17 @@ class PrepareSystemFolder implements ShouldQueue
             // is always the code as last pushed, and nothing here ever has to pull.
             $this->git($path, ['config', 'receive.denyCurrentBranch', 'updateInstead']);
 
+            // The branch it follows is the one checked out: after "Follow main", the folder
+            // holds main's files, and the next push to main updates them.
+            $branch = $this->system->branch;
+            $current = trim(Process::path($path)->run(['git', '-c', 'safe.directory=*', 'symbolic-ref', '--short', 'HEAD'])->output());
+            if ($current !== $branch) {
+                $this->git($path, ['-c', 'safe.directory=*', 'symbolic-ref', 'HEAD', "refs/heads/{$branch}"]);
+                if (Process::path($path)->run(['git', '-c', 'safe.directory=*', 'rev-parse', '--verify', '--quiet', "refs/heads/{$branch}"])->successful()) {
+                    $this->git($path, ['-c', 'safe.directory=*', 'reset', '--hard', '--quiet']);
+                }
+            }
+
             $this->system->update(['state' => System::READY, 'error' => null]);
         } catch (Throwable $e) {
             $this->system->update(['state' => System::FAILED, 'error' => $e->getMessage()]);

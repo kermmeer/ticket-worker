@@ -10,6 +10,7 @@ const props = defineProps({ system: { type: Object, required: true } });
 const checks = computed(() => props.system.checks);
 const form = useForm({
     node: checks.value.node ?? '',
+    python: checks.value.python ?? '',
     setup: checks.value.setup ?? '',
     redirects: checks.value.redirects ?? '',
     list: (checks.value.list ?? []).map((check) => ({ ...check })),
@@ -40,6 +41,18 @@ const presets = {
             { name: 'unit tests', command: 'npx ng test --watch=false --browsers=ChromeHeadless', enabled: false, note: 'Needs a browser in the agent container' },
         ],
     },
+    python: {
+        label: 'A Python worker (pipenv)',
+        node: '',
+        python: '3.12',
+        setup: 'pip install --quiet pipenv && pipenv install --dev --deploy',
+        list: [
+            { name: 'merge markers', command: 'make check-merge', enabled: true, note: '' },
+            { name: 'pylint', command: 'make check-pylint', enabled: true, note: '' },
+            { name: 'language', command: 'make check-language', enabled: true, note: '' },
+            { name: 'unit tests', command: 'make test-unittest', enabled: false, note: 'Needs RabbitMQ, as in CI' },
+        ],
+    },
     php: {
         label: 'PHP with make check',
         node: '20',
@@ -53,7 +66,8 @@ const presets = {
 };
 function usePreset(key) {
     const preset = presets[key];
-    form.node = preset.node;
+    form.node = preset.node ?? '';
+    form.python = preset.python ?? '';
     form.setup = preset.setup;
     form.list = preset.list.map((check) => ({ ...check }));
 }
@@ -101,15 +115,18 @@ const on = computed(() => (checks.value.list ?? []).filter((check) => check.enab
                 <span class="text-muted">Start from</span>
                 <button v-for="(preset, key) in presets" :key="key" type="button" class="rounded-md border border-line px-2 py-0.5 text-xs hover:text-ink" @click="usePreset(key)">{{ preset.label }}</button>
             </p>
-            <div class="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+            <div class="grid gap-3 sm:grid-cols-[6rem_6rem_minmax(0,1fr)]">
                 <label class="text-sm">Node <span class="text-muted">(major)</span>
                     <input v-model="form.node" placeholder="none" :class="field" class="mt-1 font-mono" />
+                </label>
+                <label class="text-sm">Python
+                    <input v-model="form.python" placeholder="none" :class="field" class="mt-1 font-mono" />
                 </label>
                 <label class="text-sm">Setup <span class="text-muted">(once, in the checks workspace: installs the dependencies)</span>
                     <input v-model="form.setup" placeholder="npm ci" :class="field" class="mt-1 font-mono" />
                 </label>
             </div>
-            <p v-if="form.errors.node" class="text-sm text-signal">{{ form.errors.node }}</p>
+            <p v-if="form.errors.node || form.errors.python" class="text-sm text-signal">{{ form.errors.node || form.errors.python }}</p>
             <div class="text-sm">
                 <p>Private npm packages <span class="text-muted">(from a registry behind the VPN: copy them here once, then prepare again)</span></p>
                 <p v-if="checks.packages?.length" class="mt-1 font-mono text-xs">{{ checks.packages.join(' · ') }}</p>
