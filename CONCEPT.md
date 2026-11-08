@@ -846,7 +846,9 @@ The value in brackets is what the design assumes until then.
 
 ### Proposed on 8 November 2026: development work, and a chat that listens
 
-*For review: nothing below is built yet.*
+*Built on 8 November 2026, as decided below: the chat that listens, support and development
+by issue type, Build on a branch with its guide, Refine, the code at a glance on the ticket
+and in the overview, and the overview's development groups with a Kind filter.*
 
 **Why.** Agent turns fell from about 30 a week in mid-October to four or five. About half
 of the open tickets are development, not support: CAT is Improvements, Stories, Bugs and

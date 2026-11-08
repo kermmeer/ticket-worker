@@ -102,6 +102,12 @@ function toggleHidden() {
                 </template>
                 <span v-if="message.assignee" class="text-muted">· assigns {{ message.assignee }}</span>
             </p>
+            <!-- Code built for it: where, and how much. -->
+            <p v-for="branch in ticket.branches ?? []" :key="branch.name" class="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm">
+                <span class="font-mono text-xs">{{ branch.system }} · {{ branch.name }}</span>
+                <span class="text-muted">· {{ branch.commits }} {{ branch.commits === 1 ? 'commit' : 'commits' }}</span>
+                <span class="font-mono text-xs"><span class="text-done">+{{ branch.added }}</span> <span class="text-signal">−{{ branch.removed }}</span></span>
+            </p>
             <QuickScanLine v-if="ticket.quick_scan" :scan="ticket.quick_scan" />
             <p v-if="ticket.casebook" class="mt-1.5 text-sm">
                 <Link :href="$page.props.me?.is_editor ? `/casebook/${ticket.casebook.id}/edit` : '/casebook'" class="text-working hover:underline">

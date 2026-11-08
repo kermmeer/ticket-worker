@@ -24,6 +24,8 @@ const groups = [
     { key: 'new-activity', label: 'New activity', hint: 'Commented on or changed since the last analysis' },
     { key: 'not-analysed', label: 'Not analysed', hint: 'Synced, nothing started yet' },
     { key: 'parked', label: 'Parked', hint: 'Session closed, ticket still open in Jira' },
+    { key: 'dev-in-progress', label: 'Development · in progress', hint: 'Stories, improvements and bugs in progress in Jira' },
+    { key: 'dev-to-do', label: 'Development · to do', hint: 'Not started in Jira yet' },
     { key: 'sleeping', label: 'Sleeping', hint: 'Waiting on the requester' },
 ];
 const awake = groups.filter((group) => group.key !== 'sleeping');
@@ -71,11 +73,16 @@ const savedPerson = stored('overview.person') ?? (stored('overview.mine') === tr
 const personFilter = ref(savedPerson === 'me' || people.value.includes(savedPerson) ? savedPerson : null);
 watch(personFilter, (value) => keep('overview.person', value));
 const isMe = (name) => !!name && [me.value.jira_name, me.value.name].filter(Boolean).some((mine) => mine.toLowerCase() === name.toLowerCase());
-const ofPerson = (ticket) =>
+// Support, development, or both: kept like the rest.
+const savedKind = stored('overview.kind');
+const kindFilter = ref(['support', 'development'].includes(savedKind) ? savedKind : null);
+watch(kindFilter, (value) => keep('overview.kind', value));
+
+const ofPerson = (ticket) => (kindFilter.value === null || ticket.kind === kindFilter.value) && (
     personFilter.value === null ||
     (personFilter.value === 'me'
         ? ticket.mine || isMe(ticket.assignee) || isMe(ticket.reporter)
-        : ticket.assignee === personFilter.value || ticket.reporter === personFilter.value);
+        : ticket.assignee === personFilter.value || ticket.reporter === personFilter.value));
 
 const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value === 'mine' ? followed.value.has(ticket.space_id) : ticket.space_id === spaceFilter.value);
 const statusFilter = ref(null);
@@ -363,6 +370,14 @@ onBeforeUnmount(() => {
             </label>
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
+            <label class="flex items-center gap-2 text-sm">
+                <span class="text-muted">Kind</span>
+                <select v-model="kindFilter" class="rounded-md border px-2 py-1.5 text-sm" :class="kindFilter ? 'border-signal bg-surface' : 'border-line bg-surface'">
+                    <option :value="null">Support and development</option>
+                    <option value="support">Support</option>
+                    <option value="development">Development</option>
+                </select>
+            </label>
             <label class="flex items-center gap-2 text-sm">
                 <span class="text-muted">Whose</span>
                 <select v-model="personFilter" class="max-w-48 rounded-md border px-2 py-1.5 text-sm" :class="personFilter ? 'border-signal bg-surface' : 'border-line bg-surface'">

@@ -15,6 +15,8 @@ const states = {
     'not-analysed': { label: 'Not analysed', tone: 'text-muted', shape: 'ring' },
     parked: { label: 'Parked', tone: 'text-muted', shape: 'pause' },
     hidden: { label: 'Hidden', tone: 'text-muted', shape: 'ring' },
+    'dev-in-progress': { label: 'In progress', tone: 'text-working', shape: 'half' },
+    'dev-to-do': { label: 'To do', tone: 'text-muted', shape: 'ring' },
     closed: { label: 'Closed', tone: 'text-done', shape: 'check' },
 };
 

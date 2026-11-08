@@ -24,9 +24,11 @@ class OverviewController extends Controller
         $spaces = Space::query()->with('site')->visibleTo(auth()->user())->where('state', Space::ACTIVE)->orderBy('label')->get();
 
         $byId = $spaces->keyBy('id');
+        // Per space, which issue types are development work.
+        $devTypes = $spaces->mapWithKeys(fn (Space $space) => [$space->id => \App\Settings\SpaceSettings::for($space)->types('development_types')]);
 
         $tickets = Ticket::query()
-            ->with('casebookEntry:id,title')
+            ->with(['casebookEntry:id,title', 'branches.system:id,name'])
             ->open()
             ->whereIn('space_id', $spaces->pluck('id'))
             ->orderByDesc('jira_updated_at')
@@ -105,7 +107,13 @@ class OverviewController extends Controller
                     : null,
                 // Waiting on the requester sleeps, whatever else is going on. Agents arrive
                 // with step 2; until then every other ticket waits for a first look.
-                'group' => $this->group($ticket, $sessions[$ticket->id] ?? null, $byId[$ticket->space_id]),
+                'kind' => ($dev = in_array(mb_strtolower((string) $ticket->issue_type), $devTypes[$ticket->space_id] ?? [], true)) ? 'development' : 'support',
+                'issue_type' => $ticket->issue_type,
+                // The code built for it, in short.
+                'branches' => $ticket->branches->map(fn ($branch) => [
+                    'system' => $branch->system?->name, 'name' => $branch->name, 'commits' => $branch->commits, 'added' => $branch->added, 'removed' => $branch->removed,
+                ])->values(),
+                'group' => $this->group($ticket, $sessions[$ticket->id] ?? null, $byId[$ticket->space_id], $dev),
             ]),
         ]);
     }
@@ -114,7 +122,7 @@ class OverviewController extends Controller
      * What a ticket needs from you (CONCEPT.md §6). Hidden by you beats everything; an
      * agent at work or waiting for you comes next; then sleep, a closed session, or nothing yet.
      */
-    private function group(Ticket $ticket, ?AgentSession $session, Space $space): string
+    private function group(Ticket $ticket, ?AgentSession $session, Space $space, bool $development = false): string
     {
         $last = $session?->turns->last();
 
@@ -123,6 +131,8 @@ class OverviewController extends Controller
             $session?->state === 'open' && in_array($last?->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true) => 'working',
             $session?->state === 'open' && $last !== null => 'needs-you',
             $space->sleeps($ticket->status) => 'sleeping',
+            // Development goes by where it is in Jira, not by what an agent did.
+            $development => $ticket->status_category === 'indeterminate' ? 'dev-in-progress' : 'dev-to-do',
             $session?->state === 'closed' => 'parked',
             default => 'not-analysed',
         };
