@@ -118,6 +118,17 @@ class ChecksTest extends TestCase
         $this->assertSame('git@code.internal.example:dev/oidc.git', $env['GIT_CONFIG_VALUE_1']);
     }
 
+    public function test_private_npm_packages_copied_here_show_with_where_to_copy_them(): void
+    {
+        config(['agent.systems_push_base' => 'me@10.0.0.5:/srv/tw/data/systems']);
+        File::ensureDirectoryExists(Checks::packages($this->system));
+        File::put(Checks::packages($this->system).'/dstny-js-angular-tree-component-18.0.4.tgz', 'x');
+
+        $this->get('/systems')->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->where('systems.0.checks.packages', ['dstny-js-angular-tree-component-18.0.4.tgz'])
+            ->where('systems.0.checks.packages_target', 'me@10.0.0.5:/srv/tw/data/agent/checks/packages/billing/'));
+    }
+
     public function test_checks_are_set_on_the_systems_page_and_a_new_setup_prepares_again(): void
     {
         \Illuminate\Support\Facades\Queue::fake();

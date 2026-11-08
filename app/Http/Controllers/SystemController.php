@@ -52,6 +52,11 @@ class SystemController extends Controller
                     'node' => $system->checks_node, 'setup' => $system->checks_setup, 'redirects' => $system->checks_redirects,
                     'state' => $system->checks_state, 'log' => $system->checks_log, 'prepared_at' => $system->checks_prepared_at?->toIso8601String(),
                     'list' => $system->checks->map(fn ($check) => $check->only(['id', 'name', 'command', 'enabled', 'note']))->values(),
+                    // Private npm packages copied here, and where to copy them to, as your machine sees it.
+                    'packages' => array_map('basename', glob(\App\Agent\Checks::packages($system).'/*.tgz') ?: []),
+                    'packages_target' => filled($base = config('agent.systems_push_base'))
+                        ? preg_replace('#/systems/?$#', '', $base).'/agent/checks/packages/'.$system->name.'/'
+                        : \App\Agent\Checks::packages($system).'/',
                 ] : null,
                 // Its APIs; a secret is only ever "set" or not.
                 'databases' => $system->databases->map(fn (DbConnection $db) => [

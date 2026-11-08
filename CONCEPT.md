@@ -912,5 +912,18 @@ the way `push-systems.sh` reaches GitLab. Speed: the chat is already on the ligh
   how many lines added and removed.
 - *A guide with every build:* a short user guide when the change shows to users, a short
   technical note when it does not, written by the agent with the build, to copy along.
+- *Checks* (built 8 November 2026). Your GitLab CI runs on every push and stays the full
+  test; what saves time is catching lint and type errors before you push. Each system has
+  checks, each a command that passes or fails and each switched on or off (one that needs
+  something behind the VPN stays off until it can work). They run in a checks workspace of
+  the system's own, where a setup command installed the dependencies once (`npm ci`,
+  `composer install`); those are ignored by git, so they stay when the workspace is moved to
+  the state of a build. The agent container has PHP and Composer only: a system names its
+  Node version and the official build is downloaded once into the tools folder; Python can
+  come the same way. A private repository the setup cannot reach is redirected, through
+  git's own `insteadOf`, to a system pushed here under that name. During a build the agent
+  has `run_checks`, runs them when it thinks it is done and fixes what fails; the final
+  state is checked once more and the result shows with the build. The full suite, with its
+  databases, queues and images from the internal registry, stays with CI.
 - *The database behind the VPN* is boss's production database, the one the read-only data
   tools (database servers, §11) are for, not the tool's own. Reaching it stays for later.

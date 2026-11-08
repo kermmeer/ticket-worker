@@ -39,6 +39,12 @@ class Checks
         return self::root().'/checks/'.$system->name;
     }
 
+    /** Where private package files for a system go: copied here from a machine that can reach them. */
+    public static function packages(System $system): string
+    {
+        return self::root().'/checks/packages/'.$system->name;
+    }
+
     /** A fresh workspace at the system's branch, its runtime, and the setup command run in it. */
     public function prepare(System $system): string
     {
@@ -56,6 +62,14 @@ class Checks
 
         if (filled($system->checks_node)) {
             $log .= 'Node '.$this->node($system->checks_node)['version']."\n";
+        }
+
+        // Private npm packages you copied here (npm pack, with the VPN on): into npm's cache,
+        // where npm ci finds them by the checksum in the lockfile, instead of the registry it cannot reach.
+        $packages = glob(self::packages($system).'/*.tgz') ?: [];
+        if ($packages !== [] && filled($system->checks_node)) {
+            $process = $this->shell($system, $dir, 'npm cache add '.implode(' ', array_map('escapeshellarg', $packages)), 600);
+            $log .= 'Private packages: '.implode(', ', array_map('basename', $packages)).($process->isSuccessful() ? '' : ' (could not add: '.trim($process->getErrorOutput()).')')."\n";
         }
 
         if (filled($system->checks_setup)) {
@@ -157,6 +171,7 @@ class Checks
         $env = [
             'PATH' => $path, 'CI' => 'true', 'HOME' => self::root().'/home', 'NG_CLI_ANALYTICS' => 'false',
             'COMPOSER_HOME' => self::root().'/home/.composer', 'npm_config_cache' => self::root().'/home/.npm',
+            'npm_config_prefer_offline' => 'true',
             'GIT_TERMINAL_PROMPT' => '0',
         ] + $this->redirects($system);
         File::ensureDirectoryExists(self::root().'/home');

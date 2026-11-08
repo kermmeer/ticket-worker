@@ -64,6 +64,13 @@ const states = {
     ready: { label: 'ready', tone: 'text-done' },
     failed: { label: 'setup failed', tone: 'text-signal' },
 };
+// Copying a private npm package here, from a machine with the VPN on.
+const [host, folder] = (props.system.checks.packages_target ?? '').includes(':') ? props.system.checks.packages_target.split(/:(.*)/s) : [null, props.system.checks.packages_target];
+const packCommands = computed(() => [
+    'npm pack @scope/name@version        # the exact version in the lockfile, with the VPN on',
+    host ? `ssh ${host} mkdir -p ${folder} && scp *.tgz ${host}:${folder}` : `cp *.tgz ${folder}`,
+].join('\n'));
+
 const on = computed(() => (checks.value.list ?? []).filter((check) => check.enabled));
 </script>
 
@@ -103,6 +110,11 @@ const on = computed(() => (checks.value.list ?? []).filter((check) => check.enab
                 </label>
             </div>
             <p v-if="form.errors.node" class="text-sm text-signal">{{ form.errors.node }}</p>
+            <div class="text-sm">
+                <p>Private npm packages <span class="text-muted">(from a registry behind the VPN: copy them here once, then prepare again)</span></p>
+                <p v-if="checks.packages?.length" class="mt-1 font-mono text-xs">{{ checks.packages.join(' · ') }}</p>
+                <pre class="mt-1 overflow-x-auto rounded-md border border-line bg-sunken p-2 font-mono text-xs leading-relaxed">{{ packCommands }}</pre>
+            </div>
             <label class="block text-sm">Private repositories <span class="text-muted">(one per line: the address the setup asks for = a system pushed here)</span>
                 <textarea v-model="form.redirects" rows="2" placeholder="git@code.internal.destiny.be:development/oidc-aad-php-library.git = oidc-aad-php-library" :class="field" class="mt-1 font-mono text-xs"></textarea>
             </label>
