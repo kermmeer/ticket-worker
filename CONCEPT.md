@@ -843,3 +843,63 @@ The value in brackets is what the design assumes until then.
   `compose.yml` with its own MySQL (INSTALL.md); nothing in it assumes the first server.
 - **D. A gate of its own.** *Answered 2026-10-06:* `APP_PASSWORD`, asked once per browser
   session; empty means something else in front guards it.
+
+### Proposed on 8 November 2026: development work, and a chat that listens
+
+*For review: nothing below is built yet.*
+
+**Why.** Agent turns fell from about 30 a week in mid-October to four or five. About half
+of the open tickets are development, not support: CAT is Improvements, Stories, Bugs and
+Spikes; ODOSIRB Stories and Epics. The ticket page was built around an incident (is the
+data still wrong, the cause, a reply to the reporter, a case) and has nothing for a story.
+And the chat was less convenient than a plain Claude chat: it starts from the quick scan's
+conclusion, and when corrected it goes on defending that conclusion instead of looking again.
+What would save the most time is the agent building the change.
+
+**1. Two kinds of work.** Each issue type is *support* or *development*. Default: Incident,
+Ask a question, Emailed request and Service request are support; Story, Improvement, Bug,
+Task, Sub-task, Spike and Epic are development. A space can move a type. The page and the
+overview follow the kind.
+
+**2. One chat per ticket, that listens.**
+- The chat no longer starts from the quick scan's conclusion: the agent reads the ticket
+  itself. The scan stays on the page, for you.
+- What you say overrides what the agent concluded before, its own proposal included. When
+  you correct it, it drops the earlier idea and looks again, rather than arguing for it.
+- It answers freely, like a Claude chat. A fixed format only where a button asks for one
+  (proposal, case, refinement, build summary).
+- Ask, Refine and Build all happen in that one conversation, so a correction you make in
+  the chat carries into the code.
+
+**3. Build: a branch named after the ticket.** The main thing.
+- *Build* (or "build it" in the chat): the agent writes the change in a copy of the system
+  at its current commit, on a branch named after the ticket (`DEVBESUP-3211`), and commits.
+  The tool then puts that branch into the system's repository on the server, the one your
+  clones already know as `ticket-worker`. You take it from there:
+  `git fetch ticket-worker DEVBESUP-3211`, check it out, push it to whichever origin.
+- Follow-ups go onto the same branch as new commits ("also cover the CSV export").
+- `push-systems.sh` only updates each system's own branch, so ticket branches survive it.
+- One branch per system the change touches.
+- The page shows the branch, its commits, the diff and the fetch command; the patch file
+  stays as a download.
+- Still untested: the agent cannot run the code. Running the tests is a later step.
+
+**4. Refine (smaller).** A button that writes, in the chat: what is asked in two lines, the
+open questions for the product owner, acceptance criteria, where in the code it lands, a
+size (S, M, L) and the risks. You edit it and copy it into Jira.
+
+**5. The page for development.** The header; *In short* shows the refinement, or "not
+refined yet"; the chat; the branch; the ticket. No reply to a reporter unless you ask for
+one, and no data check.
+
+**6. The overview.** Development tickets grouped by To Do and In Progress, with a mark when
+a branch exists. The SLA order stays for support.
+
+**Later.** Colleagues on the same instance (accounts exist; this one runs with
+`SIGN_IN=off` for now). The databases behind the VPN: a tunnel from a machine inside it,
+the way `push-systems.sh` reaches GitLab. Speed: the chat is already on the lighter model.
+
+**Open.**
+- Branch name: the key alone (`DEVBESUP-3211`), or with a prefix (`feature/DEVBESUP-3211`)?
+- Branch from where: the system's tracked branch (`master`), or another per space?
+- Quick scans on development tickets: keep, or only for support?
