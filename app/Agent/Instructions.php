@@ -312,8 +312,12 @@ class Instructions
     }
 
     /** Build the ticket's change on its branch, in the copy the tool prepared. */
-    public static function buildRequest(Ticket $ticket, string $systemName, string $copy, string $branch, string $base, bool $continued, ?string $request = null): string
+    public static function buildRequest(Ticket $ticket, string $systemName, string $copy, string $branch, string $base, bool $continued, ?string $request = null, array $checks = []): string
     {
+        $checking = $checks === []
+            ? '- You cannot run anything, so read carefully: imports, types, every caller of what you change.'
+            : '- You can run '.implode(', ', $checks).' with run_checks. When you think you are done, run them, fix what fails'
+              ."\n  because of your change, and run them again. A failure that was there before your change: say so, leave it.";
         $where = $continued
             ? "The branch {$branch} already holds earlier work on this ticket: build on it, do not start over."
             : "The branch {$branch} is new, made from {$base}.";
@@ -331,7 +335,7 @@ class Instructions
         - Follow the code around it: its structure, style, naming and error handling.
         - Where the system has tests near the code you change, add or adjust them.
         - Migrations, configuration, translations: include what the change needs.
-        - You cannot run anything, so read carefully: imports, types, every caller of what you change.
+        {$checking}
         - If something in the ticket is unclear, make the sensible choice and say which in the summary.
 
         End with the JSON: the commit message, a summary, how to test it, the risks, and a short

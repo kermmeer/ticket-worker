@@ -29,6 +29,7 @@ class System extends Model
     protected $hidden = ['pull_secret'];
 
     protected $fillable = [
+        'checks_node', 'checks_setup', 'checks_redirects', 'checks_state', 'checks_log', 'checks_prepared_at',
         'name', 'kind', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
         'scan_state', 'scan_stop_requested', 'scan_log', 'scan_error', 'scan_cost_usd',
         'scan_input_tokens', 'scan_output_tokens', 'scan_user_id',
@@ -38,6 +39,7 @@ class System extends Model
     protected function casts(): array
     {
         return [
+            'checks_prepared_at' => 'datetime',
             'pull_secret' => 'encrypted',
             'pulled_at' => 'datetime',
             'context_written_at' => 'datetime',
@@ -56,6 +58,18 @@ class System extends Model
     {
         $this->update(['context' => $body, 'context_commit' => $commit, 'context_written_at' => now()]);
         $this->contexts()->create(['body' => $body, 'commit' => $commit, 'written_by' => $by]);
+    }
+
+    /** Its checks, in their order. */
+    public function checks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SystemCheck::class)->orderBy('position')->orderBy('id');
+    }
+
+    /** Checks a build can run now: switched on, and the workspace for them ready. */
+    public function runnableChecks(): \Illuminate\Support\Collection
+    {
+        return $this->checks_state === 'ready' ? $this->checks->where('enabled', true)->values() : collect();
     }
 
     public function hasCode(): bool

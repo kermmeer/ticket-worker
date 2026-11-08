@@ -85,14 +85,20 @@ class RunAgentTurn implements ShouldQueue
                 $this->event($turn, 'tool', "copying {$system->name} to build/{$system->name} on {$meta['branch']}");
                 $prepared = app(ScratchCopy::class)->prepareBranch($system, $copy, $meta['branch'], $meta['base']);
                 $turn->update([
-                    'prompt' => Instructions::buildRequest($ticket, $system->name, 'build/'.$system->name, $meta['branch'], $meta['base'], $prepared['continued'], $turn->note),
+                    'prompt' => Instructions::buildRequest($ticket, $system->name, 'build/'.$system->name, $meta['branch'], $meta['base'], $prepared['continued'], $turn->note,
+                        $system->load('checks')->runnableChecks()->pluck('name')->all()),
                     'patch_meta' => [...$meta, 'system' => $system->name, 'base_sha' => $prepared['base'], 'continued' => $prepared['continued']],
                 ]);
             }
 
             // The systems' APIs, through the tool's MCP server, which holds the secrets.
             $writes = in_array($turn->kind, ['patch', 'build'], true);
-            $tools = $writes ? [] : ApiToolServer::toolNamesFor($systems);
+            // A patch gets no tools; a build its system's checks, when it has any; the rest the data tools.
+            $tools = match (true) {
+                $turn->kind === 'build' => ApiToolServer::buildToolNames(System::with('checks')->find($turn->patch_meta['system_id'] ?? null)),
+                $writes => [],
+                default => ApiToolServer::toolNamesFor($systems),
+            };
             $hasApis = $tools !== [];
             $settings = SpaceSettings::for($ticket->space);
             // A question in the chat on the lighter model; digging deeper, patches and cases on the full one.
@@ -214,6 +220,18 @@ class RunAgentTurn implements ShouldQueue
             // On the server, for your clones to fetch: by the worker, which may write the systems.
             if ($built !== null && $turn->kind === 'build') {
                 $publish = true;
+                // What it hands in, checked once more: the result goes with the build.
+                $system = System::with('checks')->find($patchMeta['system_id'] ?? null);
+                if ($system?->runnableChecks()->isNotEmpty()) {
+                    $this->event($turn, 'tool', 'running the checks on what it handed in');
+                    try {
+                        $results = app(\App\Agent\Checks::class)->run($system, $copy);
+                        $patchMeta['checks'] = collect($results)->map(fn ($r) => [...$r, 'output' => $r['ok'] ? '' : Str::limit($r['output'], 4000)])->all();
+                        $this->event($turn, 'tool', 'checks: '.\App\Agent\Checks::line($results));
+                    } catch (Throwable $e) {
+                        $patchMeta['checks_error'] = Str::limit($e->getMessage(), 500);
+                    }
+                }
             }
         }
 

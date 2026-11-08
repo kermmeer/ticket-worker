@@ -111,6 +111,8 @@ Route::middleware('role:editor')->group(function () {
         Route::post('/{system}/scan', 'scan')->name('scan');
         Route::post('/{system}/scan/stop', 'stopScan')->name('scan.stop');
         Route::put('/{system}/context', 'updateContext')->name('context');
+        Route::put('/{system}/checks', 'updateChecks')->name('checks');
+        Route::post('/{system}/checks/prepare', 'prepareChecks')->name('checks.prepare');
         Route::post('/{system}/apis', 'storeApi')->name('apis.store');
         Route::put('/{system}/apis/{api}', 'updateApi')->name('apis.update');
         Route::delete('/{system}/apis/{api}', 'destroyApi')->name('apis.destroy');

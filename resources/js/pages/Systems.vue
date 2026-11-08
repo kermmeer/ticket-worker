@@ -4,6 +4,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import ApiConnections from '../components/ApiConnections.vue';
 import DbConnections from '../components/DbConnections.vue';
 import DbServers from '../components/DbServers.vue';
+import SystemChecks from '../components/SystemChecks.vue';
 import PullFrom from '../components/PullFrom.vue';
 import { reachable } from '../connection.js';
 import { tokens } from '../time.js';
@@ -291,6 +292,7 @@ const states = {
                 </div>
 
                 <PullFrom :system="system" :ssh-available="sshAvailable" />
+                <SystemChecks :system="system" />
                 <ApiConnections :system="system" :auth-kinds="authKinds" />
                 <DbConnections :system="system" :drivers="dbDrivers" :servers="dbServers" />
             </template>

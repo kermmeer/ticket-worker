@@ -23,7 +23,7 @@ class SystemController extends Controller
     public function index(): Response
     {
         return Inertia::render('Systems', [
-            'systems' => System::query()->with(['apis', 'databases.server'])->orderBy('name')->get()->map(fn (System $system) => [
+            'systems' => System::query()->with(['apis', 'databases.server', 'checks'])->orderBy('name')->get()->map(fn (System $system) => [
                 'id' => $system->id,
                 'name' => $system->name,
                 'kind' => $system->kind,
@@ -46,6 +46,12 @@ class SystemController extends Controller
                     'url' => $system->pull_url, 'auth' => $system->pull_auth, 'username' => $system->pull_username,
                     'has_secret' => filled($system->pull_secret), 'public_key' => $system->pull_public_key,
                     'state' => $system->pull_state, 'error' => $system->pull_error, 'at' => $system->pulled_at?->toIso8601String(),
+                ] : null,
+                // What a build can check before it is handed in, and the workspace for that.
+                'checks' => $system->hasCode() ? [
+                    'node' => $system->checks_node, 'setup' => $system->checks_setup, 'redirects' => $system->checks_redirects,
+                    'state' => $system->checks_state, 'log' => $system->checks_log, 'prepared_at' => $system->checks_prepared_at?->toIso8601String(),
+                    'list' => $system->checks->map(fn ($check) => $check->only(['id', 'name', 'command', 'enabled', 'note']))->values(),
                 ] : null,
                 // Its APIs; a secret is only ever "set" or not.
                 'databases' => $system->databases->map(fn (DbConnection $db) => [
@@ -420,6 +426,51 @@ class SystemController extends Controller
     }
 
     /** Your own edit of the context: kept as a version like the agent's. */
+    /** The checks of a system, and how to prepare for them; a changed setup prepares again. */
+    public function updateChecks(Request $request, System $system): RedirectResponse
+    {
+        abort_unless($system->hasCode(), 404);
+        $data = $request->validate([
+            'node' => ['nullable', 'regex:/^v?\d{1,2}$/'],
+            'setup' => ['nullable', 'string', 'max:4000'],
+            'redirects' => ['nullable', 'string', 'max:2000'],
+            'list' => ['array', 'max:20'],
+            'list.*.name' => ['required', 'string', 'max:60'],
+            'list.*.command' => ['required', 'string', 'max:2000'],
+            'list.*.enabled' => ['boolean'],
+            'list.*.note' => ['nullable', 'string', 'max:255'],
+        ], ['node.regex' => 'A major version, like 20.']);
+
+        $setup = ['checks_node' => filled($data['node'] ?? null) ? ltrim($data['node'], 'v') : null, 'checks_setup' => $data['setup'] ?? null, 'checks_redirects' => $data['redirects'] ?? null];
+        $system->fill($setup);
+        $prepareAgain = $system->isDirty() || ($system->checks_state === null && filled($setup['checks_setup'] ?? null));
+        $system->save();
+
+        $system->checks()->delete();
+        foreach (array_values($data['list'] ?? []) as $i => $check) {
+            $system->checks()->create(['name' => $check['name'], 'command' => $check['command'], 'enabled' => $check['enabled'] ?? true, 'note' => $check['note'] ?? null, 'position' => $i]);
+        }
+        AuditEvent::record('system.checks', $system->name, count($data['list'] ?? []).' checks, '.collect($data['list'] ?? [])->where('enabled', true)->count().' on'.($prepareAgain ? '; setup changed' : ''));
+
+        if ($prepareAgain) {
+            \App\Jobs\PrepareChecks::dispatch($system);
+
+            return back()->with('success', 'Saved. Preparing the checks workspace now: that can take a few minutes the first time.');
+        }
+
+        return back()->with('success', 'Saved.');
+    }
+
+    /** Prepare again: after a push that changed the dependencies, say. */
+    public function prepareChecks(System $system): RedirectResponse
+    {
+        abort_unless($system->hasCode(), 404);
+        $system->update(['checks_state' => 'queued']);
+        \App\Jobs\PrepareChecks::dispatch($system);
+
+        return back()->with('success', 'Preparing the checks workspace.');
+    }
+
     public function updateContext(Request $request, System $system): RedirectResponse
     {
         $data = $request->validate(['context' => ['required', 'string', 'max:60000']]);

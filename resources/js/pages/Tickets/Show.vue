@@ -528,9 +528,19 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                                     <span class="font-mono">{{ turn.patch.meta.system }} · {{ turn.patch.meta.branch }}</span>
                                     <span v-if="turn.patch.meta.published" class="text-done"> · on the server</span>
                                     <span v-else class="text-working"> · putting it on the server…</span>
-                                    <span class="text-waiting"> · untested: the agent cannot run code</span>
+                                    <span v-if="!turn.patch.meta.checks?.length" class="text-waiting"> · unchecked: this system has no checks set up</span>
                                 </p>
                                 <code class="block font-mono text-xs break-all text-muted">git fetch ticket-worker {{ turn.patch.meta.branch }} &amp;&amp; git checkout {{ turn.patch.meta.branch }}</code>
+                                <!-- The checks it ran on what it handed in. -->
+                                <div v-if="turn.patch.meta.checks?.length" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                    <span class="text-muted">Checks</span>
+                                    <span v-for="check in turn.patch.meta.checks" :key="check.name" :class="check.ok ? 'text-done' : 'text-signal'">{{ check.name }} {{ check.ok ? '✓' : '✗' }}</span>
+                                </div>
+                                <details v-for="check in (turn.patch.meta.checks ?? []).filter((c) => !c.ok)" :key="`out-${check.name}`" class="rounded-md border border-signal/30">
+                                    <summary class="cursor-pointer px-3 py-1.5 text-xs text-signal">What {{ check.name }} said</summary>
+                                    <pre class="overflow-x-auto border-t border-line p-3 font-mono text-xs whitespace-pre-wrap">{{ check.output }}</pre>
+                                </details>
+                                <p v-if="turn.patch.meta.checks_error" class="text-xs text-signal">The checks could not run: {{ turn.patch.meta.checks_error }}</p>
                                 <details v-if="turn.patch.meta.guide" class="rounded-md border border-line">
                                     <summary class="cursor-pointer px-3 py-2 text-muted hover:text-ink">{{ turn.patch.meta.guide_kind === 'user' ? 'User guide' : 'Technical note' }}</summary>
                                     <div class="border-t border-line p-3"><AgentText :text="turn.patch.meta.guide" /></div>

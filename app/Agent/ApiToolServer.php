@@ -28,7 +28,22 @@ class ApiToolServer
      * @param  Collection<int, ApiConnection>  $apis
      * @param  (\Closure(string): void)|null  $log  where each call is written down
      */
-    public function __construct(private readonly Collection $apis, private readonly ?\Closure $log = null, private readonly ?Collection $dbs = null) {}
+    /** Check runs in one build: each takes minutes, so a few are enough. */
+    public const MAX_CHECK_RUNS = 6;
+
+    private int $checkRuns = 0;
+
+    /**
+     * @param  (\Closure(): array)|null  $runChecks  a build's checks, when it has any
+     * @param  list<string>  $checkNames
+     */
+    public function __construct(
+        private readonly Collection $apis,
+        private readonly ?\Closure $log = null,
+        private readonly ?Collection $dbs = null,
+        private readonly ?\Closure $runChecks = null,
+        private readonly array $checkNames = [],
+    ) {}
 
     /**
      * The tool names a turn on these systems should be allowed, as Claude Code calls them;
@@ -52,7 +67,24 @@ class ApiToolServer
 
     public static function forTurn(AgentTurn $turn, iterable $systems): self
     {
-        return new self(self::apisOf($systems), fn (string $line) => AgentEvent::create(['agent_turn_id' => $turn->id, 'type' => 'tool', 'summary' => $line]), self::dbsOf($systems));
+        $log = fn (string $line) => AgentEvent::create(['agent_turn_id' => $turn->id, 'type' => 'tool', 'summary' => $line]);
+
+        // A build gets its system's checks, and nothing else: it writes code, it does not look up data.
+        if ($turn->kind === 'build') {
+            $system = \App\Models\System::with('checks')->find($turn->patch_meta['system_id'] ?? null);
+            $checks = $system?->runnableChecks() ?? collect();
+            $copy = $system ? ScratchCopy::buildPath($turn->session->ticket, $system) : null;
+
+            return new self(collect(), $log, collect(), $checks->isEmpty() ? null : fn () => app(Checks::class)->run($system, $copy), $checks->pluck('name')->all());
+        }
+
+        return new self(self::apisOf($systems), $log, self::dbsOf($systems));
+    }
+
+    /** The tool names a build on this system is allowed. */
+    public static function buildToolNames(?\App\Models\System $system): array
+    {
+        return $system !== null && $system->runnableChecks()->isNotEmpty() ? ['mcp__ticket-worker__run_checks'] : [];
     }
 
     /** For a quick scan: the calls go into the ticket's scan trail. */
@@ -101,6 +133,16 @@ class ApiToolServer
 
     private function tools(): array
     {
+        if ($this->runChecks !== null) {
+            return [[
+                'name' => 'run_checks',
+                'description' => 'Run this system\'s checks ('.implode(', ', $this->checkNames).') on your copy as it is now, '
+                    .'edits included. Each passes or fails, with the end of its output. They take minutes: run them when you think '
+                    .'you are done, fix what fails, and run them again. At most '.self::MAX_CHECK_RUNS.' times.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) []],
+            ]];
+        }
+
         $names = $this->apis->map(fn (ApiConnection $api) => $this->key($api))->values()->all();
         $dbNames = ($this->dbs ?? collect())->map(fn (DbConnection $db) => $db->system->name.'/'.$db->name)->values()->all();
         $databaseTools = $dbNames === [] ? [] : [
@@ -152,6 +194,23 @@ class ApiToolServer
 
     private function call(string $tool, array $arguments): array
     {
+        if ($tool === 'run_checks' && $this->runChecks !== null) {
+            if (++$this->checkRuns > self::MAX_CHECK_RUNS) {
+                return $this->text('That is '.self::MAX_CHECK_RUNS.' runs: enough. Hand in what you have and say what still fails.', true);
+            }
+            try {
+                $results = ($this->runChecks)();
+            } catch (Throwable $e) {
+                $this->log('checks: could not run');
+
+                return $this->text('The checks could not run: '.$e->getMessage(), true);
+            }
+            $this->log('checks: '.Checks::line($results));
+
+            return $this->text(collect($results)->map(fn ($r) => "## {$r['name']}: ".($r['ok'] ? 'passed' : "FAILED (exit {$r['exit']})")." in {$r['seconds']}s"
+                .($r['ok'] ? '' : "\n\n{$r['output']}"))->implode("\n\n"));
+        }
+
         if ($tool === 'list_databases' || $tool === 'run_query') {
             return $this->database($tool, $arguments);
         }
