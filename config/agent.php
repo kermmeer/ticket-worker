@@ -57,6 +57,18 @@ return [
         'fresh_after_minutes' => (int) env('AGENT_CHAT_FRESH_AFTER_MINUTES', 30),
     ],
 
+    // Development work (CONCEPT.md, proposal of 8 November 2026): which issue types are
+    // development rather than support, and how their branches are named. A space can differ.
+    'development' => [
+        'types' => env('AGENT_DEVELOPMENT_TYPES', 'Story, Improvement, Bug, Task, Sub-task, Subtask, Spike, Epic, New Feature'),
+        'fix_types' => env('AGENT_FIX_TYPES', 'Bug'),
+        'branch_prefixes' => filter_var(env('AGENT_BRANCH_PREFIXES', 'on'), FILTER_VALIDATE_BOOLEAN),
+        'feature_prefix' => env('AGENT_FEATURE_PREFIX', 'feature/'),
+        'fix_prefix' => env('AGENT_FIX_PREFIX', 'fix/'),
+        // Empty: each system's own branch (master, mostly).
+        'base_branch' => env('AGENT_BASE_BRANCH'),
+    ],
+
     // The quick scan of a new ticket: a lighter model, little effort and a small budget,
     // since it runs on every new ticket of a space that has it on.
     'quick' => [

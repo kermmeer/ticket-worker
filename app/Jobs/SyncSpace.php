@@ -107,6 +107,9 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
         // New tickets get their quick scan, if the space has it on and an agent can sign in;
         // a flood beyond the limit waits for you to press Quick scan.
         if ($space->quick_scan && Instructions::instanceCredentials() !== [] && Budget::allows($space, null)) {
+            // Development tickets only where the space asks for it: a scan is support triage.
+            $devToo = (bool) \App\Settings\SpaceSettings::for($space)->get('dev_quick_scan');
+            $fresh = array_values(array_filter($fresh, fn (Ticket $ticket) => $devToo || ! $ticket->setRelation('space', $space)->isDevelopment()));
             foreach (array_slice($fresh, 0, (int) config('agent.quick.per_sync')) as $ticket) {
                 QuickScanTicket::start($ticket);
             }

@@ -31,7 +31,8 @@ onBeforeUnmount(() => clearInterval(timer));
 
 const settingLabels = {
     model: 'Model', effort: 'Effort', turn_budget_usd: 'Per turn', chat_model: 'Chat model', chat_effort: 'Chat effort', fresh_after_minutes: 'Fresh chat after (min)', quick_model: 'Quick scan model', quick_effort: 'Quick effort',
-    quick_budget_usd: 'Per quick scan', monthly_budget_usd: 'Monthly budget', auto_patch: 'Automatic patches',
+    quick_budget_usd: 'Per quick scan', monthly_budget_usd: 'Monthly budget', auto_patch: 'Automatic patches', development_types: 'Development types', fix_types: 'Fix types',
+    branch_prefixes: 'Branch prefixes', feature_prefix: 'Feature prefix', fix_prefix: 'Fix prefix', base_branch: 'Branch from', dev_quick_scan: 'Quick scans of development',
 };
 const show = (key, value) => (value === null || value === undefined ? 'none' : key === 'auto_patch' ? (value ? 'on' : 'off') : key.endsWith('_usd') ? `$${Number(value).toFixed(2)}` : value);
 </script>

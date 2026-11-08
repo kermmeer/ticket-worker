@@ -61,6 +61,37 @@ const field = 'mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 tex
             <input :value="modelValue.quick_budget_usd ?? ''" type="number" step="0.05" min="0.05" :placeholder="defaults.quick_budget_usd" :class="field" @input="set('quick_budget_usd', $event.target.value)" />
         </label>
 
+        <p class="text-sm font-medium sm:col-span-3">Development work <span class="font-normal text-muted">(the issue types the agent builds for, on a branch)</span></p>
+        <label class="text-sm sm:col-span-2">Development types <span class="text-muted">(comma-separated; the rest is support)</span>
+            <input :value="modelValue.development_types ?? ''" :placeholder="defaults.development_types" :class="field" @input="set('development_types', $event.target.value)" />
+        </label>
+        <label class="text-sm">Fix types <span class="text-muted">(get the fix prefix)</span>
+            <input :value="modelValue.fix_types ?? ''" :placeholder="defaults.fix_types" :class="field" @input="set('fix_types', $event.target.value)" />
+        </label>
+        <label class="text-sm">Branch names
+            <select :value="modelValue.branch_prefixes ?? ''" :class="field" @change="set('branch_prefixes', $event.target.value === '' ? null : $event.target.value === '1')">
+                <option value="">as the default ({{ defaults.branch_prefixes ? 'with a prefix' : 'the key alone' }})</option>
+                <option value="1">with a prefix: feature/KEY, fix/KEY</option>
+                <option value="0">the key alone</option>
+            </select>
+        </label>
+        <label class="text-sm">Feature prefix
+            <input :value="modelValue.feature_prefix ?? ''" :placeholder="defaults.feature_prefix" :class="field" class="font-mono" @input="set('feature_prefix', $event.target.value)" />
+        </label>
+        <label class="text-sm">Fix prefix
+            <input :value="modelValue.fix_prefix ?? ''" :placeholder="defaults.fix_prefix" :class="field" class="font-mono" @input="set('fix_prefix', $event.target.value)" />
+        </label>
+        <label class="text-sm">Branch from <span class="text-muted">(empty: the system's own)</span>
+            <input :value="modelValue.base_branch ?? ''" :placeholder="defaults.base_branch || 'master'" :class="field" class="font-mono" @input="set('base_branch', $event.target.value)" />
+        </label>
+        <label class="text-sm sm:col-span-2">Quick scans of new development tickets
+            <select :value="modelValue.dev_quick_scan ?? ''" :class="field" class="max-w-64" @change="set('dev_quick_scan', $event.target.value === '' ? null : $event.target.value === '1')">
+                <option value="">as the default ({{ defaults.dev_quick_scan ? 'on' : 'off' }})</option>
+                <option value="1">on</option>
+                <option value="0">off: support tickets only</option>
+            </select>
+        </label>
+
         <p class="text-sm font-medium sm:col-span-3">Budget</p>
         <label class="text-sm sm:col-span-3">
             Monthly budget ($) <span class="text-muted">{{ perSpace ? 'for all work on this space' : 'per space, unless a space sets its own' }}; empty: none</span>

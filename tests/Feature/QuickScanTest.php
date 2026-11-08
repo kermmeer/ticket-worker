@@ -37,9 +37,13 @@ class QuickScanTest extends TestCase
     {
         return ['id' => $id, 'key' => "SUP-{$id}", 'fields' => [
             'summary' => "Ticket {$id}", 'status' => ['name' => 'Open', 'statusCategory' => ['key' => 'new']],
+            'issuetype' => ['name' => $this->types[$id] ?? 'Incident'],
             'created' => '2026-10-09T10:00:00.000+0200', 'updated' => '2026-10-09T10:00:00.000+0200',
         ]];
     }
+
+    /** Issue types by id; Incident when not named. */
+    private array $types = [];
 
     /** What Jira lists now. Fakes stack rather than replace, so one fake reads this. */
     private array $inJira = [];
@@ -70,6 +74,21 @@ class QuickScanTest extends TestCase
         Queue::assertPushed(QuickScanTicket::class, 1);
         Queue::assertPushed(QuickScanTicket::class, fn ($job) => $job->ticket->key === 'SUP-3');
         $this->assertSame('queued', Ticket::firstWhere('key', 'SUP-3')->quick_scan_state);
+    }
+
+    public function test_new_development_tickets_get_a_quick_scan_only_where_the_space_says_so(): void
+    {
+        Queue::fake();
+        $this->types = ['3' => 'Story', '4' => 'Incident', '5' => 'Story'];
+
+        $this->syncWith(['1']);
+        $this->syncWith(['1', '3', '4']);
+        Queue::assertPushed(QuickScanTicket::class, 1);
+        Queue::assertPushed(QuickScanTicket::class, fn ($job) => $job->ticket->key === 'SUP-4');
+
+        $this->space->update(['settings' => ['dev_quick_scan' => true]]);
+        $this->syncWith(['1', '3', '4', '5']);
+        Queue::assertPushed(QuickScanTicket::class, fn ($job) => $job->ticket->key === 'SUP-5');
     }
 
     public function test_a_space_without_quick_scan_scans_nothing(): void

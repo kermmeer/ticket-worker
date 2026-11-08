@@ -25,9 +25,22 @@ class SpaceSettings
         'quick_budget_usd' => 'money',
         'monthly_budget_usd' => 'money',
         'auto_patch' => 'bool',
+        'development_types' => 'text',
+        'fix_types' => 'text',
+        'branch_prefixes' => 'bool',
+        'feature_prefix' => 'string',
+        'fix_prefix' => 'string',
+        'base_branch' => 'string',
+        'dev_quick_scan' => 'bool',
         'reply_rules' => 'text',
         'answer_rules' => 'text',
     ];
+
+    /** A comma-separated list of issue types, as lowercase names. */
+    public function types(string $key): array
+    {
+        return array_values(array_filter(array_map(fn ($type) => mb_strtolower(trim($type)), explode(',', (string) $this->get($key)))));
+    }
 
     public const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -65,6 +78,14 @@ class SpaceSettings
             // No budget unless someone sets one: the Claude account usually has its own.
             'monthly_budget_usd' => isset($saved['monthly_budget_usd']) ? (float) $saved['monthly_budget_usd'] : null,
             'auto_patch' => Setting::autoPatch(),
+            'development_types' => $saved['development_types'] ?? config('agent.development.types'),
+            'fix_types' => $saved['fix_types'] ?? config('agent.development.fix_types'),
+            'branch_prefixes' => (bool) ($saved['branch_prefixes'] ?? config('agent.development.branch_prefixes')),
+            'feature_prefix' => $saved['feature_prefix'] ?? config('agent.development.feature_prefix'),
+            'fix_prefix' => $saved['fix_prefix'] ?? config('agent.development.fix_prefix'),
+            'base_branch' => $saved['base_branch'] ?? config('agent.development.base_branch'),
+            // Quick scans are support triage: development tickets get one only where a space says so.
+            'dev_quick_scan' => (bool) ($saved['dev_quick_scan'] ?? false),
             'reply_rules' => Setting::replyRules(),
             'answer_rules' => Setting::answerRules(),
         ];
@@ -85,6 +106,13 @@ class SpaceSettings
             'quick_budget_usd' => ['nullable', 'numeric', 'min:0.05', 'max:20'],
             'monthly_budget_usd' => ['nullable', 'numeric', 'min:1', 'max:100000'],
             'auto_patch' => ['nullable', 'boolean'],
+            'development_types' => ['nullable', 'string', 'max:500'],
+            'fix_types' => ['nullable', 'string', 'max:500'],
+            'branch_prefixes' => ['nullable', 'boolean'],
+            'feature_prefix' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9._\/-]+$/'],
+            'fix_prefix' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9._\/-]+$/'],
+            'base_branch' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._\/-]+$/'],
+            'dev_quick_scan' => ['nullable', 'boolean'],
             'reply_rules' => ['nullable', 'string', 'max:4000'],
             'answer_rules' => ['nullable', 'string', 'max:4000'],
         ];

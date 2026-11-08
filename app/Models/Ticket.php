@@ -129,6 +129,31 @@ class Ticket extends Model
         return (string) $this->summary;
     }
 
+    /** Support (an incident, a question) or development (a story, a bug to build a fix for). */
+    public function kind(): string
+    {
+        $types = \App\Settings\SpaceSettings::for($this->space)->types('development_types');
+
+        return in_array(mb_strtolower((string) $this->issue_type), $types, true) ? 'development' : 'support';
+    }
+
+    public function isDevelopment(): bool
+    {
+        return $this->kind() === 'development';
+    }
+
+    /** feature/DEVBESUP-3211, fix/… for a fix type, or the key alone with prefixes off. */
+    public function branchName(): string
+    {
+        $settings = \App\Settings\SpaceSettings::for($this->space);
+        if (! $settings->get('branch_prefixes')) {
+            return $this->key;
+        }
+        $fix = in_array(mb_strtolower((string) $this->issue_type), $settings->types('fix_types'), true);
+
+        return ((string) $settings->get($fix ? 'fix_prefix' : 'feature_prefix')).$this->key;
+    }
+
     public function rememberMatch(?array $match): void
     {
         // Tied by hand: what the words say does not undo what you decided.
