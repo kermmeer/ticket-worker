@@ -135,6 +135,7 @@ Route::middleware('role:admin')->group(function () {
     Route::get('/setup', SetupController::class)->name('setup');
     Route::put('/setup/reply-rules', [SetupController::class, 'replyRules'])->name('setup.reply-rules');
     Route::put('/setup/reply-template', [SetupController::class, 'replyTemplate'])->name('setup.reply-template');
+    Route::put('/setup/agents', [SetupController::class, 'agents'])->name('setup.agents');
     Route::put('/setup/answer-rules', [SetupController::class, 'answerRules'])->name('setup.answer-rules');
     Route::put('/setup/auto-patch', [SetupController::class, 'autoPatch'])->name('setup.auto-patch');
     Route::put('/setup/settings', [SetupController::class, 'settings'])->name('setup.settings');

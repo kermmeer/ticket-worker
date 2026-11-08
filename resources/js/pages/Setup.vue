@@ -12,6 +12,8 @@ const props = defineProps({
     autoPatch: { type: Boolean, default: true },
     answerRules: { type: String, required: true },
     replyTemplate: { type: String, default: '' },
+    agents: { type: Number, default: 2 },
+    maxAgents: { type: Number, default: 16 },
     defaultAnswerRules: { type: String, required: true },
     sharedClaude: { type: String, default: null },
     defaults: { type: Object, required: true },
@@ -45,6 +47,11 @@ function saveShared() {
 const rules = useForm({ rules: props.replyRules });
 
 const answers = useForm({ rules: props.answerRules });
+
+const agentCount = useForm({ agents: props.agents });
+function saveAgents() {
+    agentCount.put('/setup/agents', { preserveScroll: true });
+}
 
 const template = useForm({ template: props.replyTemplate });
 function saveTemplate() {
@@ -220,6 +227,19 @@ const marks = {
 
     <section class="mt-10">
         <h2 class="eyebrow">Replies</h2>
+        <form class="card mt-3 p-5" @submit.prevent="saveAgents">
+            <label for="agents" class="font-medium">Agents at once</label>
+            <p class="mt-1 max-w-3xl text-sm text-muted">
+                How many analyses, chats, builds and quick scans run side by side; the rest wait their turn. More is faster
+                when several people work, and spends the budget faster too. Lowering it never cuts an agent off: those at work finish.
+            </p>
+            <div class="mt-3 flex items-center gap-2">
+                <input id="agents" v-model.number="agentCount.agents" type="number" min="1" :max="maxAgents" class="w-24 rounded-md border border-line bg-page px-3 py-1.5 text-sm" />
+                <button type="submit" class="btn btn-signal" :disabled="agentCount.processing || !agentCount.isDirty">Save</button>
+            </div>
+            <p v-if="agentCount.errors.agents" class="mt-1 text-sm text-signal">{{ agentCount.errors.agents }}</p>
+        </form>
+
         <form class="card mt-3 p-5" @submit.prevent="saveTemplate">
             <label for="reply-template" class="font-medium">Your greeting and sign-off</label>
             <p class="mt-1 max-w-3xl text-sm text-muted">

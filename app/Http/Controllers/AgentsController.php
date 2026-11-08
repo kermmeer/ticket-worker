@@ -55,6 +55,7 @@ class AgentsController extends Controller
 
         return Inertia::render('Agents', [
             'working' => $turns->values(),
+            'capacity' => \App\Models\Setting::agents(),
             'quickScans' => [
                 'running' => $scans->whereIn('quick_scan_state', ['queued', 'running'])->map(fn (Ticket $ticket) => [
                     'id' => "scan-{$ticket->id}", 'ticket' => $ticket->key, 'summary' => $ticket->summary, 'state' => $ticket->quick_scan_state,

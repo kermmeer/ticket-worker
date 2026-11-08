@@ -33,6 +33,8 @@ class SetupController extends Controller
             'envClaude' => ($env = \App\Agent\Instructions::envCredentials()) !== [] ? (isset($env['ANTHROPIC_API_KEY']) ? 'API key' : 'subscription token') : null,
             'answerRules' => Setting::answerRules(),
             'replyTemplate' => (string) Setting::get(Setting::REPLY_TEMPLATE),
+            'agents' => Setting::agents(),
+            'maxAgents' => Setting::MAX_AGENTS,
             'defaultAnswerRules' => Setting::DEFAULT_ANSWER_RULES,
         ]);
     }
@@ -114,6 +116,19 @@ class SetupController extends Controller
         return back()->with('success', $data['kind'] === 'none'
             ? 'Removed. Without one in .env either, only people with their own sign-in can run agents, and new tickets get no automatic quick scan.'
             : 'Saved. Everyone without their own sign-in runs on it, and automatic quick scans do.');
+    }
+
+    /** How many agents may work at once: the pool in the agent container follows within seconds. */
+    public function agents(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['agents' => ['required', 'integer', 'min:1', 'max:'.Setting::MAX_AGENTS]]);
+        $before = Setting::agents();
+        Setting::put(Setting::AGENTS, (string) $data['agents']);
+        AuditEvent::record('setup.agents', 'agents at once', "{$before} → {$data['agents']}");
+
+        return back()->with('success', $data['agents'] < $before
+            ? "Up to {$data['agents']} at once. Agents already at work finish first."
+            : "Up to {$data['agents']} at once, from the next turn that waits.");
     }
 
     /** The greeting and sign-off around every reply, yours or the agent's. */

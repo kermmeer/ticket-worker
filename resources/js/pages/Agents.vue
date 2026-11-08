@@ -8,6 +8,7 @@ import { ago, short } from '../time.js';
 // The agents at a glance: what works now and for whom, what your work signs in with, and
 // the settings in force per space.
 const props = defineProps({
+    capacity: { type: Number, default: 2 },
     working: { type: Array, required: true },
     quickScans: { type: Object, required: true },
     systems: { type: Array, required: true },
@@ -41,6 +42,10 @@ const show = (key, value) => (value === null || value === undefined ? 'none' : k
     <Head title="Agents" />
     <p class="eyebrow">Agents</p>
     <h1 class="display mt-2 text-3xl">{{ busy ? `${busy} at work` : 'Nothing at work right now' }}</h1>
+    <p class="mt-1 text-sm text-muted">
+        Up to {{ capacity }} at once<template v-if="busy > capacity">: {{ busy - capacity }} waiting their turn</template>.
+        <Link v-if="$page.props.me?.is_admin" href="/setup#agents" class="underline hover:text-ink">Change</Link>
+    </p>
 
     <!-- What your work signs in with -->
     <section class="mt-8 grid gap-6 lg:grid-cols-2">

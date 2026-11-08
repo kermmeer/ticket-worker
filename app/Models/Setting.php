@@ -55,6 +55,16 @@ class Setting extends Model
 
     public const SHARED_CLAUDE = 'shared_claude';
 
+    /** How many agents may work at once, set on the Setup page; AGENT_MAX_PARALLEL until then. */
+    public const AGENTS = 'agents';
+
+    public const MAX_AGENTS = 16;
+
+    public static function agents(): int
+    {
+        return max(1, min(self::MAX_AGENTS, (int) (static::get(self::AGENTS) ?? config('agent.max_parallel'))));
+    }
+
     /** A secret setting: stored encrypted with APP_KEY, read back decrypted, never shown. */
     public static function putSecret(string $key, ?array $value): void
     {

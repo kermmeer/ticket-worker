@@ -447,7 +447,7 @@ Later turns pass `--resume <uuid>` instead of `--session-id`.
 - **Structured answers.** The analysis turn and *Update proposal* pass `--json-schema`, so
   their final answer is the proposal as validated JSON. Conversation turns stay plain prose.
 - **Limits.** Each turn has a budget ceiling (`--max-budget-usd`, default set per space). At
-  most `AGENT_MAX_PARALLEL` turns run at once, and only one per session; a turn whose session
+  most *Agents at once* (Setup; `AGENT_MAX_PARALLEL` until set) turns run at once, and only one per session; a turn whose session
   is busy waits.
 
 Why one process per turn: a session waiting for you costs nothing (no process, no memory),
@@ -582,7 +582,7 @@ image, so they run the same code:
 |---|---|---|
 | `worker` | `queue:work` for everything except agent turns: Jira sync, preparing the systems' folders | the whole app folder, like `app` |
 | `scheduler` | `schedule:work`: the sync, the health reports, the clean-ups | the whole app folder |
-| `agent` | `queue:work --queue=agents`, two replicas (`AGENT_MAX_PARALLEL`) | the code read-only, `shared/agent/` read-write, `shared/systems/` read-only, nothing else of `shared/` |
+| `agent` | `agent:pool`: one container, up to N agents at once, each a `queue:work --once` of its own; N is *Agents at once* on Setup (since 2026-11-08; it was two fixed replicas) | the code read-only, `shared/agent/` read-write, `shared/systems/` read-only, nothing else of `shared/` |
 
 - The repository's `compose.yml` and `docker/Dockerfile` define them, with a MySQL of
   their own (built 2026-10-06); an instance can also bring its own containers, as long as
@@ -639,7 +639,7 @@ repository is on the list (§17).
 | `CLAUDE_EFFORT` | `high` | |
 | `CLAUDE_CHAT_MODEL`, `CLAUDE_CHAT_EFFORT` | `claude-sonnet-5`, `medium` | Ask in the ticket chat; Dig deeper uses `CLAUDE_MODEL` |
 | `AGENT_CHAT_FRESH_AFTER_MINUTES` | `30` | a chat this quiet starts afresh, with a summary of the last one |
-| `AGENT_MAX_PARALLEL` | `2` | turns running at once |
+| `AGENT_MAX_PARALLEL` | `2` | agents at once, until *Agents at once* on Setup says otherwise |
 | `AGENT_TURN_BUDGET_USD` | `3` | default ceiling per turn; a space can override it |
 | `SYSTEMS_PATH` | `shared/systems` | the folders you push the systems into |
 | `SYSTEMS_PUSH_BASE` | — | the same folder as your machine sees it, for the push command, e.g. `you@server:/srv/ticket-worker/data/systems` |

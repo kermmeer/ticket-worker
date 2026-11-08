@@ -99,7 +99,8 @@ services:
       target: agent
     deploy:
       replicas: ${AGENT_MAX_PARALLEL:-2}
-    command: ["php", "artisan", "queue:work", "--queue=agents", "--sleep=3", "--tries=1", "--timeout=1800"]
+    # Up to N agents at once, N from "Agents at once" on the Setup page (AGENT_MAX_PARALLEL until set).
+    command: ["php", "artisan", "agent:pool"]
     stop_grace_period: 60s
     depends_on: *migrated
     environment:
