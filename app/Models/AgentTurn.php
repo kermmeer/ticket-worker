@@ -20,7 +20,7 @@ class AgentTurn extends Model
     public const STOPPED = 'stopped';
 
     protected $fillable = [
-        'agent_session_id', 'user_id', 'kind', 'model', 'prompt', 'note', 'state', 'stop_requested', 'proposal', 'case_draft', 'patch', 'patch_meta', 'answer',
+        'agent_session_id', 'user_id', 'kind', 'model', 'prompt', 'note', 'state', 'stop_requested', 'proposal', 'case_draft', 'refinement', 'patch', 'patch_meta', 'answer',
         'error', 'cost_usd', 'claude_total_usd', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens',
         'duration_ms', 'started_at', 'finished_at',
     ];
@@ -30,6 +30,7 @@ class AgentTurn extends Model
         return [
             'proposal' => 'array',
             'case_draft' => 'array',
+            'refinement' => 'array',
             'patch_meta' => 'array',
             'stop_requested' => 'boolean',
             'cost_usd' => 'float',

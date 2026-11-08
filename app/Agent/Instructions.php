@@ -265,6 +265,32 @@ class Instructions
         ];
     }
 
+    /** A development ticket refined, as a team would before building it. */
+    public static function refineSchema(): array
+    {
+        $text = ['type' => 'string'];
+        $list = ['type' => 'array', 'items' => $text];
+
+        return [
+            'type' => 'object',
+            'required' => ['summary', 'questions', 'acceptance_criteria', 'code', 'size', 'size_reason'],
+            'properties' => [
+                'summary' => $text + ['description' => 'What is asked, in two lines, in plain words.'],
+                'questions' => $list + ['description' => 'What the product owner must answer before it can be built well; empty when nothing is unclear. Each one short and answerable.'],
+                'acceptance_criteria' => $list + ['description' => 'When it is done: each one checkable, as "Given/When/Then" or a plain statement.'],
+                'code' => $list + ['description' => 'Where in the code it lands: system/path, with what changes there, one line each.'],
+                'size' => ['type' => 'string', 'enum' => ['S', 'M', 'L'], 'description' => 'S: hours. M: a day or two. L: more, or it should be split.'],
+                'size_reason' => $text + ['description' => 'Why that size, in one line.'],
+                'risks' => $list + ['description' => 'What could go wrong or what it could break.'],
+            ],
+        ];
+    }
+
+    public static function refineRequest(Ticket $ticket): string
+    {
+        return "Refine ticket {$ticket->key} as a team would before building it: read ticket.md and look at the code it touches, so that where it lands and how big it is are real, not guessed. Take this conversation into account. Keep every part short. End with the JSON.";
+    }
+
     /** What a build turn answers with: the commit, and a guide to go with the change. */
     public static function buildSchema(): array
     {

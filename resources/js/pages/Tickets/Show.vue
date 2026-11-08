@@ -8,6 +8,7 @@ import FoldingSection from '../../components/FoldingSection.vue';
 import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
 import QuickScanCard from '../../components/QuickScanCard.vue';
+import Refinement from '../../components/Refinement.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
 import StatusLabel from '../../components/StatusLabel.vue';
 import TicketKey from '../../components/TicketKey.vue';
@@ -239,7 +240,7 @@ function stepLine(turn) {
 // The brief: one line that says what this ticket is about and where it stands.
 const scanResult = computed(() => props.ticket.quick_scan?.result ?? null);
 const briefLine = computed(() =>
-    proposal.value?.headline ?? proposal.value?.problem ?? scanResult.value?.summary ?? 'Not looked at yet: ask about it below, or give it a quick scan first.',
+    proposal.value?.headline ?? proposal.value?.problem ?? (props.ticket.kind === 'development' ? props.ticket.refinement?.summary : null) ?? scanResult.value?.summary ?? 'Not looked at yet: ask about it below, or give it a quick scan first.',
 );
 
 // The jump bar's parts: only those the page has.
@@ -251,7 +252,7 @@ const jumps = computed(() => [
     { id: 'ticket', label: 'Ticket' },
 ]);
 
-const turnLabels = { build: 'Build', analysis: 'Deep analysis', message: 'Answer', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
+const turnLabels = { refine: 'Refinement', build: 'Build', analysis: 'Deep analysis', message: 'Answer', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
 
 // Development work: built on the ticket's own branch rather than patched.
 const isDev = computed(() => props.ticket.kind === 'development');
@@ -345,6 +346,11 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             <dt class="text-muted">Likely</dt><dd class="line-clamp-3">{{ scanResult.likely_cause }}</dd>
             <dt class="text-muted">Next</dt><dd class="line-clamp-3">{{ scanResult.next_step }}</dd>
         </dl>
+        <dl v-if="isDev && ticket.refinement && !proposal" class="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+            <dt class="text-muted">Size</dt><dd><span class="font-mono">{{ ticket.refinement.size }}</span> <span class="text-muted">{{ ticket.refinement.size_reason }}</span></dd>
+            <template v-if="ticket.refinement.questions?.length"><dt class="text-muted">Open</dt><dd class="line-clamp-2">{{ ticket.refinement.questions.length }} {{ ticket.refinement.questions.length === 1 ? 'question' : 'questions' }} for the product owner: {{ ticket.refinement.questions[0] }}</dd></template>
+        </dl>
+        <p v-else-if="isDev && !proposal" class="mt-3 text-sm text-muted">Not refined yet.</p>
         <!-- The code built for it, per repository: at a glance, with the command to fetch it. -->
         <div v-if="ticket.branches.length" class="mt-3 space-y-1.5 text-sm">
             <p v-for="branch in ticket.branches" :key="branch.id" class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -509,6 +515,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                         </template>
                         <ActivityLine v-if="turn.state === 'running'" :now="lastTool" :tally="`${turn.events.filter((e) => e.type === 'tool').length} steps`" />
                         <p v-if="turn.state === 'queued'" class="text-sm text-muted">Waiting for a free agent…</p>
+                        <Refinement v-if="turn.refinement" :refinement="turn.refinement" />
                         <Link v-if="turn.case_draft" :href="`/casebook/create?turn=${turn.id}`" class="btn btn-signal self-start">Review the case and write it down</Link>
                         <div v-if="turn.patch?.text" class="space-y-2 text-sm">
                             <!-- What it changes and the file: in view. Why, how to test, the risks, the diff: one click away. -->
@@ -592,6 +599,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                                 <input v-if="!ticket.branches.length" v-model="buildBase" :placeholder="`from ${buildDefaultBase}`" aria-label="Branch to build from" class="w-36 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm placeholder:font-sans placeholder:text-muted" />
                                 <button type="button" class="btn btn-signal" :disabled="message.processing" @click="build">{{ ticket.branches.length ? 'Build on' : 'Build' }}</button>
                             </span>
+                            <button v-if="isDev" type="button" class="btn" @click="post('refine')">{{ ticket.refinement ? 'Refine again' : 'Refine' }}</button>
                             <template v-if="session && !isDev">
                                 <button type="button" class="btn" @click="post('restate')">Update proposal</button>
                                 <button type="button" class="btn" @click="post('case')">Draft a case</button>

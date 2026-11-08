@@ -70,6 +70,8 @@ class TicketController extends Controller
                 // The code built for it, per repository: branch, commits, lines.
                 'branches' => $ticket->branches()->with('system:id,name')->get()->map->summary()->values(),
                 'base_branch' => SpaceSettings::for($ticket->space)->get('base_branch'),
+                // The latest refinement, from whichever chat made it.
+                'refinement' => AgentTurn::query()->whereIn('agent_session_id', $ticket->sessions()->select('id'))->whereNotNull('refinement')->latest('id')->first()?->refinement,
                 // Gone from the space's open tickets: resolved, or moved out of its rules.
                 'left' => $ticket->left_at !== null || $ticket->status_category === 'done',
             ],
@@ -264,6 +266,22 @@ class TicketController extends Controller
     public function restate(Ticket $ticket): RedirectResponse
     {
         return $this->follow($ticket, 'proposal', Instructions::restate($ticket->space));
+    }
+
+    /** Refine a development ticket: questions, acceptance criteria, where it lands, a size. */
+    public function refine(Ticket $ticket): RedirectResponse
+    {
+        abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
+        if ($ticket->openSession()?->busy()) {
+            return back()->with('error', 'The agent is still working; wait or stop it.');
+        }
+        [$session] = $this->chat($ticket);
+        $this->turn($session, 'refine', Instructions::refineRequest($ticket));
+
+        return back();
     }
 
     /** The agent drafts a casebook case; you review it in the form before it exists. */
@@ -463,6 +481,7 @@ class TicketController extends Controller
             'tokens_out' => $turns->sum(fn (AgentTurn $turn) => (int) $turn->output_tokens),
             'busy' => $turns->contains(fn ($turn) => in_array($turn->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true)),
             'proposal' => $turns->whereNotNull('proposal')->last()?->proposal,
+            'refinement' => $turns->whereNotNull('refinement')->last()?->refinement,
             'turns' => $turns->map(fn (AgentTurn $turn) => [
                 'id' => $turn->id,
                 'kind' => $turn->kind,
@@ -475,6 +494,7 @@ class TicketController extends Controller
                 'answer' => $turn->kind === 'message' ? $turn->answer : null,
                 'error' => $turn->error,
                 'case_draft' => $turn->case_draft !== null,
+                'refinement' => $turn->refinement,
                 // A patch turn: what it changed, and the patch itself for the diff view.
                 'patch' => in_array($turn->kind, ['patch', 'build'], true) ? [
                     'meta' => collect($turn->patch_meta ?? [])->except('system_id'),

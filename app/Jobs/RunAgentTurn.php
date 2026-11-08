@@ -97,7 +97,7 @@ class RunAgentTurn implements ShouldQueue
             $settings = SpaceSettings::for($ticket->space);
             // A question in the chat on the lighter model; digging deeper, patches and cases on the full one.
             // A case draft writes up what the conversation found: no investigation, so the lighter model.
-            $chat = in_array($turn->kind, ['message', 'case'], true);
+            $chat = in_array($turn->kind, ['message', 'case', 'refine'], true);
             $model = $settings->get($chat ? 'chat_model' : 'model');
             $turn->update(['model' => $model]);
             $command = ClaudeRun::command(
@@ -123,6 +123,8 @@ class RunAgentTurn implements ShouldQueue
                 $command = [...$command, '--json-schema', json_encode(Instructions::patchSchema())];
             } elseif ($turn->kind === 'build') {
                 $command = [...$command, '--json-schema', json_encode(Instructions::buildSchema())];
+            } elseif ($turn->kind === 'refine') {
+                $command = [...$command, '--json-schema', json_encode(Instructions::refineSchema())];
             }
             // A patch turn may write, and restricted mode lets it write in every folder it is
             // given: so it gets only the workspace, where its copy is. Without Docker's
@@ -183,6 +185,10 @@ class RunAgentTurn implements ShouldQueue
             ? ($result['structured_output'] ?? self::jsonFrom((string) ($result['result'] ?? '')))
             : null;
 
+        $refinement = $state === AgentTurn::DONE && $turn->kind === 'refine'
+            ? ($result['structured_output'] ?? self::jsonFrom((string) ($result['result'] ?? '')))
+            : null;
+
         $patch = null;
         $patchMeta = $turn->patch_meta;
         if ($state === AgentTurn::DONE && in_array($turn->kind, ['patch', 'build'], true)) {
@@ -215,6 +221,7 @@ class RunAgentTurn implements ShouldQueue
             'state' => $state,
             'proposal' => $proposal,
             'case_draft' => $caseDraft,
+            'refinement' => $refinement,
             'patch' => $patch,
             'patch_meta' => $patchMeta,
             'answer' => $result['result'] ?? null,

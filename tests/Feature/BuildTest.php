@@ -106,6 +106,21 @@ class BuildTest extends TestCase
             ->where('ticket.branches.0.fetch', 'git fetch ticket-worker feature/SUP-1 && git checkout feature/SUP-1'));
     }
 
+    public function test_refine_writes_questions_criteria_and_a_size_on_the_chat_model(): void
+    {
+        config(['agent.chat.model' => 'claude-sonnet-5']);
+        $refinement = ['summary' => 'Export lists as CSV.', 'questions' => ['Which columns?'], 'acceptance_criteria' => ['A CSV downloads'], 'code' => ['billing/Export.php: add csv'], 'size' => 'S', 'size_reason' => 'One exporter.'];
+        Process::fake(['*claude*' => Process::describe()->output(json_encode(['type' => 'result', 'result' => '', 'structured_output' => $refinement])."\n")->runsFor(iterations: 1), '*' => Process::result('')]);
+
+        $this->post("/tickets/{$this->ticket->id}/refine")->assertSessionHasNoErrors();
+
+        $turn = AgentTurn::sole();
+        $this->assertSame(['refine', AgentTurn::DONE, 'claude-sonnet-5'], [$turn->kind, $turn->state, $turn->model]);
+        $this->get("/tickets/{$this->ticket->id}")->assertInertia(fn (Assert $page) => $page
+            ->where('ticket.refinement.size', 'S')
+            ->where('ticket.refinement.questions.0', 'Which columns?'));
+    }
+
     public function test_build_it_in_the_chat_of_a_development_ticket_builds(): void
     {
         \Illuminate\Support\Facades\Queue::fake();

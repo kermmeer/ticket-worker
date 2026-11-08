@@ -54,6 +54,7 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/case', 'draftCase')->name('case');
     Route::post('/patch', 'patch')->name('patch');
     Route::post('/build', 'build')->name('build');
+    Route::post('/refine', 'refine')->name('refine');
     Route::post('/quick-scan', 'quickScan')->name('quick-scan');
     Route::get('/turns/{turn}/patch', 'patchFile')->name('patch.file');
     Route::post('/stop', 'stop')->name('stop');
