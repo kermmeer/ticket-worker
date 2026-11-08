@@ -7,7 +7,7 @@
 #
 #   push-systems.sh [fetch|push|both] [folder ...]
 #
-# Every git clone in the folders given, or in the folders directly below them, takes
+# Every git clone in the folders given, or up to three folders below them, takes
 # part when it has a "ticket-worker" (or "ticketworker") remote. One-time setup per clone:
 #
 #   git remote add ticket-worker you@server:/srv/ticket-worker/data/systems/billing
@@ -29,8 +29,12 @@ esac
 failed=0
 seen=0
 
+pushed=
+
+# Clones anywhere up to three folders down: a GitFork-style layout nests them
+# (code/boss-workers/telepo), and a clone skipped without a word is no clone pushed.
 for root in "$@"; do
-    for repo in "$root" "$root"/*/; do
+    while IFS= read -r repo; do
         [ -e "$repo/.git" ] || continue
         # Either spelling of the remote, and of its branch setting.
         remote=
@@ -62,8 +66,11 @@ for root in "$@"; do
         fi
 
         echo "$name: $branch at $(git -C "$repo" rev-parse --short "refs/remotes/origin/$branch") ($mode)"
-    done
+        pushed="$pushed $name"
+    done < <(find "$root" -maxdepth 4 -name .git -prune -print 2>/dev/null | sed 's#/\.git$##' | sort)
 done
+
+[ -n "$pushed" ] && echo "Done:$pushed. A clone not named here has no ticket-worker remote, or is more than three folders down."
 
 if [ "$seen" -eq 0 ]; then
     echo "No clone with a ticket-worker remote in: $*" >&2

@@ -276,7 +276,9 @@ function follow(system, branch) {
                         <p class="text-muted">
                             Check in your clone that <code class="font-mono">git remote get-url ticket-worker</code> ends in
                             <code class="font-mono">/{{ system.name }}</code>, and that the push sent <code class="font-mono">{{ system.branch }}</code>:
-                            push-systems.sh pushes <code class="font-mono">main</code> unless <code class="font-mono">git config ticket-worker.branch {{ system.branch }}</code> says otherwise.
+                            push-systems.sh pushes <code class="font-mono">main</code> unless <code class="font-mono">git config ticket-worker.branch {{ system.branch }}</code> says otherwise,
+                            and only finds clones with that remote up to three folders below the folder you give it (copies of the script from before 8 November: one).
+                            Its last line names the clones it pushed.
                         </p>
                     </template>
                     <button type="button" class="text-muted underline hover:text-ink" @click="router.reload({ only: ['systems'] })">Look again</button>
