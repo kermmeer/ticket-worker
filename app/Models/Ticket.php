@@ -21,7 +21,7 @@ class Ticket extends Model
         'space_id', 'site', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
         'issue_type', 'reporter', 'assignee', 'assignee_account_id', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
         'first_seen_at', 'last_seen_at', 'left_at', 'hidden_at',
-        'casebook_manual', 'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id', 'sla_warned',
+        'casebook_manual', 'local', 'local_description', 'local_user_id', 'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id', 'sla_warned',
     ];
 
     protected function casts(): array
@@ -37,6 +37,7 @@ class Ticket extends Model
             'quick_scan' => 'array',
             'quick_scan_steps' => 'array',
             'casebook_manual' => 'boolean',
+            'local' => 'boolean',
             'quick_scan_cost_usd' => 'float',
             'quick_scan_at' => 'datetime',
             'sla_warned' => 'array',
@@ -127,6 +128,47 @@ class Ticket extends Model
     public function matchText(): string
     {
         return (string) $this->summary;
+    }
+
+    /** Own work, not (yet) a Jira ticket. */
+    public function isLocal(): bool
+    {
+        return (bool) $this->local;
+    }
+
+    /** Where its screenshots and files are kept, until they go to Jira with the ticket. */
+    public function filesPath(): string
+    {
+        return rtrim((string) config('agent.work_files_path'), '/').'/'.$this->id;
+    }
+
+    /** @return list<array{name: string, size: int, mime: ?string}> */
+    public function localFiles(): array
+    {
+        return collect(glob($this->filesPath().'/*') ?: [])->filter(fn ($path) => is_file($path))->sort()->map(fn ($path) => [
+            'name' => basename($path), 'size' => filesize($path), 'mime' => mime_content_type($path) ?: null,
+        ])->values()->all();
+    }
+
+    /** Own work, in the shape Jira's issue has: for the page and for the agent's ticket.md. */
+    public function localIssue(): array
+    {
+        return [
+            'key' => $this->key,
+            'summary' => $this->summary,
+            'description' => (string) $this->local_description,
+            'status' => 'Own work',
+            'status_category' => null,
+            'priority' => null,
+            'type' => $this->issue_type,
+            'reporter' => $this->reporter,
+            'assignee' => $this->assignee,
+            'assignee_account_id' => null,
+            'created' => $this->created_at?->toIso8601String(),
+            'updated' => $this->updated_at?->toIso8601String(),
+            'comments' => [],
+            'attachments' => [],
+        ];
     }
 
     public function branches(): \Illuminate\Database\Eloquent\Relations\HasMany

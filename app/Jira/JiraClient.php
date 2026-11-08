@@ -297,6 +297,33 @@ class JiraClient
             ->values()->all();
     }
 
+    /**
+     * A new issue in a project, with its description in Jira's wiki markup. Only with
+     * JIRA_WRITE=real; the caller checks. Returns its key.
+     */
+    public function createIssue(string $projectKey, string $type, string $summary, string $description): string
+    {
+        $answer = $this->send('post', '/rest/api/2/issue', ['fields' => [
+            'project' => ['key' => $projectKey],
+            'issuetype' => ['name' => $type],
+            'summary' => $summary,
+            'description' => $description,
+        ]]);
+
+        return (string) ($answer['key'] ?? throw new JiraException('Jira made no issue.'));
+    }
+
+    /** A file onto an issue, for a description that shows it (!name!). */
+    public function attach(string $key, string $path): void
+    {
+        $response = $this->request()->withHeaders(['X-Atlassian-Token' => 'no-check'])
+            ->attach('file', fopen($path, 'r'), basename($path))
+            ->post('/rest/api/2/issue/'.rawurlencode($key).'/attachments');
+        if ($response->failed()) {
+            throw JiraException::fromResponse($response);
+        }
+    }
+
     /** Assign a ticket. Only with JIRA_WRITE=real; the caller says what would have happened otherwise. */
     public function assign(string $key, string $accountId): void
     {

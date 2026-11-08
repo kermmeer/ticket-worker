@@ -86,7 +86,8 @@ class OverviewController extends Controller
                 ],
                 'created_at' => $ticket->jira_created_at?->toIso8601String(),
                 'updated_at' => $ticket->jira_updated_at?->toIso8601String(),
-                'url' => $byId[$ticket->space_id]->jira()->browseUrl($ticket->key),
+                'url' => $ticket->local ? null : $byId[$ticket->space_id]->jira()->browseUrl($ticket->key),
+                'local' => (bool) $ticket->local,
                 'open_label' => $byId[$ticket->space_id]->openLabel(),
                 'page' => route('tickets.show', $ticket, false),
                 // Only what the row shows: the overview refreshes every 30 seconds with every ticket,
@@ -130,6 +131,7 @@ class OverviewController extends Controller
             $ticket->hidden_at !== null => 'hidden',
             $session?->state === 'open' && in_array($last?->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true) => 'working',
             $session?->state === 'open' && $last !== null => 'needs-you',
+            (bool) $ticket->local => 'own-work',
             $space->sleeps($ticket->status) => 'sleeping',
             // Development goes by where it is in Jira, not by what an agent did.
             $development => $ticket->status_category === 'indeterminate' ? 'dev-in-progress' : 'dev-to-do',

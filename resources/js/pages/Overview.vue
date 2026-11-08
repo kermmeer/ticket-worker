@@ -21,6 +21,7 @@ const props = defineProps({
 const groups = [
     { key: 'needs-you', label: 'Needs you', hint: 'A proposal is ready, or the agent asked you something' },
     { key: 'working', label: 'Working', hint: 'An agent is busy on it right now' },
+    { key: 'own-work', label: 'Own work', hint: 'Started here, no Jira ticket yet' },
     { key: 'new-activity', label: 'New activity', hint: 'Commented on or changed since the last analysis' },
     { key: 'not-analysed', label: 'Not analysed', hint: 'Synced, nothing started yet' },
     { key: 'parked', label: 'Parked', hint: 'Session closed, ticket still open in Jira' },
@@ -324,7 +325,11 @@ onBeforeUnmount(() => {
     </template>
 
     <template v-else>
-        <p class="eyebrow">Overview</p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <p class="eyebrow">Overview</p>
+            <!-- Something you saw yourself: work on it first, make it a ticket later. -->
+            <Link href="/work/new" class="btn">New work</Link>
+        </div>
         <h1 class="display mt-3 text-5xl leading-[1.05] sm:text-6xl">
             {{ awakeCount }} open {{ awakeCount === 1 ? 'ticket' : 'tickets' }}
         </h1>

@@ -62,6 +62,7 @@ function toggleHidden() {
                 <!-- Out to the outbox or Jira. The label says where, for screen readers and on hover;
                      the arrow-out-of-a-box shape says "elsewhere" without it. -->
                 <a
+                    v-if="ticket.url"
                     :href="ticket.url"
                     target="_blank"
                     rel="noopener"

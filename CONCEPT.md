@@ -925,5 +925,19 @@ the way `push-systems.sh` reaches GitLab. Speed: the chat is already on the ligh
   has `run_checks`, runs them when it thinks it is done and fixes what fails; the final
   state is checked once more and the result shows with the build. The full suite, with its
   databases, queues and images from the internal registry, stays with CI.
+- *Own work* (built 8 November 2026). Something you see yourself (an issue, an improvement)
+  you want to work on first and make a ticket of later. *New work* on the overview starts it
+  in a space: a working title, what you are after, a kind. Here it is a ticket marked local,
+  `WIP-<n>`, so it has the chat, Refine and Build of any other, on `feature/WIP-<n>`; the
+  sync leaves it alone and nothing asks Jira about it. Screenshots and files go with it
+  (chosen, or pasted with Ctrl+V); the agent sees them. When it is ready, *Draft the ticket*:
+  the agent writes the Jira title, type and description from the chat and the code built,
+  in Jira markup, the screenshots in it as `!name|thumbnail!`. You edit it, then either
+  *Create it in Jira and link* (with `JIRA_WRITE=real`: the issue is made in the space's
+  project and the files attached) or make it in Jira yourself and link it by its key. Linking
+  moves the chats, refinements, branches and files onto the real ticket, renames the
+  branches to its key (`feature/DEVBESUP-3300`), and the own-work item goes. Its open chat is
+  closed on the way: a chat cannot follow to the new ticket's folder, so the next question
+  starts from its summary.
 - *The database behind the VPN* is boss's production database, the one the read-only data
   tools (database servers, §11) are for, not the tool's own. Reaching it stays for later.

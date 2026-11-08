@@ -46,6 +46,16 @@ Route::controller(AccountController::class)->group(function () {
 Route::get('/', OverviewController::class)->name('overview');
 Route::post('/quick-scans', [QuickScanBatchController::class, 'store'])->name('quick-scans.store');
 Route::delete('/quick-scans', [QuickScanBatchController::class, 'destroy'])->name('quick-scans.destroy');
+// Own work: started here, made a Jira ticket later.
+Route::controller(\App\Http\Controllers\OwnWorkController::class)->name('work.')->group(function () {
+    Route::get('/work/new', 'create')->name('create');
+    Route::post('/work', 'store')->name('store');
+    Route::put('/work/{ticket}', 'update')->name('update');
+    Route::post('/work/{ticket}/files', 'upload')->name('upload');
+    Route::get('/work/{ticket}/files/{name}', 'file')->name('file');
+    Route::delete('/work/{ticket}/files/{name}', 'destroyFile')->name('file.destroy');
+});
+
 Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('tickets.')->group(function () {
     Route::get('/', 'show')->name('show');
     Route::post('/analyse', 'analyse')->name('analyse');
@@ -55,6 +65,8 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/patch', 'patch')->name('patch');
     Route::post('/build', 'build')->name('build');
     Route::post('/refine', 'refine')->name('refine');
+    Route::post('/draft-ticket', 'draftTicket')->name('draft-ticket');
+    Route::post('/link', 'link')->name('link');
     Route::post('/quick-scan', 'quickScan')->name('quick-scan');
     Route::get('/turns/{turn}/patch', 'patchFile')->name('patch.file');
     Route::post('/stop', 'stop')->name('stop');

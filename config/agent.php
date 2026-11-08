@@ -45,6 +45,9 @@ return [
     // e.g. you@server:/srv/ticket-worker/data/systems
     'systems_push_base' => env('SYSTEMS_PUSH_BASE'),
 
+    // Own work's screenshots and files, until they go to Jira with its ticket.
+    'work_files_path' => env('WORK_FILES_PATH', storage_path('app/private/work')),
+
     'sync_every_minutes' => (int) env('SYNC_EVERY_MINUTES', 10),
 
     // The ticket chat: questions on a lighter model, quickly; "Dig deeper" uses the model

@@ -44,11 +44,19 @@ class Workspace
         File::deleteDirectory($root.'/casebook');
         File::ensureDirectoryExists($root.'/casebook');
 
-        $jira = $ticket->space->jira();
-        $issue = $jira->issue($ticket->key);
         $skipped = [];
+        // Own work has no Jira issue: what you wrote, and your screenshots and files.
+        if ($ticket->isLocal()) {
+            $issue = $ticket->localIssue();
+            foreach ($ticket->localFiles() as $file) {
+                copy($ticket->filesPath().'/'.$file['name'], $root.'/attachments/'.$file['name']);
+            }
+        } else {
+            $jira = $ticket->space->jira();
+            $issue = $jira->issue($ticket->key);
+        }
 
-        foreach (array_slice($issue['attachments'], 0, self::MAX_ATTACHMENTS) as $file) {
+        foreach ($ticket->isLocal() ? [] : array_slice($issue['attachments'], 0, self::MAX_ATTACHMENTS) as $file) {
             $target = $root.'/attachments/'.self::safeName($file['id'], $file['filename']);
             if (is_file($target)) {
                 continue;
@@ -61,7 +69,9 @@ class Workspace
             $skipped[] = (count($issue['attachments']) - self::MAX_ATTACHMENTS).' more attachments (not downloaded)';
         }
 
-        file_put_contents($root.'/ticket.md', self::ticketDocument($issue, $skipped));
+        file_put_contents($root.'/ticket.md', self::ticketDocument($issue, $skipped)
+            .($ticket->isLocal() ? "\n\nThis is the engineer's own work: no Jira ticket yet. Screenshots and files: "
+                .(implode(', ', array_map(fn ($file) => 'attachments/'.$file['name'], $ticket->localFiles())) ?: 'none')."\n" : ''));
 
         foreach ($this->systems($ticket)->filter->hasCode() as $system) {
             file_put_contents($root.'/systems/'.$system->name.'.history.txt', self::history($system));
@@ -72,7 +82,7 @@ class Workspace
         return $skipped;
     }
 
-    /** The systems this ticket's space names, or every system when it names none. */
+    /** The systems this ticket's space names: none when it names none. */
     public function systems(Ticket $ticket)
     {
         // What the space has ticked, and nothing else: a space without systems has tickets

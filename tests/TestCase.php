@@ -18,6 +18,8 @@ abstract class TestCase extends BaseTestCase
         $this->withoutVite();
 
         // The gate is this machine's choice; a test that wants it says so.
+        // Never the app's own folder: test tickets have the ids real ones have.
+        config(['agent.work_files_path' => sys_get_temp_dir().'/tw-work-files-'.getmypid()]);
         config(['app.password' => null, 'auth.trusted_header' => null, 'auth.sign_in' => true, 'auth.sign_in_as' => null]);
 
         // Nor is this machine's Jira: a test that wants one sets it (AGENTS.md).

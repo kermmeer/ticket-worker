@@ -88,7 +88,7 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
 
         // Gone from the open tickets: say so, and take their status as it is now (resolved,
         // mostly), which the search above no longer brings.
-        $left = $space->tickets()->open()->whereNotIn('jira_id', $seen)->get();
+        $left = $space->tickets()->open()->where('local', false)->whereNotIn('jira_id', $seen)->get();
         $space->tickets()->whereKey($left->modelKeys())->update(['left_at' => $now]);
         foreach ($left->chunk(100) as $chunk) {
             try {

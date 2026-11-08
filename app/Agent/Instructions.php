@@ -291,6 +291,43 @@ class Instructions
         return "Refine ticket {$ticket->key} as a team would before building it: read ticket.md and look at the code it touches, so that where it lands and how big it is are real, not guessed. Take this conversation into account. Keep every part short. End with the JSON.";
     }
 
+    /** Own work's Jira ticket, as the agent drafts it. */
+    public static function ticketDraftSchema(): array
+    {
+        $text = ['type' => 'string'];
+
+        return [
+            'type' => 'object',
+            'required' => ['title', 'type', 'description'],
+            'properties' => [
+                'title' => $text + ['description' => 'The ticket title: what it is about, under 90 characters, as a team member would write it.'],
+                'type' => ['type' => 'string', 'enum' => \App\Http\Controllers\OwnWorkController::TYPES],
+                'description' => $text + ['description' => 'The ticket description in Jira wiki markup (h3. headings, * bullets, {code} blocks). '
+                    .'Sections: the problem or the need; what was done or is to be done; acceptance criteria; technical notes with the branch. '
+                    .'Show each screenshot where it helps, as !name|thumbnail! with its file name exactly. Under 400 words.'],
+            ],
+        ];
+    }
+
+    public static function ticketDraftRequest(Ticket $ticket): string
+    {
+        $files = array_column($ticket->localFiles(), 'name');
+        $shots = $files === [] ? 'There are no screenshots.' : 'Screenshots and files that go with the ticket (they are in attachments/): '.implode(', ', $files).'.';
+        $branches = $ticket->branches()->with('system')->get()->map(fn ($branch) => "{$branch->system?->name}: {$branch->name}, {$branch->commits} commits, +{$branch->added} −{$branch->removed} in {$branch->files} files, from {$branch->base}")->implode('; ') ?: 'none yet';
+
+        return <<<TEXT
+        This is the engineer's own work, started before there was a ticket. Write the Jira ticket for it now,
+        from this conversation, what was built and ticket.md, so the team understands it without having been
+        here. Look at the code changes on the branch where they explain it.
+
+        Work built so far: {$branches}
+        {$shots}
+
+        Write it as the engineer would: plain and short. Not "the agent did", but what the change is.
+        End with the JSON.
+        TEXT;
+    }
+
     /** What a build turn answers with: the commit, and a guide to go with the change. */
     public static function buildSchema(): array
     {

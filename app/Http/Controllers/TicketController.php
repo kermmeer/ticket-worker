@@ -11,6 +11,7 @@ use App\Jobs\QuickScanTicket;
 use App\Jobs\RunAgentTurn;
 use App\Models\AgentSession;
 use App\Models\AgentTurn;
+use App\Models\AuditEvent;
 use App\Models\Ticket;
 use App\Outbox\OutboxClient;
 use App\Settings\SpaceSettings;
@@ -18,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -35,17 +37,21 @@ class TicketController extends Controller
         $jira = $ticket->space->jira();
 
         // Fresh from Jira on every visit and refresh; the cache is for the page's own polling
-        // while an agent works, which asks every few seconds.
-        if (! request()->hasHeader('X-Inertia-Partial-Data')) {
-            Cache::forget("ticket.issue.{$ticket->id}");
-        }
-        try {
-            $issue = Cache::remember("ticket.issue.{$ticket->id}", 60, fn () => $jira->issue($ticket->key));
-            $issueError = null;
-            $ticket->takeLive($issue);
-        } catch (JiraException $e) {
-            $issue = null;
-            $issueError = $e->getMessage();
+        // while an agent works, which asks every few seconds. Own work has no Jira issue yet.
+        $issueError = null;
+        if ($ticket->isLocal()) {
+            $issue = $ticket->localIssue();
+        } else {
+            if (! request()->hasHeader('X-Inertia-Partial-Data')) {
+                Cache::forget("ticket.issue.{$ticket->id}");
+            }
+            try {
+                $issue = Cache::remember("ticket.issue.{$ticket->id}", 60, fn () => $jira->issue($ticket->key));
+                $ticket->takeLive($issue);
+            } catch (JiraException $e) {
+                $issue = null;
+                $issueError = $e->getMessage();
+            }
         }
 
         $session = $ticket->openSession();
@@ -61,7 +67,12 @@ class TicketController extends Controller
                 'assignee' => $ticket->assignee,
                 'assigned_to_me' => Ticket::isMine($ticket->assignee_account_id, $ticket->assignee, auth()->user()),
                 'slas' => $ticket->space->visibleSlas($ticket->slas),
-                'url' => $jira->browseUrl($ticket->key),
+                'url' => $ticket->isLocal() ? null : $jira->browseUrl($ticket->key),
+                // Own work: what you wrote, your files, and the Jira ticket the agent drafted for it.
+                'local' => $ticket->isLocal(),
+                'local_description' => $ticket->local_description,
+                'files' => $ticket->isLocal() ? array_map(fn ($file) => [...$file, 'url' => route('work.file', [$ticket, $file['name']], false)], $ticket->localFiles()) : [],
+                'ticket_draft' => $ticket->isLocal() ? AgentTurn::query()->whereIn('agent_session_id', $ticket->sessions()->select('id'))->whereNotNull('ticket_draft')->latest('id')->first()?->ticket_draft : null,
                 'open_label' => $ticket->space->openLabel(),
                 'space' => ['label' => $ticket->space->label, 'colour' => $ticket->space->colour, 'type' => $ticket->space->type],
                 'quick_scan' => $ticket->quickScanData(),
@@ -93,6 +104,8 @@ class TicketController extends Controller
             // What a patch can be for.
             'systems' => app(Workspace::class)->systems($ticket)->map(fn ($system) => ['id' => $system->id, 'name' => $system->name, 'branch' => $system->branch, 'code' => $system->hasCode()])->values(),
             'outboxReady' => app(OutboxClient::class)->configured(),
+            'jiraWrite' => config('services.jira.write') === 'real',
+            'workTypes' => \App\Http\Controllers\OwnWorkController::TYPES,
             // Your greeting and sign-off: an empty reply box fills with it, the agent's draft goes inside it.
             'replyTemplate' => \App\Models\Setting::replyTemplateFor(auth()->user()?->firstName() ?? $jira->firstName()),
         ]);
@@ -282,6 +295,88 @@ class TicketController extends Controller
         $this->turn($session, 'refine', Instructions::refineRequest($ticket));
 
         return back();
+    }
+
+    /** Own work, ready for Jira: the agent drafts its ticket, title, type and description, screenshots in it. */
+    public function draftTicket(Ticket $ticket): RedirectResponse
+    {
+        abort_unless($ticket->isLocal(), 404);
+        abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
+        if ($ticket->openSession()?->busy()) {
+            return back()->with('error', 'The agent is still working; wait or stop it.');
+        }
+        [$session] = $this->chat($ticket);
+        $this->turn($session, 'ticket', Instructions::ticketDraftRequest($ticket));
+
+        return back();
+    }
+
+    /**
+     * Own work becomes the Jira ticket made for it: its chats, refinements and branches move
+     * onto that ticket, the branches take its key, and the own-work item goes. The ticket is
+     * found by its key, or made first when you ask for that and Jira may be written to.
+     */
+    public function link(Request $request, Ticket $ticket): RedirectResponse
+    {
+        abort_unless($ticket->isLocal(), 404);
+        $data = $request->validate([
+            'key' => ['required_without:create', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z][A-Za-z0-9_]*-\d+$/'],
+            'create' => ['nullable', 'boolean'],
+            'title' => ['required_with:create', 'nullable', 'string', 'max:250'],
+            'type' => ['required_with:create', 'nullable', 'string', 'max:60'],
+            'description' => ['nullable', 'string', 'max:32000'],
+        ], ['key.regex' => 'A Jira key, like DEVBESUP-3300.']);
+        if ($ticket->openSession()?->busy()) {
+            return back()->with('error', 'The agent is still working; wait or stop it.');
+        }
+        $space = $ticket->space;
+        $jira = $space->jira();
+
+        try {
+            if ($data['create'] ?? false) {
+                if (config('services.jira.write') !== 'real') {
+                    return back()->with('error', 'JIRA_WRITE=dummy: nothing was made in Jira. Copy the draft into a new ticket there, and link it by its key.');
+                }
+                $key = $jira->createIssue($space->project_key, $data['type'], $data['title'], (string) ($data['description'] ?? ''));
+                foreach ($ticket->localFiles() as $file) {
+                    $jira->attach($key, $ticket->filesPath().'/'.$file['name']);
+                }
+            } else {
+                $key = strtoupper($data['key']);
+            }
+            $found = $jira->search('key = "'.$key.'"', [...\App\Jira\JiraClient::TICKET_FIELDS], max: 1)['issues'][0] ?? null;
+        } catch (JiraException $e) {
+            return back()->with('error', 'Jira: '.$e->getMessage());
+        }
+        if ($found === null) {
+            return back()->withErrors(['key' => "Jira has no {$key} that this tool can see."]);
+        }
+
+        $real = Ticket::record($space, $found, now());
+        \Illuminate\Support\Facades\DB::transaction(function () use ($ticket, $real) {
+            // A chat cannot follow to the new key's folder: closed, the next one starts from its summary.
+            $ticket->sessions()->where('state', 'open')->update(['state' => 'closed', 'closed_at' => now()]);
+            AgentSession::where('ticket_id', $ticket->id)->update(['ticket_id' => $real->id]);
+            foreach ($ticket->branches()->get() as $branch) {
+                if ($real->branches()->where('system_id', $branch->system_id)->exists()) {
+                    continue; // the real ticket has its own branch there already: this one stays as it is
+                }
+                $branch->update(['ticket_id' => $real->id]);
+                \App\Jobs\RenameBranch::dispatch($branch->fresh(), $real->branchName());
+            }
+        });
+        // The screenshots go along, for the next agent on it.
+        if ($ticket->localFiles() !== []) {
+            File::copyDirectory($ticket->filesPath(), $real->filesPath());
+        }
+        File::deleteDirectory($ticket->filesPath());
+        AuditEvent::record('work.link', $ticket->key, "became {$real->key}".(($data['create'] ?? false) ? ' (made in Jira)' : ''));
+        $ticket->delete();
+
+        return to_route('tickets.show', $real)->with('success', "Linked: this is {$real->key} now, with the work done for it.");
     }
 
     /** The agent drafts a casebook case; you review it in the form before it exists. */

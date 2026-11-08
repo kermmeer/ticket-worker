@@ -7,6 +7,7 @@ import CodeBlock from '../../components/CodeBlock.vue';
 import FoldingSection from '../../components/FoldingSection.vue';
 import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
+import OwnWork from '../../components/OwnWork.vue';
 import QuickScanCard from '../../components/QuickScanCard.vue';
 import Refinement from '../../components/Refinement.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
@@ -33,6 +34,8 @@ const props = defineProps({
     deepModel: { type: String, default: '' },
     freshAfter: { type: Number, default: 30 },
     replyTemplate: { type: String, default: null },
+    jiraWrite: { type: Boolean, default: false },
+    workTypes: { type: Array, default: () => [] },
 });
 
 // "claude-sonnet-5" reads as "Sonnet 5".
@@ -75,6 +78,14 @@ function analyse() {
 }
 
 const chatBox = ref(null);
+const ownWork = ref(null);
+// A screenshot pasted anywhere on own work's page goes to its files.
+onMounted(() => props.ticket.local && window.addEventListener('paste', pasteAnywhere));
+onBeforeUnmount(() => window.removeEventListener('paste', pasteAnywhere));
+function pasteAnywhere(event) {
+    if (event.target?.closest?.('textarea, input')) return;
+    ownWork.value?.onPaste(event);
+}
 const focusChat = () => setTimeout(() => chatBox.value?.focus(), 50);
 
 const busy = computed(() => props.session?.busy ?? false);
@@ -245,7 +256,7 @@ const briefLine = computed(() =>
 
 // The jump bar's parts: only those the page has.
 const jumps = computed(() => [
-    { id: 'scan', label: 'Quick scan' },
+    ...(props.ticket.local ? [{ id: 'own', label: 'Own work' }] : [{ id: 'scan', label: 'Quick scan' }]),
     { id: 'agent', label: 'Chat' },
     ...(proposal.value ? [{ id: 'proposal', label: 'Proposal' }] : []),
     { id: 'reply', label: 'Reply' },
@@ -302,15 +313,15 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
 <template>
     <Head :title="ticket.key" />
 
-    <p class="eyebrow"><Link href="/" class="hover:text-ink">Overview</Link> / {{ ticket.key }}</p>
+    <p class="eyebrow"><Link href="/" class="hover:text-ink">Overview</Link> / {{ ticket.local ? 'Own work' : ticket.key }}</p>
     <div class="mt-3 flex flex-wrap items-center gap-3">
         <TicketKey :value="ticket.key" />
         <StatusLabel :status="ticket.status" :tone="ticket.status_tone" />
         <SpaceLabel :label="ticket.space.label" :colour="ticket.space.colour" class="text-sm text-muted" />
         <span v-if="ticket.priority" class="text-sm text-muted">· {{ ticket.priority }}</span>
         <span class="text-sm text-muted">· {{ ticket.assignee ? `assigned to ${ticket.assignee}` : 'assigned to nobody' }}</span>
-        <button v-if="$page.props.me?.jira_account_id && !ticket.assigned_to_me" type="button" class="text-sm text-muted underline hover:text-ink" @click="post('assign-to-me')">Assign to me</button>
-        <a :href="ticket.url" target="_blank" rel="noopener" class="ml-auto text-sm text-muted hover:text-ink">Open in {{ openLabel }} ↗</a>
+        <button v-if="!ticket.local && $page.props.me?.jira_account_id && !ticket.assigned_to_me" type="button" class="text-sm text-muted underline hover:text-ink" @click="post('assign-to-me')">Assign to me</button>
+        <a v-if="ticket.url" :href="ticket.url" target="_blank" rel="noopener" class="ml-auto text-sm text-muted hover:text-ink">Open in {{ openLabel }} ↗</a>
     </div>
     <h1 class="display mt-3 text-3xl leading-tight sm:text-4xl">{{ ticket.summary }}</h1>
     <p v-if="ticket.slas.length" class="mt-2 flex flex-wrap gap-x-5 text-sm">
@@ -393,8 +404,13 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         <a v-for="part in jumps" :key="part.id" :href="`#${part.id}`" class="shrink-0 rounded-full border border-line px-3 py-1.5 text-sm">{{ part.label }}</a>
     </nav>
 
+    <!-- Own work: what it is, its screenshots, and the Jira ticket it becomes. -->
+    <FoldingSection v-if="ticket.local" id="own" title="Own work" remember="ticket.own" class="mt-8 scroll-mt-28">
+        <OwnWork ref="ownWork" :ticket="ticket" :types="workTypes" :jira-write="jiraWrite" :busy="busy" />
+    </FoldingSection>
+
     <!-- Folded once there is a proposal: the brief above says what matters of it. -->
-    <FoldingSection id="scan" title="Quick scan" remember="ticket.quick-scan-2" :open="!proposal" class="mt-8 scroll-mt-28">
+    <FoldingSection v-if="!ticket.local" id="scan" title="Quick scan" remember="ticket.quick-scan-2" :open="!proposal" class="mt-8 scroll-mt-28">
         <QuickScanCard :ticket-id="ticket.id" :scan="ticket.quick_scan" :agent-ready="agentReady" />
     </FoldingSection>
 

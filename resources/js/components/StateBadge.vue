@@ -17,6 +17,7 @@ const states = {
     hidden: { label: 'Hidden', tone: 'text-muted', shape: 'ring' },
     'dev-in-progress': { label: 'In progress', tone: 'text-working', shape: 'half' },
     'dev-to-do': { label: 'To do', tone: 'text-muted', shape: 'ring' },
+    'own-work': { label: 'Own work', tone: 'text-working', shape: 'dot' },
     closed: { label: 'Closed', tone: 'text-done', shape: 'check' },
 };
 
