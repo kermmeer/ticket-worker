@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Agent\ClaudeRun;
+use App\Agent\Instructions;
 use App\Agent\Workspace;
 use App\Jobs\RunAgentTurn;
 use App\Models\AgentSession;
@@ -64,7 +65,7 @@ class ChatTest extends TestCase
         $this->assertSame(['Resolved', 'done'], [$this->ticket->fresh()->status, $this->ticket->fresh()->status_category]);
     }
 
-    public function test_a_question_starts_a_chat_with_the_ticket_and_the_quick_scan(): void
+    public function test_a_question_starts_a_chat_from_the_ticket_not_from_the_quick_scans_guess(): void
     {
         $this->post("/tickets/{$this->ticket->id}/messages", ['text' => 'Is the data still wrong?', 'language' => 'auto'])->assertSessionHasNoErrors();
 
@@ -72,13 +73,15 @@ class ChatTest extends TestCase
         $this->assertSame('message', $turn->kind);
         $this->assertSame('Is the data still wrong?', $turn->note, 'Your words, for the log.');
         $this->assertStringContainsString('chat about ticket SUP-1', $turn->prompt);
-        $this->assertStringContainsString('A second run adds to the line', $turn->prompt, 'The quick scan goes along.');
+        $this->assertStringNotContainsString('A second run adds to the line', $turn->prompt, 'The quick scan\'s guess is no starting point.');
         $this->assertStringEndsWith('Is the data still wrong?', $turn->prompt);
         Queue::assertPushed(RunAgentTurn::class);
 
         $this->get("/tickets/{$this->ticket->id}")->assertInertia(fn (Assert $page) => $page
             ->where('session.turns.0.prompt', 'Is the data still wrong?')
             ->where('chatModel', 'claude-sonnet-5'));
+
+        $this->assertStringContainsString('When they correct you', Instructions::system(new AgentSession(['reply_language' => 'auto']), []));
     }
 
     public function test_a_question_runs_on_the_chat_model_and_digging_deeper_on_the_full_one(): void

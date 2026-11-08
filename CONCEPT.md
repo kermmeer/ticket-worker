@@ -899,7 +899,16 @@ a branch exists. The SLA order stays for support.
 `SIGN_IN=off` for now). The databases behind the VPN: a tunnel from a machine inside it,
 the way `push-systems.sh` reaches GitLab. Speed: the chat is already on the lighter model.
 
-**Open.**
-- Branch name: the key alone (`DEVBESUP-3211`), or with a prefix (`feature/DEVBESUP-3211`)?
-- Branch from where: the system's tracked branch (`master`), or another per space?
-- Quick scans on development tickets: keep, or only for support?
+**Decided on 8 November 2026.**
+- *Branch names:* `feature/<KEY>` by default, `fix/<KEY>` for the types that count as fixes
+  (Bug by default). Both prefixes and which types are fixes can be set per space (and on
+  Setup for all), and prefixes can be switched off: then the branch is the key alone.
+- *Branch from:* `master`, that is the system's own branch, unless a space sets another;
+  and you can pick another on the ticket before the first build.
+- *Quick scans on development tickets:* a switch per space, off by default.
+- *Code at a glance:* every ticket shows, per repository, the branch, how many commits and
+  how many lines added and removed.
+- *A guide with every build:* a short user guide when the change shows to users, a short
+  technical note when it does not, written by the agent with the build, to copy along.
+- *The database behind the VPN* is boss's production database, the one the read-only data
+  tools (database servers, §11) are for, not the tool's own. Reaching it stays for later.

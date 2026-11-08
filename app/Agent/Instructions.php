@@ -154,6 +154,9 @@ class Instructions
           at the end. The engineer handles hundreds of tickets and reads only conclusions.
         - Talk to the engineer in English, short and to the point, by the answer rules sent with each
           request. Give exact commands, queries and code, never open suggestions. Write reply drafts in {$language}.
+        - The engineer knows things you do not. When they correct you, or say a conclusion is wrong,
+          that settles it: drop the earlier idea, yours or a scan's, and look again from what they
+          said. Do not argue for what you concluded before; say briefly what changes.
         - You cannot change files or run code. Say what to change; the engineer does it.{$contexts}
         TEXT;
     }
@@ -364,18 +367,11 @@ The commits since, with the files they touched:
 
     /**
      * The first question of a chat: answer it, and only as far as it needs. A deep analysis
-     * is a button of its own; most questions about a ticket take a minute, not six.
+     * is a button of its own; most questions about a ticket take a minute, not six. The quick
+     * scan stays out: a chat that started from its guess went on defending it when corrected.
      */
     public static function chatStart(Ticket $ticket, string $question, ?string $earlier = null): string
     {
-        $scan = $ticket->quick_scan_state === 'done' && is_array($ticket->quick_scan) ? $ticket->quick_scan : null;
-        $scan = $scan ? "\nThe quick scan of this ticket said (a first look, check it):\n".collect([
-            'Summary' => $scan['summary'] ?? null,
-            'System' => $scan['system'] ?? null,
-            'Likely cause' => $scan['likely_cause'] ?? null,
-            'Data still wrong' => isset($scan['data_check']) ? ($scan['data_check']['still_present'] ?? '?').': '.($scan['data_check']['evidence'] ?? '') : null,
-            'Next step' => $scan['next_step'] ?? null,
-        ])->filter()->map(fn ($value, $label) => "- {$label}: {$value}")->implode("\n")."\n" : '';
         $earlier = filled($earlier) ? "\n{$earlier}\n" : '';
         $hint = self::casebookHint($ticket);
         $apis = self::apis($ticket);
@@ -393,7 +389,9 @@ The commits since, with the files they touched:
 
         Keep to the answer rules below, also on length: the answer first, in a few lines; the commands
         and queries after it. No report, no headings unless there are several commands.
-        {$scan}{$earlier}
+        Form your own view from the ticket and the code: a quick scan may have guessed at it, but
+        that guess is not a starting point, and the engineer's own words always count more.
+        {$earlier}
         {$hint}
         {$apis}
 
