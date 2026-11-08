@@ -118,7 +118,9 @@ class DbConnection extends Model
     private function connect(): PDO
     {
         $login = $this->login();
+        // Through its server's SSH tunnel, when the server has one.
+        $at = $this->db_server_id && $this->server ? $this->server->endpoint() : ['host' => $login['host'], 'port' => $login['port']];
 
-        return DbServer::open($login['driver'], $login['host'], $login['port'], $this->database, $login['username'], $login['password']);
+        return DbServer::open($login['driver'], $at['host'], $at['port'], $this->database, $login['username'], $login['password']);
     }
 }

@@ -1,0 +1,24 @@
+#!/usr/bin/env php
+<?php
+// Stands in for ssh in tests: opens the -L port as ssh would, writes the jump host's key
+// into the known_hosts file as accept-new does, and stays up. FAKE_SSH_FAIL makes it refuse.
+$args = $argv;
+if ($message = getenv('FAKE_SSH_FAIL')) {
+    fwrite(STDERR, $message."\n");
+    exit(255);
+}
+$forward = $args[array_search('-L', $args, true) + 1];
+[$host, $port] = explode(':', $forward);
+foreach ($args as $i => $arg) {
+    if (str_starts_with($arg, 'UserKnownHostsFile=')) {
+        $file = substr($arg, strlen('UserKnownHostsFile='));
+        if (trim((string) @file_get_contents($file)) === '') {
+            file_put_contents($file, "jump.example ssh-ed25519 AAAAFAKEHOSTKEY\n");
+        }
+    }
+}
+file_put_contents(getenv('FAKE_SSH_ARGS') ?: '/dev/null', json_encode($args));
+$server = stream_socket_server("tcp://{$host}:{$port}");
+while ($client = @stream_socket_accept($server, 30)) {
+    fclose($client);
+}

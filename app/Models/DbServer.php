@@ -12,13 +12,29 @@ use PDO;
  */
 class DbServer extends Model
 {
-    protected $fillable = ['name', 'driver', 'host', 'port', 'username', 'password', 'notes'];
+    protected $fillable = ['name', 'driver', 'host', 'port', 'username', 'password', 'notes', 'ssh_host', 'ssh_port', 'ssh_user'];
 
-    protected $hidden = ['password'];
+    protected $hidden = ['password', 'ssh_key'];
 
     protected function casts(): array
     {
-        return ['password' => 'encrypted', 'port' => 'integer'];
+        return ['password' => 'encrypted', 'port' => 'integer', 'ssh_key' => 'encrypted', 'ssh_port' => 'integer'];
+    }
+
+    /** Reached through a jump host over SSH, rather than directly. */
+    public function tunnelled(): bool
+    {
+        return filled($this->ssh_host) && filled($this->ssh_user);
+    }
+
+    /**
+     * Where to connect: the server itself, or the local end of its SSH tunnel.
+     *
+     * @return array{host: string, port: ?int}
+     */
+    public function endpoint(): array
+    {
+        return $this->tunnelled() ? \App\Support\SshTunnel::to($this) : ['host' => (string) $this->host, 'port' => $this->port];
     }
 
     public function databases(): HasMany
@@ -48,7 +64,8 @@ class DbServer extends Model
      */
     public function listDatabases(): array
     {
-        $pdo = self::open($this->driver, $this->host, $this->port, null, $this->username, $this->password);
+        $at = $this->endpoint();
+        $pdo = self::open($this->driver, $at['host'], $at['port'], null, $this->username, $this->password);
         $names = $this->driver === 'pgsql'
             ? $pdo->query('SELECT datname FROM pg_database WHERE NOT datistemplate ORDER BY datname')->fetchAll(PDO::FETCH_COLUMN)
             : $pdo->query('SHOW DATABASES')->fetchAll(PDO::FETCH_COLUMN);

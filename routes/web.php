@@ -137,6 +137,8 @@ Route::middleware('role:editor')->group(function () {
         Route::put('/db-servers/{server}', 'updateServer')->name('db-servers.update');
         Route::delete('/db-servers/{server}', 'destroyServer')->name('db-servers.destroy');
         Route::post('/db-servers/{server}/try', 'tryServer')->name('db-servers.try');
+        Route::post('/db-servers/{server}/ssh-key', 'serverKey')->name('db-servers.ssh-key');
+        Route::post('/db-servers/{server}/ssh-forget', 'forgetServerHostKey')->name('db-servers.ssh-forget');
         Route::get('/db-servers/{server}/databases', 'serverDatabases')->name('db-servers.databases');
         Route::post('/{system}/databases', 'storeDb')->name('databases.store');
         Route::put('/{system}/databases/{db}', 'updateDb')->name('databases.update');

@@ -13,6 +13,7 @@ use App\Models\DbServer;
 use App\Models\System;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -78,6 +79,9 @@ class SystemController extends Controller
                 'id' => $server->id, 'name' => $server->name, 'driver' => $server->driver, 'host' => $server->host, 'port' => $server->port,
                 'username' => $server->username, 'has_password' => filled($server->password), 'notes' => $server->notes,
                 'used' => $server->databases_count,
+                // Its SSH tunnel: the jump host, the public half of its key, whether the jump host's key is pinned.
+                'ssh_host' => $server->ssh_host, 'ssh_port' => $server->ssh_port, 'ssh_user' => $server->ssh_user,
+                'ssh_public_key' => $server->ssh_public_key, 'ssh_pinned' => filled($server->ssh_known_hosts),
             ]),
             'sshAvailable' => PullSystem::sshAvailable(),
             'agentReady' => Instructions::credentials() !== [],
@@ -327,7 +331,13 @@ class SystemController extends Controller
                 unset($data['password']);
             }
         }
+        // Another jump host is another host key: the pinned one goes.
+        if (($data['ssh_host'] ?? null) !== $server->ssh_host || (int) ($data['ssh_port'] ?? 0) !== (int) $server->ssh_port) {
+            $data['ssh_known_hosts'] = null;
+        }
         $before = $server->getAttributes();
+        $server->forceFill(array_key_exists('ssh_known_hosts', $data) ? ['ssh_known_hosts' => $data['ssh_known_hosts']] : []);
+        unset($data['ssh_known_hosts']);
         $server->update($data);
         $server->databases()->update(['driver' => $server->driver]);
         AuditEvent::record('db-server.update', $server->name, 'changed '.AuditEvent::changes($before, $server->getAttributes(), ['password']));
@@ -356,6 +366,34 @@ class SystemController extends Controller
         return back()->with('success', "{$server->name}: it lets you in and sees {$count} database".($count === 1 ? '' : 's').'.');
     }
 
+    /** A key pair for its SSH tunnel: the private half stays here, encrypted; the public half goes on the jump host. */
+    public function serverKey(DbServer $server): RedirectResponse
+    {
+        $dir = sys_get_temp_dir().'/tw-key-'.uniqid();
+        mkdir($dir, 0700);
+        $process = new \Symfony\Component\Process\Process(['ssh-keygen', '-t', 'ed25519', '-N', '', '-C', "ticket-worker {$server->name}", '-f', $dir.'/key', '-q']);
+        $process->run();
+        if (! $process->isSuccessful()) {
+            File::deleteDirectory($dir);
+
+            return back()->with('error', 'ssh-keygen failed: '.($process->getErrorOutput() ?: 'is openssh-client in the image?'));
+        }
+        $server->forceFill(['ssh_key' => file_get_contents($dir.'/key'), 'ssh_public_key' => trim(file_get_contents($dir.'/key.pub'))])->save();
+        File::deleteDirectory($dir);
+        AuditEvent::record('db-server.ssh-key', $server->name, 'new key pair for its SSH tunnel');
+
+        return back()->with('success', "A new key for {$server->name}: put its public half in ~/.ssh/authorized_keys of {$server->ssh_user} on the jump host, then Try.");
+    }
+
+    /** The jump host was rebuilt and has a new key of its own: forget the pinned one, meet it again. */
+    public function forgetServerHostKey(DbServer $server): RedirectResponse
+    {
+        $server->forceFill(['ssh_known_hosts' => null])->save();
+        AuditEvent::record('db-server.ssh-host-key', $server->name, 'forgot the jump host\'s key');
+
+        return back()->with('success', 'Forgotten. The next connection takes the jump host\'s key as it is then.');
+    }
+
     /** Its databases, for picking one in a project's form. */
     public function serverDatabases(DbServer $server): \Illuminate\Http\JsonResponse
     {
@@ -376,7 +414,10 @@ class SystemController extends Controller
             'username' => ['required', 'string', 'max:128'],
             'password' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:4000'],
-        ], ['name.regex' => 'Lower-case letters, digits and dashes, like main-mysql.']);
+            'ssh_host' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9.\-:\[\]]+$/'],
+            'ssh_port' => ['nullable', 'integer', 'between:1,65535'],
+            'ssh_user' => ['required_with:ssh_host', 'nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
+        ], ['name.regex' => 'Lower-case letters, digits and dashes, like main-mysql.', 'ssh_user.required_with' => 'Which user on the jump host?']);
     }
 
     public function storeDb(Request $request, System $system): RedirectResponse
