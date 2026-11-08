@@ -100,6 +100,29 @@ const states = {
     failed: { label: 'Failed', tone: 'text-signal' },
 };
 
+// Every system folded on arrival: opened to look at or change, so nothing is changed by a stray click.
+const opened = ref(new Set());
+const isOpen = (system) => opened.value.has(system.id);
+function toggle(system) {
+    const next = new Set(opened.value);
+    next.has(system.id) ? next.delete(system.id) : next.add(system.id);
+    opened.value = next;
+}
+// Folded, in one line: the last push, whether it has a context, its checks and connections.
+function summary(system) {
+    if (system.state !== 'ready') return system.state === 'failed' ? system.error : 'Being prepared…';
+    const parts = [];
+    if (system.kind !== 'api') {
+        parts.push(system.head ? `last push ${system.head.hash} · ${when(system.head.committed_at)}` : system.branches_here?.length ? `nothing on ${system.branch}; ${system.branches_here.join(', ')} arrived` : 'nothing pushed yet');
+        parts.push(system.context ? (system.commits_behind ? `context ${system.commits_behind} commits behind` : 'context up to date') : 'no context yet');
+        const on = (system.checks?.list ?? []).filter((check) => check.enabled).length;
+        if (on) parts.push(`${on} ${on === 1 ? 'check' : 'checks'}${system.checks.state && system.checks.state !== 'ready' ? ` (${system.checks.state})` : ''}`);
+    }
+    if (system.apis.length) parts.push(`${system.apis.length} ${system.apis.length === 1 ? 'API' : 'APIs'}`);
+    if (system.databases.length) parts.push(`${system.databases.length} ${system.databases.length === 1 ? 'database' : 'databases'}`);
+    return parts.join(' · ');
+}
+
 // Renaming, or following another branch.
 const editing = ref(null);
 const edit = useForm({ name: '', branch: '' });
@@ -210,15 +233,24 @@ function follow(system, branch) {
 
     <ul class="mt-10 space-y-4">
         <li v-for="system in systems" :key="system.id" class="card p-5">
-            <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <!-- Folded until opened: what it is and how it stands, in one line; everything to change, inside. -->
+            <button type="button" class="flex w-full flex-wrap items-baseline gap-x-4 gap-y-1 text-left" :aria-expanded="isOpen(system)" @click="toggle(system)">
+                <svg aria-hidden="true" viewBox="0 0 12 12" class="size-3 shrink-0 self-center text-muted transition-transform" :class="{ '-rotate-90': !isOpen(system) }" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 4.5 6 7.5l3-3" />
+                </svg>
                 <h2 class="font-mono text-lg">{{ system.name }}</h2>
                 <span v-if="system.kind === 'api'" class="rounded-[3px] border border-line px-1.5 font-mono text-[0.66rem] leading-5 tracking-wide text-muted uppercase">API only</span>
                 <span v-else class="font-mono text-xs text-muted">branch {{ system.branch }}</span>
                 <span class="ml-auto font-mono text-xs font-medium tracking-wide uppercase" :class="states[system.state]?.tone">
                     {{ states[system.state]?.label ?? system.state }}
                 </span>
-                <button type="button" class="text-xs text-muted underline hover:text-ink" :aria-expanded="editing === system.id" @click="startEdit(system)">Edit</button>
-            </div>
+            </button>
+            <p v-if="!isOpen(system)" class="mt-1.5 pl-5 text-sm text-muted">{{ summary(system) }}</p>
+
+            <template v-if="isOpen(system)">
+            <p class="mt-2 flex justify-end">
+                <button type="button" class="text-xs text-muted underline hover:text-ink" :aria-expanded="editing === system.id" @click="startEdit(system)">Rename or change its branch</button>
+            </p>
             <form v-if="editing === system.id" class="mt-3 flex flex-wrap items-end gap-3 rounded-md border border-line p-3" @submit.prevent="saveEdit(system)">
                 <label class="text-sm">Name
                     <input v-model="edit.name" class="mt-1 block w-48 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm" />
@@ -347,6 +379,7 @@ function follow(system, branch) {
                 <SystemChecks :system="system" />
                 <ApiConnections :system="system" :auth-kinds="authKinds" />
                 <DbConnections :system="system" :drivers="dbDrivers" :servers="dbServers" />
+            </template>
             </template>
         </li>
     </ul>
