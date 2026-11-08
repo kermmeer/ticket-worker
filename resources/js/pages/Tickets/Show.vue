@@ -251,7 +251,27 @@ const jumps = computed(() => [
     { id: 'ticket', label: 'Ticket' },
 ]);
 
-const turnLabels = { analysis: 'Deep analysis', message: 'Answer', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
+const turnLabels = { build: 'Build', analysis: 'Deep analysis', message: 'Answer', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
+
+// Development work: built on the ticket's own branch rather than patched.
+const isDev = computed(() => props.ticket.kind === 'development');
+const codeSystems = computed(() => props.systems.filter((system) => system.code));
+const buildSystem = ref(null);
+const buildBase = ref('');
+const buildDefaultBase = computed(() => props.ticket.base_branch || codeSystems.value.find((system) => system.id === buildSystem.value)?.branch || codeSystems.value[0]?.branch || 'master');
+function build() {
+    router.post(`/tickets/${props.ticket.id}/build`, { system: buildSystem.value, base: buildBase.value.trim() || null, text: message.text }, {
+        preserveScroll: true,
+        onStart: () => (actionError.value = null),
+        onSuccess: () => (actionError.value = pageProps.props.flash?.error ?? null) || (message.text = ''),
+    });
+}
+const copiedFetch = ref(null);
+async function copyFetch(branch) {
+    await copyText(branch.fetch);
+    copiedFetch.value = branch.id;
+    setTimeout(() => (copiedFetch.value = null), 2000);
+}
 
 // A patch is for one system: the proposal's, unless you pick another.
 const patchSystem = ref(null);
@@ -325,7 +345,21 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             <dt class="text-muted">Likely</dt><dd class="line-clamp-3">{{ scanResult.likely_cause }}</dd>
             <dt class="text-muted">Next</dt><dd class="line-clamp-3">{{ scanResult.next_step }}</dd>
         </dl>
-        <p v-if="scanResult?.data_check" class="mt-2 text-sm">
+        <!-- The code built for it, per repository: at a glance, with the command to fetch it. -->
+        <div v-if="ticket.branches.length" class="mt-3 space-y-1.5 text-sm">
+            <p v-for="branch in ticket.branches" :key="branch.id" class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span class="text-muted">Code</span>
+                <span class="font-mono">{{ branch.system }} · {{ branch.name }}</span>
+                <span class="text-muted">{{ branch.commits }} {{ branch.commits === 1 ? 'commit' : 'commits' }} · {{ branch.files }} {{ branch.files === 1 ? 'file' : 'files' }}</span>
+                <span class="font-mono text-xs"><span class="text-done">+{{ branch.added }}</span> <span class="text-signal">−{{ branch.removed }}</span></span>
+                <span class="text-xs text-muted">from {{ branch.base }}</span>
+                <button type="button" class="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-ink" :title="branch.fetch" @click="copyFetch(branch)">
+                    {{ copiedFetch === branch.id ? 'Copied' : 'Copy the fetch command' }}
+                </button>
+            </p>
+        </div>
+        <p v-else-if="isDev" class="mt-3 text-sm text-muted">No code yet: Build writes it on <code class="font-mono">{{ ticket.branch_name }}</code>.</p>
+        <p v-if="scanResult?.data_check && !isDev" class="mt-2 text-sm">
             <span class="text-muted">The data now: </span>
             <span class="font-medium" :class="{ yes: 'text-signal', no: 'text-done', unknown: 'text-muted' }[scanResult.data_check.still_present]">
                 {{ { yes: 'still wrong', no: 'already right', unknown: 'not checked' }[scanResult.data_check.still_present] }}
@@ -482,10 +516,23 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             <p class="font-mono text-xs text-muted">
                                 <template v-for="(file, index) in turn.patch.meta.files" :key="file.path">{{ index ? ' · ' : '' }}{{ file.path.split('/').pop() }} <span class="text-done">+{{ file.added }}</span> <span class="text-signal">−{{ file.removed }}</span></template>
                             </p>
+                            <div v-if="turn.kind === 'build'" class="space-y-2">
+                                <p class="text-xs">
+                                    <span class="font-mono">{{ turn.patch.meta.system }} · {{ turn.patch.meta.branch }}</span>
+                                    <span v-if="turn.patch.meta.published" class="text-done"> · on the server</span>
+                                    <span v-else class="text-working"> · putting it on the server…</span>
+                                    <span class="text-waiting"> · untested: the agent cannot run code</span>
+                                </p>
+                                <code class="block font-mono text-xs break-all text-muted">git fetch ticket-worker {{ turn.patch.meta.branch }} &amp;&amp; git checkout {{ turn.patch.meta.branch }}</code>
+                                <details v-if="turn.patch.meta.guide" class="rounded-md border border-line">
+                                    <summary class="cursor-pointer px-3 py-2 text-muted hover:text-ink">{{ turn.patch.meta.guide_kind === 'user' ? 'User guide' : 'Technical note' }}</summary>
+                                    <div class="border-t border-line p-3"><AgentText :text="turn.patch.meta.guide" /></div>
+                                </details>
+                            </div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <a :href="`/tickets/${ticket.id}/turns/${turn.id}/patch`" class="btn btn-signal">Download the patch</a>
+                                <a :href="`/tickets/${ticket.id}/turns/${turn.id}/patch`" class="btn" :class="{ 'btn-signal': turn.kind !== 'build' }">{{ turn.kind === 'build' ? 'This commit as a patch' : 'Download the patch' }}</a>
                                 <code class="font-mono text-xs text-muted">{{ amCommand(turn.patch.text) }}</code>
-                                <span class="text-xs text-waiting">untested: the agent cannot run code</span>
+                                <span v-if="turn.kind !== 'build'" class="text-xs text-waiting">untested: the agent cannot run code</span>
                             </div>
                             <details class="rounded-md border border-line">
                                 <summary class="cursor-pointer px-3 py-2 text-muted hover:text-ink">How to test it, the risks, and the diff</summary>
@@ -536,7 +583,16 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             <select v-model="language" class="rounded-md border border-line bg-page px-2 py-1.5 text-sm" aria-label="Reply language">
                                 <option v-for="choice in languages" :key="choice" :value="choice">{{ choice === 'auto' ? "replies in the ticket's language" : `replies in ${choice}` }}</option>
                             </select>
-                            <template v-if="session">
+                            <!-- Development: build it on the ticket's branch. The system and base only before the first build. -->
+                            <span v-if="isDev && codeSystems.length" class="flex flex-wrap gap-1">
+                                <select v-if="codeSystems.length > 1 && !ticket.branches.length" v-model="buildSystem" class="min-w-0 rounded-md border border-line bg-page px-1.5 text-sm" aria-label="System to build in">
+                                    <option :value="null">the right system</option>
+                                    <option v-for="system in codeSystems" :key="system.id" :value="system.id">{{ system.name }}</option>
+                                </select>
+                                <input v-if="!ticket.branches.length" v-model="buildBase" :placeholder="`from ${buildDefaultBase}`" aria-label="Branch to build from" class="w-36 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm placeholder:font-sans placeholder:text-muted" />
+                                <button type="button" class="btn btn-signal" :disabled="message.processing" @click="build">{{ ticket.branches.length ? 'Build on' : 'Build' }}</button>
+                            </span>
+                            <template v-if="session && !isDev">
                                 <button type="button" class="btn" @click="post('restate')">Update proposal</button>
                                 <button type="button" class="btn" @click="post('case')">Draft a case</button>
                                 <span class="flex gap-1">
@@ -549,6 +605,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             </template>
                         </div>
                         <p class="text-xs text-muted">
+                            <template v-if="isDev"><strong class="font-medium">Build</strong>: {{ modelName(deepModel) }} writes the change on <code class="font-mono">{{ ticket.branches[0]?.name ?? ticket.branch_name }}</code>, with what you typed and the chat so far; a next build adds commits to it.</template>
                             <strong class="font-medium">Ask</strong>: a quick answer from {{ modelName(chatModel) }}, usually within a minute.
                             <strong class="font-medium">Dig deeper</strong>: the full analysis with a proposal and a reply draft, by {{ modelName(deepModel) }}, a few minutes; what you typed goes along.
                             A chat quiet for {{ freshAfter }} minutes starts afresh on the next question, with a summary of this one.
@@ -653,7 +710,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                 </div>
             </FoldingSection>
             <!-- The reply: the agent's draft when there is one, else yours, in your own frame. -->
-            <FoldingSection id="reply" title="Reply" remember="ticket.reply" class="scroll-mt-28">
+            <FoldingSection id="reply" title="Reply" :remember="`ticket.reply.${ticket.kind}`" :open="!isDev" class="scroll-mt-28">
                 <form id="reply-form" class="text-sm" @submit.prevent="toOutbox(false)">
                     <label for="reply-text" class="font-medium">{{ proposal?.reply_draft ? "The agent's reply draft" : "Your reply" }}<span v-if="proposal?.reply_language" class="font-normal text-muted"> · {{ proposal.reply_language }}</span></label>
                     <textarea id="reply-text" ref="replyBox" v-model="draft.body" rows="8" :placeholder="replyTemplate ? 'Click to start from your template' : ''" class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted" @focus="startReply"></textarea>
