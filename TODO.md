@@ -210,4 +210,4 @@ to it, including work you finish.
 - [x] The worker was down for 42 hours (2026-11-11 03:54 to 11-12 21:55): a full disk stopped
       its hourly restart, and 3,527 health checks and syncs piled up. The overview now warns when
       a space is three sync intervals late (half an hour at least). (2026-11-12)
-- [ ] Find what filled the disk on minas on 2026-11-11 around 03:54
+- [x] What filled the disk on 2026-11-11: a one-off by hand, nothing in the tool (2026-11-12)
