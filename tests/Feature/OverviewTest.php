@@ -52,4 +52,13 @@ class OverviewTest extends TestCase
     {
         $this->get('/')->assertInertia(fn (Assert $page) => $page->where('hasSpaces', false)->has('tickets', 0));
     }
+
+    public function test_the_page_knows_how_often_a_sync_is_due_so_it_can_say_when_one_is_late(): void
+    {
+        config(['agent.sync_every_minutes' => 10]);
+        $this->get('/')->assertInertia(fn (Assert $page) => $page->where('syncEvery', 10));
+
+        \App\Models\Setting::put(\App\Models\Setting::HYPER, '1');
+        $this->get('/')->assertInertia(fn (Assert $page) => $page->where('syncEvery', 1));
+    }
 }

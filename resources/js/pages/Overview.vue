@@ -11,6 +11,7 @@ import { ago, short } from '../time.js';
 import { byDueNext, dueAt, phrase, shortName, tone, urgency } from '../sla.js';
 
 const props = defineProps({
+    syncEvery: { type: Number, default: 10 },
     hasSpaces: { type: Boolean, required: true },
     spaces: { type: Array, required: true },
     tickets: { type: Array, required: true },
@@ -174,6 +175,12 @@ const perSpace = computed(() => {
     return counts;
 });
 
+// A space that has not synced for three intervals (half an hour at least): its tickets are
+// as they were then, and the worker that syncs is probably down. Said plainly, not in grey.
+const lateMs = computed(() => Math.max(30, 3 * props.syncEvery) * 60000);
+const isLate = (space) => !space.sync_error && space.synced_at && Date.now() - new Date(space.synced_at).getTime() > lateMs.value;
+const late = computed(() => props.spaces.filter(isLate));
+
 // Each pill's open tickets, counted as the headline counts them (not sleeping, not hidden)
 // and for the person chosen, so the spaces add up to "All spaces".
 const openPerSpace = computed(() => {
@@ -334,6 +341,10 @@ onBeforeUnmount(() => {
             {{ awakeCount }} open {{ awakeCount === 1 ? 'ticket' : 'tickets' }}
         </h1>
 
+        <p v-if="late.length" role="alert" class="mt-4 rounded-md border border-signal/40 px-4 py-2.5 text-sm text-signal">
+            No sync from Jira since {{ ago(late.map((space) => space.synced_at).sort()[0]) }}{{ late.length < spaces.length ? ` for ${late.map((space) => space.label).join(', ')}` : '' }}:
+            what you see is how Jira was then. The worker that syncs is probably down; the Agents page and the server's logs say more.
+        </p>
         <ul class="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
             <li v-if="sleepingCount">and {{ sleepingCount }} sleeping, waiting on the requester</li>
             <li v-if="hiddenCount">{{ hiddenCount }} hidden by you</li>
@@ -342,7 +353,7 @@ onBeforeUnmount(() => {
                 <SpaceLabel :label="space.label" :colour="space.colour" class="text-ink" />
                 <span v-if="space.sync_error" class="text-signal"> · sync failed: {{ space.sync_error }}</span>
                 <template v-else-if="space.synced_at">
-                    <span> · synced {{ ago(space.synced_at) }}</span>
+                    <span :class="{ 'text-signal': isLate(space) }"> · synced {{ ago(space.synced_at) }}</span>
                     <!-- A rules mistake empties a space at the next sync; say so where it shows. -->
                     <Link v-if="!perSpace[space.id]" :href="`/spaces/${space.id}/edit`" class="text-signal underline"> · its rules match no tickets</Link>
                 </template>

@@ -46,6 +46,8 @@ class OverviewController extends Controller
 
         return Inertia::render('Overview', [
             'hasSpaces' => Space::query()->exists(),
+            // How often a sync is due: a space far past it has a worker down somewhere.
+            'syncEvery' => \App\Models\Setting::hyper() ? 1 : (int) config('agent.sync_every_minutes'),
             'spaces' => $spaces->map(fn (Space $space) => [
                 'id' => $space->id,
                 'label' => $space->label,
