@@ -180,3 +180,34 @@ to it, including work you finish.
       which looked like a stuck page; an expired page reloads itself
 - [x] A case lists every ticket tied to it (strong / good / weak); "Not related" unties it for
       good, remembered through every rematch; "Link again" undoes it (2026-10-13)
+- [x] An answer handed in just before the turn budget ran out was thrown away; kept now (2026-10-13)
+- [x] Messages and notes take a pasted query result (100,000 characters), and a refused text says so
+- [x] "Make a patch" in a message makes the patch file; the proposal's system found in "boss (billing)"
+- [x] Costs per turn, not the conversation's running total ($11 showed as $57); corrected back
+- [x] The ticket page is a chat: Ask on the lighter model, Dig deeper on the full one, a fresh chat
+      after 30 quiet minutes with a summary of the last one; refused clicks show as a toast
+- [x] Your own greeting and sign-off around every reply (Setup); the reply has its own section
+- [x] The ticket page takes Jira's status on every visit; the sync looks up tickets that left
+- [x] A space without systems gets none, not all; space pills count their open tickets; new rules
+      sync at once; sections fold again while a status or search is picked
+- [x] Chats look the data up first and find API endpoints in the code; a patch cut off by its
+      budget keeps what it changed; tickets tied to a case by hand (2026-10-22)
+- [x] Patches: `git am -3`, and `--keep-cr` for files with Windows line endings
+- [x] `SIGN_IN=off` for an instance behind a gate of its own; a trusted header finds your account
+      by username or email (2026-10-26)
+- [x] Development work (2026-11-08): support or development by issue type; the chat starts from
+      the ticket, not the scan's guess, and a correction settles it; Build on `feature/KEY` or
+      `fix/KEY` into the system's repository here, with a user guide or technical note; Refine;
+      the code at a glance per ticket and in the overview; development groups and a Kind filter
+- [x] Agents at once, set on Setup: one agent container runs a pool (`agent:pool`)
+- [x] Checks per system (lint, a type check, tests), each on or off; Node and Python downloaded
+      by version; private npm packages and git repositories from copies pushed here
+- [x] Systems can be renamed or follow another branch; a card says what arrived when nothing did;
+      folded until opened; `push-systems.sh` finds nested clones and names what it pushed
+- [x] Own work: started here, drafted into a Jira ticket by the agent with your screenshots, and
+      moved onto that ticket when it is linked or made
+- [x] Database servers through an SSH tunnel; openssh-client in the images on minas
+- [x] The worker was down for 42 hours (2026-11-11 03:54 to 11-12 21:55): a full disk stopped
+      its hourly restart, and 3,527 health checks and syncs piled up. The overview now warns when
+      a space is three sync intervals late (half an hour at least). (2026-11-12)
+- [ ] Find what filled the disk on minas on 2026-11-11 around 03:54
