@@ -128,4 +128,23 @@ class ChatTest extends TestCase
         $this->assertSame($session->id, $this->ticket->openSession()->id);
         $this->assertSame('And now?', AgentTurn::query()->latest('id')->value('prompt'), 'A follow-up is only your words: the chat has the rest.');
     }
+
+    public function test_a_fresh_chat_gets_the_earlier_query_itself_and_is_told_to_check_its_columns(): void
+    {
+        $old = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-0000000000c9', 'model' => 'claude-opus-5']);
+        AgentTurn::create(['agent_session_id' => $old->id, 'kind' => 'analysis', 'prompt' => 'x', 'state' => AgentTurn::DONE, 'finished_at' => now()->subMonth(),
+            'proposal' => ['headline' => 'A reporting request', 'cause' => 'No report exists', 'fix' => 'Run the query', 'commands' => [
+                ['purpose' => 'Data volume per number per country', 'where' => 'boss, billing MySQL', 'kind' => 'read', 'command' => 'SELECT br.reference, SUM(u.units) FROM billing_reference br JOIN usage_rated ur ON ur.billing_reference_id = br.id'],
+            ]]]);
+        // Still open, quiet for a month: the next question closes it and starts afresh, as on DEVBESUP-3151.
+
+        $this->post("/tickets/{$this->ticket->id}/messages", ['text' => 'Can you make the query group per month as well?']);
+
+        $prompt = AgentTurn::query()->latest('id')->value('prompt');
+        $this->assertStringContainsString('SELECT br.reference, SUM(u.units) FROM billing_reference br', $prompt, 'The query itself, not only the conclusion.');
+        $this->assertStringContainsString('check those against the code', $prompt);
+
+        // And every turn, also in a chat that is already going, is told to name only what it has seen.
+        $this->assertStringContainsString('Never guess a name', \App\Agent\Instructions::answerRules($this->ticket->space));
+    }
 }

@@ -263,8 +263,12 @@ A chat is short-lived on purpose. Each turn of a resumed conversation re-reads a
 the prompt cache that makes that cheap is gone after a few quiet minutes, so a question an
 hour later paid for the whole history again ($2 for a one-line answer, on the ticket that
 prompted this). A chat quiet for `AGENT_CHAT_FRESH_AFTER_MINUTES` (30) therefore starts
-afresh on the next question, carrying a summary instead: the last conclusion, the last few
-exchanges, a patch made, a note left. The earlier chat stays readable, folded, above it.
+afresh on the next question, carrying a summary instead: the last conclusion with its queries
+and commands in full, the last few exchanges (the very last one whole), a patch made, a note
+left. *Changed 2026-11-13:* the summary carried only the conclusion, so a month later "make
+the query group per month" reached a chat that had never seen the query, and it wrote a new
+one from guessed columns. Every turn is now also told to name only tables, columns and code
+it has seen in the conversation, and to read a table's definition before writing a query on it. The earlier chat stays readable, folded, above it.
 
 Claude Code reports a resumed conversation's cost as its running total; each turn keeps
 the difference from the turn before (`claude_total_usd` holds the total).

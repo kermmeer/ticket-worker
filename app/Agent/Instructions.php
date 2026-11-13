@@ -536,10 +536,18 @@ The commits since, with the files they touched:
                 isset($proposal['cause']) ? 'Cause: '.$proposal['cause'] : null,
                 isset($proposal['fix']) ? 'Fix: '.$proposal['fix'] : null,
             ])->filter()->map(fn ($line) => \Illuminate\Support\Str::limit($line, 700))->implode("\n");
+            // The queries and commands themselves: "make the query group per month" a month later
+            // refers to them, and a chat without them wrote a new one from guessed columns.
+            foreach (array_slice($proposal['commands'] ?? [], 0, 4) as $command) {
+                $parts[] = 'Its command'.(isset($command['purpose']) ? " ({$command['purpose']}" : ' (').(isset($command['where']) ? ", on {$command['where']})" : ')').":\n"
+                    .\Illuminate\Support\Str::limit((string) ($command['command'] ?? ''), 3000);
+            }
         }
-        foreach ($turns->where('kind', 'message')->take(-3) as $turn) {
+        // The last exchanges; the very last one whole, since that is where the latest query or code is.
+        $messages = $turns->where('kind', 'message')->take(-3)->values();
+        foreach ($messages as $i => $turn) {
             $parts[] = 'The engineer: '.\Illuminate\Support\Str::limit((string) ($turn->note ?? $turn->prompt), 500)
-                ."\nYou: ".\Illuminate\Support\Str::limit((string) $turn->answer, 1200);
+                ."\nYou: ".\Illuminate\Support\Str::limit((string) $turn->answer, $i === $messages->count() - 1 ? 5000 : 1200);
         }
         if ($patch = $turns->whereNotNull('patch')->last()) {
             $parts[] = 'A patch was made: '.($patch->patch_meta['subject'] ?? 'see the earlier chat').'.';
@@ -548,7 +556,8 @@ The commits since, with the files they touched:
             $parts[] = 'Note left at the end: '.$session->handover_note;
         }
 
-        return "An earlier chat on this ticket (the engineer's and yours) came to this. Build on it; check what you rely on:\n\n".implode("\n\n", $parts);
+        return "An earlier chat on this ticket (the engineer's and yours) came to this. Build on it, but a query or code in it is only as good as"
+            ." the columns and names it uses: check those against the code before you change or reuse it.\n\n".implode("\n\n", $parts);
     }
 
     public static function analysis(Ticket $ticket, ?string $note = null, ?string $earlier = null): string
@@ -617,8 +626,16 @@ The commits since, with the files they touched:
      */
     public static function answerRules(?Space $space = null): string
     {
-        return "\n\nHow to answer me:\n".SpaceSettings::for($space)->get('answer_rules');
+        return "\n\nHow to answer me:\n".SpaceSettings::for($space)->get('answer_rules')."\n".self::GROUNDED;
     }
+
+    /**
+     * Not a matter of taste, so not among the answer rules you can edit: a chat once wrote a
+     * query in five seconds from columns it never looked up (usage.started_at, usage_rated.amount).
+     */
+    public const GROUNDED = '- Every table, column, class, method and endpoint you name must be one you have seen in this conversation: in the code, '
+        .'the data or the ticket. Not seen yet: read it first (the model, the migration, the controller). Before you write or change a query, read '
+        .'the definition of every table in it, and its indexes when the table is large. Never guess a name, and never write "or whichever ... used".';
 
     /** Sent with every turn that writes a reply draft, so a change applies at once. */
     public static function replyRules(?Space $space = null): string

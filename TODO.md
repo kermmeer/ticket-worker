@@ -211,3 +211,7 @@ to it, including work you finish.
       its hourly restart, and 3,527 health checks and syncs piled up. The overview now warns when
       a space is three sync intervals late (half an hour at least). (2026-11-12)
 - [x] What filled the disk on 2026-11-11: a one-off by hand, nothing in the tool (2026-11-12)
+- [x] DEVBESUP-3151 went wrong from the start (2026-11-12): a fresh chat got the conclusion but not
+      the query, and wrote a new one from guessed columns in five seconds without reading the code.
+      The summary now carries the queries and commands; every turn must name only what it has seen,
+      and read a table's definition before querying it. (2026-11-13)
