@@ -80,6 +80,9 @@ class TicketController extends Controller
                 'branch_name' => $ticket->branchName(),
                 // The code built for it, per repository: branch, commits, lines.
                 'branches' => $ticket->branches()->with('system:id,name')->get()->map->summary()->values(),
+                // Branches named after it already in its systems, built here or not: Build continues those.
+                'repo_branches' => app(Workspace::class)->systems($ticket->load('space'))->filter->hasCode()
+                    ->flatMap(fn ($system) => array_map(fn ($name) => ['system' => $system->name, 'name' => $name], Workspace::ticketBranches($system, $ticket->key)))->values(),
                 'base_branch' => SpaceSettings::for($ticket->space)->get('base_branch'),
                 // The latest refinement, from whichever chat made it.
                 'refinement' => AgentTurn::query()->whereIn('agent_session_id', $ticket->sessions()->select('id'))->whereNotNull('refinement')->latest('id')->first()?->refinement,

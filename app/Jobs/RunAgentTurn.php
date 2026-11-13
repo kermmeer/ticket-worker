@@ -313,15 +313,18 @@ class RunAgentTurn implements ShouldQueue
     {
         $ticket = $session->ticket;
         $existing = \App\Models\TicketBranch::query()->where(['ticket_id' => $ticket->id, 'system_id' => $system->id])->first();
+        // The branch built on before; else one named after the ticket already in the system
+        // (yours, ODOSSER-898); else a new one.
+        $branch = $existing?->name ?? (\App\Agent\Workspace::ticketBranches($system, $ticket->key)[0] ?? $ticket->branchName());
+        $base = $existing?->base ?? (filled($base) ? $base : (SpaceSettings::for($ticket->space)->get('base_branch') ?: $system->branch));
+        // A branch is never its own base: counted against itself it has "0 commits", which on
+        // ODOSSER-898 looked like nothing had been built.
+        if ($base === $branch) {
+            $base = SpaceSettings::for($ticket->space)->get('base_branch') ?: $system->branch;
+        }
         $turn = AgentTurn::create([
             'agent_session_id' => $session->id, 'kind' => 'build', 'prompt' => '', 'note' => $request, 'user_id' => $user?->id ?? auth()->id(),
-            'patch_meta' => [
-                'system_id' => $system->id, 'system' => $system->name,
-                // The branch built on before; else one named after the ticket already in the
-                // system (yours, ODOSSER-898); else a new one.
-                'branch' => $existing?->name ?? (\App\Agent\Workspace::ticketBranches($system, $ticket->key)[0] ?? $ticket->branchName()),
-                'base' => $existing?->base ?? (filled($base) ? $base : (SpaceSettings::for($ticket->space)->get('base_branch') ?: $system->branch)),
-            ],
+            'patch_meta' => ['system_id' => $system->id, 'system' => $system->name, 'branch' => $branch, 'base' => $base],
         ]);
         self::dispatch($turn);
 

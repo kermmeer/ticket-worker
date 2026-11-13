@@ -375,6 +375,9 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                 </button>
             </p>
         </div>
+        <p v-else-if="isDev && ticket.repo_branches.length" class="mt-3 text-sm text-muted">
+            Already on a branch of its own: <code class="font-mono">{{ ticket.repo_branches.map((b) => `${b.system} · ${b.name}`).join(', ') }}</code>. Build continues it.
+        </p>
         <p v-else-if="isDev" class="mt-3 text-sm text-muted">No code yet: Build writes it on <code class="font-mono">{{ ticket.branch_name }}</code>.</p>
         <p v-if="scanResult?.data_check && !isDev" class="mt-2 text-sm">
             <span class="text-muted">The data now: </span>
@@ -618,12 +621,12 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                             </select>
                             <!-- Development: build it on the ticket's branch. The system and base only before the first build. -->
                             <span v-if="isDev && codeSystems.length" class="flex flex-wrap gap-1">
-                                <select v-if="codeSystems.length > 1 && !ticket.branches.length" v-model="buildSystem" class="min-w-0 rounded-md border border-line bg-page px-1.5 text-sm" aria-label="System to build in">
+                                <select v-if="codeSystems.length > 1 && !ticket.branches.length && !ticket.repo_branches.length" v-model="buildSystem" class="min-w-0 rounded-md border border-line bg-page px-1.5 text-sm" aria-label="System to build in">
                                     <option :value="null">the right system</option>
                                     <option v-for="system in codeSystems" :key="system.id" :value="system.id">{{ system.name }}</option>
                                 </select>
-                                <input v-if="!ticket.branches.length" v-model="buildBase" :placeholder="`from ${buildDefaultBase}`" aria-label="Branch to build from" class="w-36 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm placeholder:font-sans placeholder:text-muted" />
-                                <button type="button" class="btn btn-signal" :disabled="message.processing" @click="build">{{ ticket.branches.length ? 'Build on' : 'Build' }}</button>
+                                <input v-if="!ticket.branches.length && !ticket.repo_branches.length" v-model="buildBase" :placeholder="`from ${buildDefaultBase}`" aria-label="Branch to build from" class="w-36 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm placeholder:font-sans placeholder:text-muted" />
+                                <button type="button" class="btn btn-signal" :disabled="message.processing" @click="build">{{ ticket.branches.length || ticket.repo_branches.length ? `Build on ${(ticket.branches[0] ?? ticket.repo_branches[0]).name}` : 'Build' }}</button>
                             </span>
                             <button v-if="isDev" type="button" class="btn" @click="post('refine')">{{ ticket.refinement ? 'Refine again' : 'Refine' }}</button>
                             <template v-if="session && !isDev">

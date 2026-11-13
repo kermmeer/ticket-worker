@@ -193,4 +193,18 @@ class BuildTest extends TestCase
 
         $this->assertFileExists(\App\Agent\Workspace::path($this->ticket).'/systems/billing.branch-sup-1.diff.txt');
     }
+
+    public function test_a_branch_is_never_its_own_base(): void
+    {
+        $this->yourBranch();
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-0000000000bb', 'model' => 'claude-opus-5']);
+        $this->agentWrites("<?php\n\nreturn ['pdf', 'csv'];\n");
+
+        // As on ODOSSER-898: the branch typed into "from …".
+        $turn = RunAgentTurn::queueBuild($session, $this->system, 'SUP-1');
+
+        $this->assertSame(['SUP-1', 'master'], [$turn->fresh()->patch_meta['branch'], $turn->fresh()->patch_meta['base']]);
+        $this->assertSame([2, 'master'], [TicketBranch::sole()->commits, TicketBranch::sole()->base]);
+        $this->get("/tickets/{$this->ticket->id}")->assertInertia(fn (Assert $page) => $page->where('ticket.repo_branches.0.name', 'SUP-1'));
+    }
 }
