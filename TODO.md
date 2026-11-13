@@ -215,3 +215,8 @@ to it, including work you finish.
       the query, and wrote a new one from guessed columns in five seconds without reading the code.
       The summary now carries the queries and commands; every turn must name only what it has seen,
       and read a table's definition before querying it. (2026-11-13)
+- [x] ODOSSER-898 (2026-11-13): the ticket's own branch was on the server but out of the agent's
+      sight (it reads the checked-out branch and runs no git). Branches named after the ticket now
+      go into its workspace as commits and diff; Build continues on such a branch; "let's get it
+      fixed now" is a build; the workspace is refreshed every turn, a failed refresh on a
+      follow-up only noted.

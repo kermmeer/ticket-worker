@@ -53,12 +53,20 @@ class RunAgentTurn implements ShouldQueue
 
         try {
             $first = $session->turns()->where('id', '<', $turn->id)->doesntExist();
-            if ($turn->kind === 'analysis' || $first) {
-                $this->event($turn, 'tool', 'gathering the ticket, its attachments and the casebook');
+            // Fresh every turn: a comment added in Jira, or a branch pushed for the ticket since
+            // the chat began, is there for the next question (attachments already here stay).
+            $this->event($turn, 'tool', 'gathering the ticket, its attachments and the casebook');
+            try {
                 $skipped = $workspace->prepare($ticket);
-                foreach ($skipped as $note) {
-                    $this->event($turn, 'text', "Skipped: {$note}");
+            } catch (Throwable $e) {
+                // A follow-up has the workspace of the turn before: a Jira hiccup is no reason to fail it.
+                if ($first) {
+                    throw $e;
                 }
+                $skipped = ['the ticket could not be refreshed ('.Str::limit($e->getMessage(), 200).'); the workspace is as it was'];
+            }
+            foreach ($skipped as $note) {
+                $this->event($turn, 'text', "Skipped: {$note}");
             }
 
             $systems = $workspace->systems($ticket);
@@ -309,7 +317,9 @@ class RunAgentTurn implements ShouldQueue
             'agent_session_id' => $session->id, 'kind' => 'build', 'prompt' => '', 'note' => $request, 'user_id' => $user?->id ?? auth()->id(),
             'patch_meta' => [
                 'system_id' => $system->id, 'system' => $system->name,
-                'branch' => $existing?->name ?? $ticket->branchName(),
+                // The branch built on before; else one named after the ticket already in the
+                // system (yours, ODOSSER-898); else a new one.
+                'branch' => $existing?->name ?? (\App\Agent\Workspace::ticketBranches($system, $ticket->key)[0] ?? $ticket->branchName()),
                 'base' => $existing?->base ?? (filled($base) ? $base : (SpaceSettings::for($ticket->space)->get('base_branch') ?: $system->branch)),
             ],
         ]);

@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
  *   attachments/              its files; the agent reads images and PDFs itself
  *   casebook/                 INDEX.md and one file per approved case
  *   systems/<name>.history.txt  each system's recent commits and the files they touched
+ *   systems/<name>.branch-*.diff.txt  work already on a branch named after the ticket
  *
  * The systems' code stays where it is, mounted read-only, and is passed with --add-dir.
  */
@@ -24,6 +25,9 @@ class Workspace
 {
     /** Attachments bigger than this are listed but not downloaded. */
     public const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+
+    /** A branch's diff for the agent, at most: a whole feature fits, a rewrite does not. */
+    public const MAX_BRANCH_DIFF = 300 * 1024;
 
     public const MAX_ATTACHMENTS = 25;
 
@@ -73,8 +77,22 @@ class Workspace
             .($ticket->isLocal() ? "\n\nThis is the engineer's own work: no Jira ticket yet. Screenshots and files: "
                 .(implode(', ', array_map(fn ($file) => 'attachments/'.$file['name'], $ticket->localFiles())) ?: 'none')."\n" : ''));
 
+        $branchFiles = [];
         foreach ($this->systems($ticket)->filter->hasCode() as $system) {
             file_put_contents($root.'/systems/'.$system->name.'.history.txt', self::history($system));
+            // Work already done for this ticket on a branch of its own (yours, or a build's):
+            // the agent reads only the checked-out branch and cannot run git, so it gets the diff.
+            foreach (self::ticketBranches($system, $ticket->key) as $branch) {
+                $file = $system->name.'.branch-'.Str::slug($branch).'.diff.txt';
+                file_put_contents($root.'/systems/'.$file, self::branchWork($system, $branch));
+                $branchFiles[] = "systems/{$file} ({$system->name}, branch {$branch})";
+            }
+        }
+
+        if ($branchFiles !== []) {
+            file_put_contents($root.'/ticket.md', "\n\n## Work already done for this ticket, on branches\n\n"
+                ."The systems' folders show their main branch, not this work. Read these first: what is already changed, in which commits.\n\n"
+                .implode("\n", array_map(fn ($line) => "- {$line}", $branchFiles))."\n", FILE_APPEND);
         }
 
         $this->writeCasebook($root.'/casebook', $ticket->space_id);
@@ -130,6 +148,50 @@ class Workspace
     }
 
     /** The last 150 commits with the files each touched: where regressions show first. */
+    /**
+     * The branches in a system named after the ticket: ODOSSER-898, fix/ODOSSER-898,
+     * feature/odosser-898-something. Ticket keys are unique, so a match is that ticket's work.
+     *
+     * @return list<string>
+     */
+    public static function ticketBranches(System $system, string $key): array
+    {
+        if (! is_dir($system->path().'/.git')) {
+            return [];
+        }
+        // Plumbing: a plain process, the same in a test as anywhere (the Process facade is Claude's, faked there).
+        $refs = new \Symfony\Component\Process\Process(['git', '-c', 'safe.directory=*', 'for-each-ref', '--format=%(refname:short)', 'refs/heads'], $system->path());
+        $refs->run();
+        $pattern = '/(^|\/)'.preg_quote($key, '/').'($|[^0-9])/i';
+
+        return collect(preg_split('/\R/', trim($refs->getOutput())))
+            ->filter(fn ($branch) => $branch !== '' && $branch !== $system->branch && preg_match($pattern, $branch))
+            // The exact key first, then prefixed ones.
+            ->sortBy(fn ($branch) => strcasecmp($branch, $key) === 0 ? 0 : 1)->values()->all();
+    }
+
+    /** A branch's commits and its whole change against the system's branch. */
+    public static function branchWork(System $system, string $branch): string
+    {
+        $git = function (array $args) use ($system) {
+            $process = new \Symfony\Component\Process\Process(['git', '-c', 'safe.directory=*', ...$args], $system->path());
+            $process->setTimeout(120)->run();
+
+            return $process->getOutput();
+        };
+        $base = $system->branch;
+        $log = $git(['log', '--date=iso', '--format=%h %ad %an%n    %s', "{$base}..{$branch}"]);
+        $stat = $git(['diff', '--stat', "{$base}...{$branch}"]);
+        $diff = $git(['diff', "{$base}...{$branch}"]);
+        if (strlen($diff) > self::MAX_BRANCH_DIFF) {
+            $diff = substr($diff, 0, self::MAX_BRANCH_DIFF)."\n[cut off: the diff goes on; read the files on the branch's commits above]";
+        }
+
+        return "Branch {$branch} of {$system->name}: work already done for this ticket, against {$base}.\n"
+            ."This is not what the system's folder shows: that folder is {$base}.\n\n"
+            ."Commits on it, newest first:\n".($log ?: "(none beyond {$base})\n")."\nFiles changed:\n{$stat}\nThe change:\n{$diff}";
+    }
+
     public static function history(System $system): string
     {
         $result = Process::path($system->path())->run([

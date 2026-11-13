@@ -131,4 +131,66 @@ class BuildTest extends TestCase
 
         $this->assertFalse(\App\Http\Controllers\TicketController::asksForBuild('How would you build it?'));
     }
+
+    /** Your own branch for the ticket, pushed here: ODOSSER-898 style, the key alone. */
+    private function yourBranch(): string
+    {
+        $this->git(['checkout', '--quiet', '-b', 'SUP-1']);
+        File::put($this->system->path().'/Export.php', "<?php\n\nreturn ['pdf', 'csv-started'];\n");
+        $this->git(['-c', 'user.name=you', '-c', 'user.email=you@example.com', 'commit', '--quiet', '-am', 'SUP-1: start the CSV export']);
+        $hash = trim($this->git(['rev-parse', '--short', 'HEAD']));
+        $this->git(['checkout', '--quiet', 'master']);
+
+        return $hash;
+    }
+
+    public function test_the_agent_gets_the_work_already_on_the_tickets_own_branch(): void
+    {
+        $hash = $this->yourBranch();
+
+        app(\App\Agent\Workspace::class)->prepare($this->ticket);
+
+        $root = \App\Agent\Workspace::path($this->ticket);
+        $diff = file_get_contents($root.'/systems/billing.branch-sup-1.diff.txt');
+        $this->assertStringContainsString($hash, $diff, 'The commit, so "what is in commit …" can be answered.');
+        $this->assertStringContainsString("+return ['pdf', 'csv-started'];", $diff);
+        $this->assertStringContainsString('systems/billing.branch-sup-1.diff.txt (billing, branch SUP-1)', file_get_contents($root.'/ticket.md'));
+    }
+
+    public function test_a_build_goes_on_the_branch_already_named_after_the_ticket(): void
+    {
+        $this->yourBranch();
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-0000000000b9', 'model' => 'claude-opus-5']);
+        $this->agentWrites("<?php\n\nreturn ['pdf', 'csv'];\n");
+
+        $turn = RunAgentTurn::queueBuild($session, $this->system);
+
+        $this->assertSame('SUP-1', $turn->fresh()->patch_meta['branch'], 'Yours, not a new fix/ or feature/ beside it.');
+        $this->assertStringContainsString('build on it, do not start over', $turn->fresh()->prompt);
+        $this->assertSame(2, TicketBranch::sole()->commits, 'Your commit and the build\'s.');
+    }
+
+    public function test_a_go_ahead_to_fix_it_is_a_build_and_talk_about_a_fix_is_not(): void
+    {
+        $asks = fn (string $text) => \App\Http\Controllers\TicketController::asksForBuild($text);
+        $this->assertTrue($asks("ok let's get it fixed now in the code of that branch ODOSSER-898"));
+        $this->assertTrue($asks('please apply that change'));
+        $this->assertTrue($asks('build it'));
+        $this->assertFalse($asks('The fix is in commit 1f04597'));
+        $this->assertFalse($asks('First what is in the fix? Especially commit 1f04597'));
+        $this->assertFalse($asks('How would you fix it'));
+    }
+
+    public function test_a_branch_pushed_while_the_chat_goes_on_reaches_the_next_question(): void
+    {
+        $session = AgentSession::create(['ticket_id' => $this->ticket->id, 'claude_session_id' => '6f1c7e2a-0000-4000-8000-0000000000ba', 'model' => 'claude-opus-5']);
+        AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'message', 'prompt' => 'Hi', 'state' => AgentTurn::DONE]);
+        $this->yourBranch();
+        Process::fake(['*claude*' => Process::result(json_encode(['type' => 'result', 'result' => 'Seen.'])."\n"), '*' => Process::result('')]);
+
+        $turn = AgentTurn::create(['agent_session_id' => $session->id, 'kind' => 'message', 'prompt' => 'What is in the fix?']);
+        (new RunAgentTurn($turn))->handle(app(\App\Agent\Workspace::class), app(\App\Agent\ClaudeRun::class));
+
+        $this->assertFileExists(\App\Agent\Workspace::path($this->ticket).'/systems/billing.branch-sup-1.diff.txt');
+    }
 }

@@ -884,6 +884,10 @@ overview follow the kind.
   clones already know as `ticket-worker`. You take it from there:
   `git fetch ticket-worker DEVBESUP-3211`, check it out, push it to whichever origin.
 - Follow-ups go onto the same branch as new commits ("also cover the CSV export").
+- A branch named after the ticket that is already in the system (yours, `ODOSSER-898`,
+  pushed with the system) is built on, not passed by. Its commits and diff are in the
+  agent's workspace on every turn, since the agent sees only the checked-out branch
+  (*added 2026-11-13*).
 - `push-systems.sh` only updates each system's own branch, so ticket branches survive it.
 - One branch per system the change touches.
 - The page shows the branch, its commits, the diff and the fetch command; the patch file

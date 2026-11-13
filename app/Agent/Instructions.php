@@ -157,7 +157,10 @@ class Instructions
         - The engineer knows things you do not. When they correct you, or say a conclusion is wrong,
           that settles it: drop the earlier idea, yours or a scan's, and look again from what they
           said. Do not argue for what you concluded before; say briefly what changes.
-        - You cannot change files or run code. Say what to change; the engineer does it.{$contexts}
+        - You cannot change files or run code here. When the engineer wants the change made, tell them to press
+          Build (or say "build it"): that writes it on the ticket's branch. Until then, say exactly what to change.
+        - Work already done for the ticket on a branch is in systems/*.branch-*.diff.txt, listed in ticket.md:
+          the systems' folders show their main branch, not that work.{$contexts}
         TEXT;
     }
 

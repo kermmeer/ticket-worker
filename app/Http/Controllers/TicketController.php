@@ -224,8 +224,14 @@ class TicketController extends Controller
     /** "Build it", "implement this", "go ahead and code it", "bouw het": not "how would you build it?". */
     public static function asksForBuild(string $text): bool
     {
-        return (bool) preg_match('/\b(build|implement|code|bouw|implementeer)\b/i', $text)
-            && ! preg_match('/^\s*(why|what|how|which|should|would|could|waarom|wat|hoe|welke)\b/i', $text)
+        // "Build it", "implement this"; or "fix", "change", "apply" when it is meant as a go-ahead:
+        // "let's get it fixed now", "please apply that", not "the fix is in commit 1f04597".
+        $asks = preg_match('/\b(build|implement|code it|bouw|implementeer)\b/i', $text)
+            || (preg_match('/\b(fix|fixed|change|apply|make the change|maak|pas aan)\b/i', $text)
+                && preg_match("/\\b(let'?s|lets|please|go ahead|now|do it|can you|could you|graag|nu)\\b/i", $text));
+
+        return (bool) $asks
+            && ! preg_match('/^\s*(why|what|how|which|should|would|waarom|wat|hoe|welke)\b/i', $text)
             && ! str_contains($text, '?');
     }
 
