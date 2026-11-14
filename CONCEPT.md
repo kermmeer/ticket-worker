@@ -1041,11 +1041,14 @@ action does the whole step, and its defaults keep you from mistakes. Taken over 
 database: once the GlobalProtect proxy works (a machine inside the VPN with SSH can serve as
 the jump host of a database server's tunnel). API docs: written per API, ordering from its spec.
 
-**Open.**
-- Reply, status and assignee in one go: the outbox takes the reply only, status and assignee
-  are set by hand there. Either the outbox learns to take them in a draft (a change in the
-  outbox, not here: its README already expects it, "Ticket Worker may ask for them later"),
-  or Ticket Worker changes status and assignee in Jira itself (`JIRA_WRITE=real`) and the
-  reply still goes through the outbox. The first keeps one place that writes to Jira.
-- 12 replaces the groups of A on the overview with badges: A's meaning stays (seen, new
-  activity, needs you), its place changes.
+**Decided on 14 November 2026.**
+- *Reply, status and assignee in one go, from Ticket Worker itself.* The outbox was meant to
+  keep Jira apart from ticket handling; now the step belongs in one place. Ticket Worker posts
+  the reply (public or internal, your template, files) and changes status and assignee in
+  Jira directly (`JIRA_WRITE=real`), offering only the transitions Jira allows from the
+  current status, plus the fields a transition asks for. Scheduling for later stays with the
+  outbox (*Draft and open in the outbox*), which keeps working as now.
+- *The overview starts from your tickets* (12), on trial: *Mine* and *All* side by side, *All*
+  being today's overview unchanged, so nothing is lost if *Mine* does not convince.
+- *Two columns* for the ticket page on a wide screen; one, with jumps, on a phone (13).
+- *Idle chats close after 14 days*; new activity and needs you mean "since your last look" (A).
