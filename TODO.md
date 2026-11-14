@@ -226,3 +226,7 @@ to it, including work you finish.
 - [x] One API sign-in per system, shared by APIs set to "as the system"; per API read, read and
       query, or changes after approval: the agent proposes, an editor runs or refuses on the
       ticket, and the agent hears the outcome (2026-11-14)
+- [x] Hyper mode on a schedule (workdays 08:00-17:00 by default when on): switches at the start
+      and end only, a switch by hand holds; every open window follows it (2026-11-14)
+- [x] Rescan by itself after a push, per system: ten minutes after the last push, at most once
+      an hour (2026-11-14)

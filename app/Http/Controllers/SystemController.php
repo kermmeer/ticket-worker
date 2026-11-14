@@ -39,6 +39,7 @@ class SystemController extends Controller
                 'context_written_at' => $system->context_written_at?->toIso8601String(),
                 'commits_behind' => $system->commitsBehind(),
                 'scan_state' => $system->scan_state,
+                'auto_scan' => (bool) $system->auto_scan,
                 'scan_log' => $system->scan_log,
                 'scan_error' => $system->scan_error,
                 'scan_cost_usd' => $system->scan_cost_usd,
@@ -181,6 +182,18 @@ class SystemController extends Controller
         ScanSystem::dispatch($system);
 
         return back();
+    }
+
+    /** Rescan by itself after a push that changes the code, or only when asked. */
+    public function autoScan(Request $request, System $system): RedirectResponse
+    {
+        $on = $request->validate(['on' => ['required', 'boolean']])['on'];
+        $system->update(['auto_scan' => $on]);
+        AuditEvent::record('system.auto-scan', $system->name, $on ? 'rescans by itself after a push' : 'rescans only when asked');
+
+        return back()->with('success', $on
+            ? (Instructions::instanceCredentials() === [] ? 'On, but it needs the shared Claude sign-in on Setup to scan by itself.' : 'On: a push that changes the code updates its context within about fifteen minutes.')
+            : 'Off: it rescans when you press Rescan.');
     }
 
     public function stopScan(System $system): RedirectResponse

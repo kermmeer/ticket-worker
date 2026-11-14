@@ -29,6 +29,7 @@ class System extends Model
     protected $hidden = ['api_secret', 'pull_secret'];
 
     protected $fillable = [
+        'auto_scan',
         'api_auth', 'api_username', 'api_field', 'api_secret',
         'checks_node', 'checks_python', 'checks_setup', 'checks_redirects', 'checks_state', 'checks_log', 'checks_prepared_at',
         'name', 'kind', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
@@ -40,6 +41,7 @@ class System extends Model
     protected function casts(): array
     {
         return [
+            'auto_scan' => 'boolean',
             'api_secret' => 'encrypted',
             'checks_prepared_at' => 'datetime',
             'pull_secret' => 'encrypted',

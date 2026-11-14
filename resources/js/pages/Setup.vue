@@ -13,6 +13,7 @@ const props = defineProps({
     answerRules: { type: String, required: true },
     replyTemplate: { type: String, default: '' },
     agents: { type: Number, default: 2 },
+    hyperSchedule: { type: Object, default: () => ({ on: false, days: [1, 2, 3, 4, 5], from: '08:00', to: '17:00', timezone: 'Europe/Brussels' }) },
     maxAgents: { type: Number, default: 16 },
     defaultAnswerRules: { type: String, required: true },
     sharedClaude: { type: String, default: null },
@@ -47,6 +48,12 @@ function saveShared() {
 const rules = useForm({ rules: props.replyRules });
 
 const answers = useForm({ rules: props.answerRules });
+
+const schedule = useForm({ ...props.hyperSchedule, days: [...props.hyperSchedule.days] });
+const weekdays = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' };
+function saveSchedule() {
+    schedule.put('/setup/hyper-schedule', { preserveScroll: true });
+}
 
 const agentCount = useForm({ agents: props.agents });
 function saveAgents() {
@@ -227,6 +234,33 @@ const marks = {
 
     <section class="mt-10">
         <h2 class="eyebrow">Replies</h2>
+        <form class="card mt-3 p-5" @submit.prevent="saveSchedule">
+            <p class="font-medium">Hyper mode on a schedule</p>
+            <p class="mt-1 max-w-3xl text-sm text-muted">
+                Syncing every minute during working hours, at the usual pace outside them. It switches at the start and the end only:
+                a switch by hand in between holds until the next one.
+            </p>
+            <label class="mt-3 flex items-center gap-2 text-sm"><input v-model="schedule.on" type="checkbox" /> On a schedule</label>
+            <div v-if="schedule.on" class="mt-3 flex flex-wrap items-end gap-4 text-sm">
+                <fieldset>
+                    <legend class="text-muted">Days</legend>
+                    <div class="mt-1 flex gap-1">
+                        <label v-for="(label, day) in weekdays" :key="day" class="cursor-pointer rounded-md border px-2 py-1" :class="schedule.days.includes(Number(day)) ? 'border-ink' : 'border-line text-muted'">
+                            <input v-model="schedule.days" type="checkbox" :value="Number(day)" class="sr-only" />{{ label }}
+                        </label>
+                    </div>
+                </fieldset>
+                <label>From <input v-model="schedule.from" type="time" class="mt-1 block rounded-md border border-line bg-page px-2 py-1.5" /></label>
+                <label>To <input v-model="schedule.to" type="time" class="mt-1 block rounded-md border border-line bg-page px-2 py-1.5" /></label>
+                <label>Time zone
+                    <input v-model="schedule.timezone" list="timezones" class="mt-1 block w-48 rounded-md border border-line bg-page px-2 py-1.5" />
+                    <datalist id="timezones"><option value="Europe/Brussels" /><option value="Europe/Amsterdam" /><option value="Europe/London" /><option value="UTC" /></datalist>
+                </label>
+            </div>
+            <p v-if="Object.keys(schedule.errors).length" class="mt-2 text-sm text-signal">{{ Object.values(schedule.errors)[0] }}</p>
+            <div class="mt-3"><button type="submit" class="btn btn-signal" :disabled="schedule.processing || !schedule.isDirty">Save</button></div>
+        </form>
+
         <form class="card mt-3 p-5" @submit.prevent="saveAgents">
             <label for="agents" class="font-medium">Agents at once</label>
             <p class="mt-1 max-w-3xl text-sm text-muted">

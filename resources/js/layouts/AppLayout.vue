@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import ThemeSwitch from '../components/ThemeSwitch.vue';
-import { connection, signInAgain } from '../connection.js';
+import { connection, reachable, signInAgain } from '../connection.js';
 
 const page = usePage();
 
@@ -57,6 +57,7 @@ const more = [
 const url = computed(() => page.url.split(/[?#]/)[0]);
 const env = computed(() => page.props.app?.env);
 const hyper = computed(() => page.props.hyper);
+const hyperNext = computed(() => page.props.hyperNext);
 const flash = computed(() => page.props.flash ?? {});
 const gate = computed(() => page.props.app?.gate);
 const me = computed(() => page.props.me);
@@ -83,8 +84,26 @@ onBeforeUnmount(() => {
 });
 
 function toggleHyper() {
-    router.post('/hyper', {}, { preserveScroll: true, preserveState: true });
+    router.post('/hyper', {}, { preserveScroll: true, preserveState: true, onSuccess: () => hyperChannel?.postMessage('changed') });
 }
+
+// Hyper mode is one switch for everyone: every open window follows it. A switch in this
+// browser reaches its other windows at once; the schedule's, or another person's, within a minute.
+const refreshHyper = () => reachable() && router.reload({ only: ['hyper', 'hyperNext'], async: true, preserveScroll: true, preserveState: true, showProgress: false });
+let hyperChannel = null;
+let hyperTimer = null;
+const onVisible = () => document.visibilityState === 'visible' && refreshHyper();
+onMounted(() => {
+    hyperChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ticket-worker-hyper') : null;
+    if (hyperChannel) hyperChannel.onmessage = refreshHyper;
+    hyperTimer = setInterval(() => document.visibilityState === 'visible' && refreshHyper(), 60000);
+    document.addEventListener('visibilitychange', onVisible);
+});
+onBeforeUnmount(() => {
+    hyperChannel?.close();
+    clearInterval(hyperTimer);
+    document.removeEventListener('visibilitychange', onVisible);
+});
 </script>
 
 <template>
@@ -117,9 +136,9 @@ function toggleHyper() {
                         :aria-pressed="hyper"
                         @click="toggleHyper"
                     >
-                        {{ hyper ? 'Hyper: every minute' : 'Hyper off' }}
+                        {{ hyper ? 'Hyper: every minute' : 'Hyper off' }}<span v-if="hyperNext" class="font-normal opacity-75"> · {{ hyperNext }}</span>
                     </button>
-                    <span v-else-if="hyper" class="rounded-md border border-signal px-2 py-1 text-xs font-medium text-signal">Hyper: every minute</span>
+                    <span v-else-if="hyper" class="rounded-md border border-signal px-2 py-1 text-xs font-medium text-signal">Hyper: every minute<span v-if="hyperNext" class="font-normal opacity-75"> · {{ hyperNext }}</span></span>
                     <span class="hidden sm:block"><ThemeSwitch /></span>
                     <Link v-if="me" href="/account" class="rounded-md px-2 py-1 text-xs hover:text-ink max-sm:hidden" :class="url.startsWith('/account') ? 'text-ink' : 'text-muted'">
                         {{ me.name }}<span v-if="!me.can_run_agents" class="text-signal"> · no Claude sign-in</span>
@@ -226,6 +245,7 @@ function toggleHyper() {
                         @click="toggleHyper"
                     >
                         {{ hyper ? 'Hyper: syncing every minute (tap to stop)' : 'Hyper off: syncing at the usual pace' }}
+                        <span v-if="hyperNext" class="block text-xs font-normal opacity-75">Its schedule: {{ hyperNext }}</span>
                     </button>
                     <div class="flex items-center justify-between gap-3"><span class="text-muted">Day or night</span><ThemeSwitch /></div>
                     <button v-if="gate" type="button" class="text-muted underline" @click="router.post('/logout')">Sign out</button>

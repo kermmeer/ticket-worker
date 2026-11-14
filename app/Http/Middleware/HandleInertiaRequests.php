@@ -36,6 +36,8 @@ class HandleInertiaRequests extends Middleware
                 'gate' => RequirePassword::enabled(),
             ],
             'hyper' => fn () => Setting::hyper(),
+            // When the schedule switches it next, for the header: "until 17:00", "on Mon 08:00".
+            'hyperNext' => fn () => \App\Sync\HyperSchedule::next(),
             // Who you are; what of it the pages need, never a secret.
             'me' => fn () => ($user = $request->user()) ? [
                 'id' => $user->id, 'name' => $user->name, 'first_name' => $user->firstName(), 'role' => $user->role, 'is_admin' => $user->is_admin, 'is_editor' => $user->atLeast('editor'),

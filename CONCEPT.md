@@ -203,7 +203,11 @@ up by itself when its status changes in Jira.
 Sync runs every 10 minutes, and each space has a *Sync now* button. **Hyper mode**, a switch
 in the header, makes it every minute, for when you are watching the queue closely. It stays on
 until you switch it off, and the header shows it in the signal colour while it is on, so it is
-never on by accident. Tickets that no longer match the rules (solved, moved, relabelled) leave the overview.
+never on by accident. *Since 2026-11-14* it can also follow a schedule (Setup: days, from,
+to, a time zone, Brussels by default): on at the start of the working day, off at its end,
+and only then, so a switch by hand in between holds until the next start or end. The header
+says what comes next ("until 17:00"), and every open window follows the switch: at once in
+the same browser, within a minute elsewhere. Tickets that no longer match the rules (solved, moved, relabelled) leave the overview.
 If one still has an open session, the tool suggests closing it.
 
 ---
@@ -931,6 +935,9 @@ the way `push-systems.sh` reaches GitLab. Speed: the chat is already on the ligh
   how many lines added and removed.
 - *A guide with every build:* a short user guide when the change shows to users, a short
   technical note when it does not, written by the agent with the build, to copy along.
+- *Rescan by itself* (2026-11-14): a system can update its context after a push that moves
+  the code past it, ten minutes after the last push and at most once an hour, on the shared
+  Claude sign-in. Off unless switched on per system; a rescan reads only what changed.
 - *Checks* (built 8 November 2026). Your GitLab CI runs on every push and stays the full
   test; what saves time is catching lint and type errors before you push. Each system has
   checks, each a command that passes or fails and each switched on or off (one that needs

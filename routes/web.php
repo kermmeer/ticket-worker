@@ -128,6 +128,7 @@ Route::middleware('role:editor')->group(function () {
         Route::post('/', 'store')->name('store');
         Route::post('/{system}/scan', 'scan')->name('scan');
         Route::post('/{system}/scan/stop', 'stopScan')->name('scan.stop');
+        Route::put('/{system}/auto-scan', 'autoScan')->name('auto-scan');
         Route::put('/{system}', 'update')->name('update');
         Route::put('/{system}/context', 'updateContext')->name('context');
         Route::put('/{system}/checks', 'updateChecks')->name('checks');
@@ -160,6 +161,7 @@ Route::middleware('role:admin')->group(function () {
     Route::put('/setup/reply-rules', [SetupController::class, 'replyRules'])->name('setup.reply-rules');
     Route::put('/setup/reply-template', [SetupController::class, 'replyTemplate'])->name('setup.reply-template');
     Route::put('/setup/agents', [SetupController::class, 'agents'])->name('setup.agents');
+    Route::put('/setup/hyper-schedule', [SetupController::class, 'hyperSchedule'])->name('setup.hyper-schedule');
     Route::put('/setup/answer-rules', [SetupController::class, 'answerRules'])->name('setup.answer-rules');
     Route::put('/setup/auto-patch', [SetupController::class, 'autoPatch'])->name('setup.auto-patch');
     Route::put('/setup/settings', [SetupController::class, 'settings'])->name('setup.settings');

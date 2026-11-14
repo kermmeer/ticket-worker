@@ -33,6 +33,7 @@ class SetupController extends Controller
             'envClaude' => ($env = \App\Agent\Instructions::envCredentials()) !== [] ? (isset($env['ANTHROPIC_API_KEY']) ? 'API key' : 'subscription token') : null,
             'answerRules' => Setting::answerRules(),
             'replyTemplate' => (string) Setting::get(Setting::REPLY_TEMPLATE),
+            'hyperSchedule' => \App\Sync\HyperSchedule::config(),
             'agents' => Setting::agents(),
             'maxAgents' => Setting::MAX_AGENTS,
             'defaultAnswerRules' => Setting::DEFAULT_ANSWER_RULES,
@@ -116,6 +117,28 @@ class SetupController extends Controller
         return back()->with('success', $data['kind'] === 'none'
             ? 'Removed. Without one in .env either, only people with their own sign-in can run agents, and new tickets get no automatic quick scan.'
             : 'Saved. Everyone without their own sign-in runs on it, and automatic quick scans do.');
+    }
+
+    /** Hyper mode by the clock: the days and hours it is on by itself. */
+    public function hyperSchedule(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'on' => ['required', 'boolean'],
+            'days' => ['array'],
+            'days.*' => ['integer', 'between:1,7'],
+            'from' => ['required', 'date_format:H:i'],
+            'to' => ['required', 'date_format:H:i', 'after:from'],
+            'timezone' => ['required', 'timezone'],
+        ], ['to.after' => 'It ends after it starts.']);
+        $data['days'] = array_values(array_unique(array_map('intval', $data['days'] ?? [])));
+        sort($data['days']);
+        \App\Sync\HyperSchedule::save($data);
+        (new \App\Sync\HyperSchedule)();
+        AuditEvent::record('setup.hyper-schedule', 'hyper mode schedule', $data['on']
+            ? implode(',', array_map(fn ($day) => \App\Sync\HyperSchedule::DAYS[$day], $data['days']))." {$data['from']}-{$data['to']} {$data['timezone']}"
+            : 'off');
+
+        return back()->with('success', $data['on'] ? 'Saved. Hyper mode follows it from now; a switch by hand holds until its next start or end.' : 'Saved: no schedule.');
     }
 
     /** How many agents may work at once: the pool in the agent container follows within seconds. */

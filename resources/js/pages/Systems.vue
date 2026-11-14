@@ -115,7 +115,7 @@ function summary(system) {
     const parts = [];
     if (system.kind !== 'api') {
         parts.push(system.head ? `last push ${system.head.hash} · ${when(system.head.committed_at)}` : system.branches_here?.length ? `nothing on ${system.branch}; ${system.branches_here.join(', ')} arrived` : 'nothing pushed yet');
-        parts.push(system.context ? (system.commits_behind ? `context ${system.commits_behind} commits behind` : 'context up to date') : 'no context yet');
+        parts.push((system.context ? (system.commits_behind ? `context ${system.commits_behind} commits behind` : 'context up to date') : 'no context yet') + (system.auto_scan ? ', rescans by itself' : ''));
         const on = (system.checks?.list ?? []).filter((check) => check.enabled).length;
         if (on) parts.push(`${on} ${on === 1 ? 'check' : 'checks'}${system.checks.state && system.checks.state !== 'ready' ? ` (${system.checks.state})` : ''}`);
     }
@@ -359,6 +359,13 @@ const newProjectAuthKinds = Object.fromEntries(Object.entries(props.authKinds).f
                             </button>
                         </span>
                     </div>
+                    <label class="mt-2 flex items-start gap-2 text-sm">
+                        <input type="checkbox" class="mt-1" :checked="system.auto_scan" @change="router.put(`/systems/${system.id}/auto-scan`, { on: $event.target.checked }, { preserveScroll: true })" />
+                        <span>
+                            Rescan by itself after a push
+                            <span class="block text-xs text-muted">When a push to {{ system.branch }} moves the code past the context: ten minutes after the last push, at most once an hour, on the shared Claude sign-in. A rescan reads only what changed.</span>
+                        </span>
+                    </label>
                     <p v-if="!system.head" class="mt-1 text-sm text-muted">Push the code first; then an agent can read it.</p>
                     <p v-else-if="!agentReady" class="mt-1 text-sm text-muted">Scanning needs an Anthropic sign-in: see Setup.</p>
                     <p v-else-if="!system.context && !scanning(system)" class="mt-1 text-sm text-muted">

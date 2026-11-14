@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::job(new ReportHealth('default'))->everyMinute();
 Schedule::job(new ReportHealth('agents'))->everyMinute();
 
+// Hyper mode on and off by its schedule, at the start and end of the working day (Setup).
+Schedule::call(new \App\Sync\HyperSchedule)->everyMinute()->name('hyper-schedule');
+
 // Spaces sync every SYNC_EVERY_MINUTES, or every minute in hyper mode.
 Schedule::call(new DispatchDueSyncs)->everyMinute()->name('dispatch-due-syncs')->withoutOverlapping();
 
@@ -20,6 +23,9 @@ Schedule::call(new StaleRuns)->everyFiveMinutes()->name('stale-runs');
 
 // A batch of quick scans, one at a time, after whatever else waits for an agent.
 Schedule::call(new FeedQuickScans)->everyMinute()->name('feed-quick-scans')->withoutOverlapping();
+
+// Systems set to rescan by themselves: after a push that moved the code past their context.
+Schedule::call(new \App\Agent\AutoScanSystems)->everyFiveMinutes()->name('auto-scan-systems')->withoutOverlapping();
 
 // Tickets' workspaces and transcripts go 30 days after their work ended (CONCEPT.md §11).
 Schedule::call(new ForgetOldWork)->dailyAt('03:17')->name('forget-old-work');
