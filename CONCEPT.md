@@ -1019,6 +1019,24 @@ activity on a ticket you work, an answer waiting for you, an SLA still in time a
 (yours, then unassigned ones in your spaces), then high priority assigned to you. Sleeping,
 hidden and done tickets never; a ticket once only.
 
+**E. The outbox's way of working** (asked for on 14 November: "I like the simplified way").
+The outbox is one page: on the left what you are doing (the ticket, the text, files, and
+*when sent, also* status, assignee and due date), on the right the ticket itself, *My tickets*
+grouped by Jira status, and the queue of what is scheduled, needs attention, or was sent. One
+action does the whole step, and its defaults keep you from mistakes. Taken over here:
+12. *The overview starts from your tickets*, grouped by Jira status as the outbox does (in
+    progress, to do, waiting), with *your next ten* above them. Whether a ticket needs you, has
+    new activity, a case or an SLA running out shows as a badge on its row, not as a group of
+    its own. Everything else (all spaces, every filter and group of now) is one tab further.
+13. *The ticket page in two columns*: the work on the left (the chat, then the reply), the
+    ticket on the right (what Jira has, its code, its case); on a phone one column with jumps,
+    as the outbox has.
+14. *The reply as the outbox writes it*: your template, files, and *when sent, also* a status
+    and an assignee, which the agent suggests ("Waiting for customer", assign to the reporter).
+    Sending and scheduling stay with the outbox, which already does them reliably (routes
+    through the workflow, retries, *needs attention*): Ticket Worker hands the whole step over
+    as one draft, so the outbox has to accept status and assignee in a draft (see Open).
+
 **Later.** The triage lane for the untouched backlog: with the new work board. The production
 database: once the GlobalProtect proxy works (a machine inside the VPN with SSH can serve as
 the jump host of a database server's tunnel). API docs: written per API, ordering from its spec.
@@ -1026,5 +1044,8 @@ the jump host of a database server's tunnel). API docs: written per API, orderin
 **Open.**
 - Reply, status and assignee in one go: the outbox takes the reply only, status and assignee
   are set by hand there. Either the outbox learns to take them in a draft (a change in the
-  outbox, not here), or Ticket Worker changes status and assignee in Jira itself
-  (`JIRA_WRITE=real`) and the reply still goes through the outbox.
+  outbox, not here: its README already expects it, "Ticket Worker may ask for them later"),
+  or Ticket Worker changes status and assignee in Jira itself (`JIRA_WRITE=real`) and the
+  reply still goes through the outbox. The first keeps one place that writes to Jira.
+- 12 replaces the groups of A on the overview with badges: A's meaning stays (seen, new
+  activity, needs you), its place changes.
