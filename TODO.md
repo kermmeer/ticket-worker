@@ -220,3 +220,6 @@ to it, including work you finish.
       go into its workspace as commits and diff; Build continues on such a branch; "let's get it
       fixed now" is a build; the workspace is refreshed every turn, a failed refresh on a
       follow-up only noted.
+- [x] On a phone, the whole menu behind ☰ beside the title (every page, New work, your account,
+      the reference pages, hyper mode, day or night); the four-item bar stays. Every page checked
+      at phone width (2026-11-14)

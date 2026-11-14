@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import ThemeSwitch from '../components/ThemeSwitch.vue';
 import { connection, signInAgain } from '../connection.js';
@@ -37,7 +37,7 @@ const allNav = [
 ];
 const may = (role) => role === 'member' || (role === 'editor' ? page.props.me?.is_editor : page.props.me?.is_admin);
 const nav = computed(() => allNav.filter((item) => may(item.role)));
-// The phone's bar: handling tickets. Spaces, systems and setup are for a wider screen.
+// The phone's bar: handling tickets, in reach of a thumb. Everything else is behind ☰.
 const phoneNav = [
     { href: '/', label: 'Tickets', active: (url) => url === '/' || url.startsWith('/tickets'), icon: 'M4 5h12M4 10h12M4 15h8' },
     { href: '/agents', label: 'Agents', active: (url) => url.startsWith('/agents'), icon: 'M10 3v2m0 10v2m7-7h-2M5 10H3m11.5-4.5L13 7M7 13l-1.5 1.5m9 0L13 13M7 7 5.5 5.5M10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z' },
@@ -61,6 +61,27 @@ const flash = computed(() => page.props.flash ?? {});
 const gate = computed(() => page.props.app?.gate);
 const me = computed(() => page.props.me);
 
+// On a phone: the whole menu in a panel from the left, behind ☰. The bar at the bottom keeps
+// the four things used most; this holds everything, so a phone can do all a desk can.
+const menuOpen = ref(false);
+const menuClose = ref(null);
+function openMenu() {
+    menuOpen.value = true;
+    nextTick(() => menuClose.value?.focus());
+}
+watch(menuOpen, (open) => (document.body.style.overflow = open ? 'hidden' : ''));
+const onKey = (event) => event.key === 'Escape' && (menuOpen.value = false);
+let stopNavigate = null;
+onMounted(() => {
+    window.addEventListener('keydown', onKey);
+    stopNavigate = router.on('navigate', () => (menuOpen.value = false));
+});
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onKey);
+    stopNavigate?.();
+    document.body.style.overflow = '';
+});
+
 function toggleHyper() {
     router.post('/hyper', {}, { preserveScroll: true, preserveState: true });
 }
@@ -71,6 +92,16 @@ function toggleHyper() {
         <!-- Slim: one quiet row. The work is the page, not the frame around it. -->
         <header class="sticky top-0 z-10 border-b border-line bg-page/90 backdrop-blur">
             <div class="flex w-full flex-wrap items-center gap-x-8 px-4 sm:px-6 lg:px-10">
+                <button
+                    type="button"
+                    class="-ml-2 -mr-6 inline-flex size-10 items-center justify-center rounded-md text-muted hover:text-ink sm:hidden"
+                    aria-label="Menu"
+                    :aria-expanded="menuOpen"
+                    aria-controls="phone-menu"
+                    @click="openMenu"
+                >
+                    <svg aria-hidden="true" viewBox="0 0 20 20" class="size-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
+                </button>
                 <Link href="/" class="flex items-center gap-2 py-2.5">
                     <img src="/favicon.svg" alt="" class="size-5" />
                     <span class="text-sm font-semibold tracking-tight">Ticket Worker</span>
@@ -138,7 +169,71 @@ function toggleHyper() {
             <button type="button" class="text-muted hover:text-ink" aria-label="Dismiss" @click="toast = null">✕</button>
         </p>
 
-        <!-- On a phone: what you work with, in reach of a thumb; the rest is on a wider screen. -->
+        <!-- On a phone: everything, behind ☰. -->
+        <div v-if="menuOpen" class="fixed inset-0 z-40 sm:hidden">
+            <div class="absolute inset-0 bg-ink/30" aria-hidden="true" @click="menuOpen = false"></div>
+            <nav
+                id="phone-menu"
+                aria-label="Menu"
+                role="dialog"
+                aria-modal="true"
+                class="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-line bg-page pb-[env(safe-area-inset-bottom)] shadow-xl"
+            >
+                <div class="flex items-center gap-2 border-b border-line px-4 py-2">
+                    <img src="/favicon.svg" alt="" class="size-5" />
+                    <span class="text-sm font-semibold tracking-tight">Ticket Worker</span>
+                    <span v-if="env && env !== 'production'" class="eyebrow">{{ env }}</span>
+                    <button ref="menuClose" type="button" class="ml-auto inline-flex size-10 items-center justify-center rounded-md text-muted hover:text-ink" aria-label="Close the menu" @click="menuOpen = false">✕</button>
+                </div>
+
+                <Link v-if="me" href="/account" class="border-b border-line px-4 py-3 text-sm" :class="url.startsWith('/account') ? 'text-ink' : 'text-muted'">
+                    <span class="block font-medium text-ink">{{ me.name }}</span>
+                    <span class="text-xs" :class="me.can_run_agents ? 'text-muted' : 'text-signal'">{{ me.can_run_agents ? 'Your account' : 'No Claude sign-in yet: set one up' }}</span>
+                </Link>
+
+                <ul class="py-2">
+                    <li v-for="item in nav" :key="item.href">
+                        <Link
+                            :href="item.href"
+                            class="flex min-h-12 items-center border-l-2 px-4 text-[0.9375rem]"
+                            :class="item.active(url) ? 'border-signal font-medium text-ink' : 'border-transparent text-muted'"
+                            :aria-current="item.active(url) ? 'page' : undefined"
+                        >
+                            {{ item.label }}
+                        </Link>
+                    </li>
+                    <li>
+                        <Link href="/work/new" class="flex min-h-12 items-center border-l-2 px-4 text-[0.9375rem]" :class="url.startsWith('/work') ? 'border-signal font-medium text-ink' : 'border-transparent text-muted'">New work</Link>
+                    </li>
+                </ul>
+
+                <template v-if="me?.is_admin">
+                    <p class="eyebrow border-t border-line px-4 pt-4 pb-1">Reference</p>
+                    <ul class="pb-2">
+                        <li v-for="item in more" :key="item.href">
+                            <Link :href="item.href" class="flex min-h-11 items-center px-4 text-sm" :class="url.startsWith(item.href) ? 'text-ink' : 'text-muted'">{{ item.label }}</Link>
+                        </li>
+                    </ul>
+                </template>
+
+                <div class="mt-auto space-y-3 border-t border-line px-4 py-4 text-sm">
+                    <button
+                        v-if="me?.is_editor"
+                        type="button"
+                        class="w-full rounded-md px-3 py-2 text-left"
+                        :class="hyper ? 'border border-signal font-medium text-signal' : 'border border-line text-muted'"
+                        :aria-pressed="hyper"
+                        @click="toggleHyper"
+                    >
+                        {{ hyper ? 'Hyper: syncing every minute (tap to stop)' : 'Hyper off: syncing at the usual pace' }}
+                    </button>
+                    <div class="flex items-center justify-between gap-3"><span class="text-muted">Day or night</span><ThemeSwitch /></div>
+                    <button v-if="gate" type="button" class="text-muted underline" @click="router.post('/logout')">Sign out</button>
+                </div>
+            </nav>
+        </div>
+
+        <!-- On a phone: what you work with most, in reach of a thumb; the rest behind ☰. -->
         <nav aria-label="Main" class="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-line bg-page/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
             <Link
                 v-for="item in phoneNav"
