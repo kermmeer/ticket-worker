@@ -293,12 +293,14 @@ const briefLine = computed(() =>
 );
 
 // The jump bar's parts: only those the page has.
+// In the order a phone shows them: the ticket first, then the work.
 const jumps = computed(() => [
-    ...(props.ticket.local ? [{ id: 'own', label: 'Own work' }] : [{ id: 'scan', label: 'Quick scan' }]),
+    ...(props.ticket.local ? [{ id: 'own', label: 'Own work' }] : []),
+    { id: 'ticket', label: 'Ticket' },
+    ...(props.ticket.local ? [] : [{ id: 'scan', label: 'Quick scan' }]),
     { id: 'agent', label: 'Chat' },
     ...(proposal.value ? [{ id: 'proposal', label: 'Proposal' }] : []),
     { id: 'reply', label: 'Reply' },
-    { id: 'ticket', label: 'Ticket' },
 ]);
 
 const turnLabels = { refine: 'Refinement', build: 'Build', analysis: 'Deep analysis', message: 'Answer', proposal: 'Proposal restated', case: 'Casebook draft', patch: 'Patch' };
@@ -466,15 +468,13 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         <OwnWork ref="ownWork" :ticket="ticket" :types="workTypes" :jira-write="jiraWrite" :busy="busy" />
     </FoldingSection>
 
-    <!-- Folded once there is a proposal: the brief above says what matters of it. -->
-    <FoldingSection v-if="!ticket.local" id="scan" title="Quick scan" remember="ticket.quick-scan-2" :open="!proposal" class="mt-8 scroll-mt-28">
-        <QuickScanCard :ticket-id="ticket.id" :scan="ticket.quick_scan" :agent-ready="agentReady" />
-    </FoldingSection>
-
-    <!-- One column on a phone (that can never grow wider than the screen), two on a wide one. -->
-    <div class="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+    <!-- One column on a phone (that can never grow wider than the screen), the ticket first.
+         Two on a wide one, as the outbox has them: the work on the left (the chat, then the reply),
+         the ticket on the right, in view while you scroll the chat. -->
+    <div class="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+        <aside aria-label="The ticket" class="min-w-0 space-y-6 self-start lg:sticky lg:top-16 lg:order-last lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:pr-1">
         <!-- The ticket, as Jira has it now -->
-        <FoldingSection id="ticket" title="Ticket" remember="ticket.ticket" class="min-w-0 scroll-mt-28 self-start">
+        <FoldingSection id="ticket" title="Ticket" remember="ticket.ticket" class="scroll-mt-28">
             <p v-if="issueError" class="text-sm text-signal">Jira did not answer: {{ issueError }}</p>
             <template v-else-if="issue">
                 <p class="text-sm text-muted">{{ issue.reporter }} · {{ short(issue.created) }} · {{ issue.type }}</p>
@@ -505,7 +505,13 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             </template>
         </FoldingSection>
 
-        <!-- The agent -->
+        <!-- Folded once there is a proposal: the brief above says what matters of it. -->
+        <FoldingSection v-if="!ticket.local" id="scan" title="Quick scan" remember="ticket.quick-scan-2" :open="!proposal" class="scroll-mt-28">
+            <QuickScanCard :ticket-id="ticket.id" :scan="ticket.quick_scan" :agent-ready="agentReady" />
+        </FoldingSection>
+        </aside>
+
+        <!-- The work: the chat, the proposal, the reply -->
         <section class="min-w-0 space-y-6">
             <!-- The chat: ask, it answers; Dig deeper for the full analysis. -->
             <FoldingSection id="agent" title="Chat" remember="ticket.agent" class="scroll-mt-28">
