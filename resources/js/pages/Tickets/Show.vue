@@ -8,6 +8,7 @@ import FoldingSection from '../../components/FoldingSection.vue';
 import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
 import DoneForm from '../../components/DoneForm.vue';
+import WhenSent from '../../components/WhenSent.vue';
 import OwnWork from '../../components/OwnWork.vue';
 import ProposedChanges from '../../components/ProposedChanges.vue';
 import QuickScanCard from '../../components/QuickScanCard.vue';
@@ -130,6 +131,35 @@ const signed = (text) => {
 };
 const framed = (text) => (props.replyTemplate && !signed(text) ? props.replyTemplate.replace('{reply}', text.trim()) : text);
 watch(proposal, (value) => (draft.body = value?.reply_draft ? framed(value.reply_draft) : ''), { immediate: true });
+
+// Send: the reply, files, status and assignee, in one step (TicketController::send).
+const replyFiles = ref([]);
+const whenSent = ref({ transition: '', fields: {}, assignee: 'keep' });
+const sending = ref(false);
+const onlyTemplate = computed(() => !props.replyTemplate ? !draft.body.trim() : draft.body.replace(/\s+/g, '') === props.replyTemplate.replace('{reply}', '').replace(/\s+/g, ''));
+const sendLabel = computed(() => {
+    const changes = whenSent.value.transition || whenSent.value.assignee !== 'keep';
+    if (onlyTemplate.value && !replyFiles.value.length) return changes ? 'Make the changes' : 'Send';
+    return changes ? 'Send, with the changes' : 'Send';
+});
+function sendNow() {
+    sending.value = true;
+    router.post(`/tickets/${props.ticket.id}/send`, {
+        body: draft.body, visibility: draft.visibility, files: replyFiles.value,
+        transition: whenSent.value.transition, fields: whenSent.value.fields, assignee: whenSent.value.assignee,
+    }, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            if (!pageProps.props.flash?.error) {
+                draft.body = '';
+                replyFiles.value = [];
+                whenSent.value = { transition: '', fields: {}, assignee: 'keep' };
+            }
+        },
+        onFinish: () => (sending.value = false),
+    });
+}
 
 // An empty box, clicked: your template, with the cursor where your text goes.
 const replyBox = ref(null);
@@ -769,25 +799,31 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                 <form id="reply-form" class="text-sm" @submit.prevent="toOutbox(false)">
                     <label for="reply-text" class="font-medium">{{ proposal?.reply_draft ? "The agent's reply draft" : "Your reply" }}<span v-if="proposal?.reply_language" class="font-normal text-muted"> · {{ proposal.reply_language }}</span></label>
                     <textarea id="reply-text" ref="replyBox" v-model="draft.body" rows="8" :placeholder="replyTemplate ? 'Click to start from your template' : ''" class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 text-sm placeholder:text-muted" @focus="startReply"></textarea>
+                    <div v-if="ticket.space.type === 'service'" class="mt-2 flex flex-wrap items-center gap-3">
+                        <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="public" /> Reply to customer</label>
+                        <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="internal" /> Internal note</label>
+                    </div>
+                    <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        <label class="btn cursor-pointer px-2.5 py-1 text-xs">Attach files<input type="file" multiple class="sr-only" @change="replyFiles = [...replyFiles, ...$event.target.files]" /></label>
+                        <span v-for="(file, index) in replyFiles" :key="index" class="rounded-md border border-line px-2 py-0.5">{{ file.name }} <button type="button" class="text-muted hover:text-signal" :aria-label="`Remove ${file.name}`" @click="replyFiles.splice(index, 1)">✕</button></span>
+                    </div>
+                    <!-- When sent, also: the status and the assignee, in the same step. -->
+                    <WhenSent v-if="!ticket.local" :key="ticket.status" v-model="whenSent" class="mt-3" :ticket-id="ticket.id" :suggest-status="proposal?.next_status" :suggest-assign="proposal?.assign_to" />
                     <div class="mt-3 flex flex-wrap items-center gap-3">
-                        <template v-if="outboxReady && ticket.space.type === 'service'">
-                            <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="public" /> Reply to customer</label>
-                            <label class="flex items-center gap-1.5"><input v-model="draft.visibility" type="radio" value="internal" /> Internal note</label>
-                        </template>
-                        <button type="button" class="btn ml-auto" :class="{ 'btn-signal': !outboxReady }" :disabled="!draft.body.trim()" @click="copyReply">
-                            {{ copied ? 'Copied' : 'Copy reply' }}
-                        </button>
+                        <button v-if="!ticket.local" type="button" class="btn btn-signal" :disabled="sending" @click="sendNow">{{ sendLabel }}</button>
+                        <button type="button" class="btn" :disabled="!draft.body.trim()" @click="copyReply">{{ copied ? 'Copied' : 'Copy reply' }}</button>
                         <template v-if="outboxReady">
-                            <button type="submit" class="btn" :disabled="draft.processing || !draft.body.trim()">Send to the outbox as a draft</button>
-                            <button type="button" class="btn btn-signal" :disabled="draft.processing || !draft.body.trim()" @click="toOutbox(true)">
-                                Draft and open in the outbox <span aria-hidden="true">↗</span>
+                            <button type="submit" class="btn" :disabled="draft.processing || !draft.body.trim()">To the outbox as a draft</button>
+                            <button type="button" class="btn" :disabled="draft.processing || !draft.body.trim()" @click="toOutbox(true)">
+                                Schedule it in the outbox <span aria-hidden="true">↗</span>
                             </button>
                         </template>
                     </div>
-                    <p v-if="outboxReady" class="mt-2 text-muted">Nothing goes to Jira from here: the draft waits in the outbox until you send it there.</p>
-                    <p v-else class="mt-2 text-muted">
-                        Nothing goes to Jira from here: copy the reply and paste it into the ticket in
-                        <a :href="ticket.url" target="_blank" rel="noopener" class="underline hover:text-ink">{{ openLabel }} ↗</a>.
+                    <p class="mt-2 text-muted">
+                        <template v-if="jiraWrite">Send posts it to {{ ticket.key }} now, then makes the changes above.</template>
+                        <template v-else>Writing to Jira is off here (JIRA_WRITE=dummy): Send says what it would do, and sends nothing.</template>
+                        <template v-if="outboxReady"> For later, schedule it in the outbox.</template>
+                        Your template with nothing written in it is never posted: only the changes go.
                     </p>
                 </form>
             </FoldingSection>

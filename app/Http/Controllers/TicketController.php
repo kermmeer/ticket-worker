@@ -448,6 +448,125 @@ class TicketController extends Controller
         return back()->with('success', 'Done.');
     }
 
+    /**
+     * The whole step at once, as the outbox does it: the reply (public, or an internal note),
+     * files, and then the assignee and the status. Your template alone is never posted: with
+     * nothing written in it, only the changes go (CONCEPT.md, decided 14 November 2026).
+     */
+    public function send(Request $request, Ticket $ticket): RedirectResponse
+    {
+        abort_if($ticket->isLocal(), 409, 'Own work has no Jira ticket yet: link it first.');
+        $data = $request->validate([
+            'body' => ['nullable', 'string', 'max:32000'],
+            'visibility' => ['nullable', Rule::in(['public', 'internal'])],
+            'files' => ['nullable', 'array', 'max:10'],
+            'files.*' => ['file', 'max:25600'],
+            'transition' => ['nullable', 'string', 'max:20'],
+            'fields' => ['nullable', 'array'],
+            'assignee' => ['nullable', 'string', 'max:200'],
+        ]);
+        $jira = $ticket->space->jira();
+        $text = self::onlyTemplate((string) ($data['body'] ?? '')) ? '' : trim((string) ($data['body'] ?? ''));
+        $files = $request->file('files') ?? [];
+        $assignee = $data['assignee'] ?? 'keep';
+        $transition = filled($data['transition'] ?? null) ? $data['transition'] : null;
+        if ($text === '' && $files === [] && $transition === null && $assignee === 'keep') {
+            return back()->with('error', 'Nothing to send: write a reply, or pick a status or an assignee.');
+        }
+
+        $plan = array_filter([
+            $text !== '' || $files !== [] ? (($data['visibility'] ?? 'public') === 'internal' ? 'an internal note' : 'the reply').($files ? ' with '.count($files).' file'.(count($files) === 1 ? '' : 's') : '') : null,
+            $assignee !== 'keep' ? 'the assignee' : null,
+            $transition !== null ? 'the status' : null,
+        ]);
+        if (config('services.jira.write') !== 'real') {
+            return back()->with('error', "JIRA_WRITE=dummy: nothing was sent. With it real, {$ticket->key} would now get ".implode(', then ', $plan).'.');
+        }
+
+        $done = [];
+        try {
+            $names = [];
+            foreach ($files as $file) {
+                $name = Str::limit(preg_replace('/[^A-Za-z0-9._ -]/', '_', $file->getClientOriginalName()) ?: 'file', 120, '');
+                $jira->attachFile($ticket->key, $file->getRealPath(), $name);
+                $names[] = $name;
+            }
+            if ($text !== '' || $names !== []) {
+                $jira->comment($ticket->key, $text, ($data['visibility'] ?? 'public') === 'internal', $names);
+                $done[] = ($data['visibility'] ?? 'public') === 'internal' ? 'internal note posted' : 'reply posted';
+            }
+            if ($assignee !== 'keep') {
+                $accountId = match (true) {
+                    $assignee === 'me' => auth()->user()?->jira_account_id ?? throw new RuntimeException('Your Jira account is not linked: link it on Your account.'),
+                    $assignee === 'unassign' => null,
+                    $assignee === 'reporter' => $jira->issue($ticket->key)['reporter_account_id'] ?? throw new RuntimeException('The reporter cannot be assigned.'),
+                    str_starts_with($assignee, 'account:') => substr($assignee, 8),
+                    default => throw new RuntimeException('Unknown assignee.'),
+                };
+                $jira->assign($ticket->key, $accountId);
+                $done[] = $accountId === null ? 'unassigned' : 'assigned';
+            }
+            if ($transition !== null) {
+                // Only what Jira offers now: the ticket may have moved since the form was opened.
+                $offered = collect($jira->transitions($ticket->key))->firstWhere('id', $transition)
+                    ?? throw new RuntimeException('Jira no longer offers that status change from where the ticket is now.');
+                $jira->transition($ticket->key, $transition, (array) ($data['fields'] ?? []));
+                $done[] = "status {$offered['to']}";
+            }
+        } catch (JiraException|RuntimeException $e) {
+            AuditEvent::record('ticket.send', $ticket->key, ($done ? implode(', ', $done).'; then ' : '').'failed: '.Str::limit($e->getMessage(), 200));
+
+            return back()->with('error', ($done ? 'Done: '.implode(', ', $done).'. Then it stopped: ' : 'Nothing was sent: ').$e->getMessage());
+        }
+
+        Cache::forget("ticket.issue.{$ticket->id}");
+        // Your own step is no news to you: the change it made in Jira does not count as new activity.
+        $ticket->markSeen(auth()->user());
+        AuditEvent::record('ticket.send', $ticket->key, implode(', ', $done));
+
+        return back()->with('success', ucfirst(implode(', ', $done)).'.');
+    }
+
+    /** Your template with nothing written in it: the frame alone, never posted. */
+    public static function onlyTemplate(string $text): bool
+    {
+        $template = \App\Models\Setting::replyTemplateFor(auth()->user()?->firstName());
+        if ($template === null || trim($text) === '') {
+            return trim($text) === '';
+        }
+        $squash = fn (string $value) => preg_replace('/\s+/', '', $value);
+
+        return $squash($text) === $squash(str_replace('{reply}', '', $template));
+    }
+
+    /** What the reply form offers: the status changes from here, and who the ticket can go to. */
+    public function sendOptions(Ticket $ticket): \Illuminate\Http\JsonResponse
+    {
+        $jira = $ticket->space->jira();
+        try {
+            $issue = $jira->issue($ticket->key);
+
+            return response()->json([
+                'status' => $issue['status'],
+                'transitions' => $jira->transitions($ticket->key),
+                'assignee' => $issue['assignee'],
+                'reporter' => ['name' => $issue['reporter'], 'assignable' => filled($issue['reporter_account_id'] ?? null) && ! ($issue['reporter_is_customer'] ?? false)],
+                'me' => filled(auth()->user()?->jira_account_id),
+            ]);
+        } catch (JiraException $e) {
+            return response()->json(['error' => $e->getMessage(), 'transitions' => []]);
+        }
+    }
+
+    public function assignable(Request $request, Ticket $ticket): \Illuminate\Http\JsonResponse
+    {
+        try {
+            return response()->json(['people' => $ticket->space->jira()->assignable($ticket->key, (string) $request->query('q', ''))]);
+        } catch (JiraException $e) {
+            return response()->json(['people' => [], 'error' => $e->getMessage()]);
+        }
+    }
+
     /** Not done after all. */
     public function undone(Ticket $ticket): RedirectResponse
     {

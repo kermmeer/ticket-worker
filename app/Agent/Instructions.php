@@ -83,6 +83,8 @@ class Instructions
             'properties' => [
                 // The engineer reads hundreds of these: the first fields must be enough on their own.
                 'headline' => $text + ['description' => 'ONE line, under 140 characters: what is wrong and what to do. The engineer may read only this.'],
+                'next_status' => $text + ['description' => 'The Jira status the ticket should go to with the reply, by its name as the ticket\'s statuses go (e.g. "Waiting for customer" when the reply asks the reporter something, "Resolved" when the reply closes it); empty to keep it.'],
+                'assign_to' => ['type' => 'string', 'enum' => ['keep', 'reporter', 'me'], 'description' => 'Who has the ticket after the reply: keep as it is, back to the reporter (when they must act), or the engineer.'],
                 'problem' => $text + ['description' => 'One sentence, under 200 characters: what the reporter sees.'],
                 'system' => $text + ['description' => 'Which system it is about, by name, or "unknown".'],
                 'cause' => $text + ['description' => 'The most likely cause, in one or two sentences, under 300 characters. Details go in evidence.'],

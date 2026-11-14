@@ -214,6 +214,9 @@ class JiraClient
             'priority' => $fields['priority']['name'] ?? null,
             'type' => $fields['issuetype']['name'] ?? null,
             'reporter' => $fields['reporter']['displayName'] ?? null,
+            'reporter_account_id' => $fields['reporter']['accountId'] ?? null,
+            // A service-desk customer cannot be assigned a ticket.
+            'reporter_is_customer' => ($fields['reporter']['accountType'] ?? 'atlassian') === 'customer',
             'assignee' => $fields['assignee']['displayName'] ?? null,
             'assignee_account_id' => $fields['assignee']['accountId'] ?? null,
             'created' => $fields['created'] ?? null,
@@ -325,9 +328,107 @@ class JiraClient
     }
 
     /** Assign a ticket. Only with JIRA_WRITE=real; the caller says what would have happened otherwise. */
-    public function assign(string $key, string $accountId): void
+    /** Assign it, or unassign it with null. Only with JIRA_WRITE=real; the caller checks. */
+    public function assign(string $key, ?string $accountId): void
     {
         $this->send('put', '/rest/api/3/issue/'.rawurlencode($key).'/assignee', ['accountId' => $accountId]);
+    }
+
+    /**
+     * A comment, public or (on a service desk) an internal note. Plain text with paragraphs
+     * and links; with files, in wiki markup, each image shown and each other file linked.
+     * Only with JIRA_WRITE=real; the caller checks.
+     *
+     * @param  list<string>  $files  names of files already attached to the issue
+     */
+    public function comment(string $key, string $text, bool $internal = false, array $files = []): string
+    {
+        $properties = $internal ? ['properties' => [['key' => 'sd.public.comment', 'value' => ['internal' => true]]]] : [];
+        if ($files === []) {
+            $answer = $this->send('post', '/rest/api/3/issue/'.rawurlencode($key).'/comment', ['body' => self::adf($text)] + $properties);
+        } else {
+            $references = array_map(fn ($name) => preg_match('/\.(png|jpe?g|gif|webp|bmp)$/i', $name) ? "!{$name}|thumbnail!" : "[^{$name}]", $files);
+            $answer = $this->send('post', '/rest/api/2/issue/'.rawurlencode($key).'/comment', ['body' => self::wiki($text)."\n\n".implode("\n", $references)] + $properties);
+        }
+
+        return (string) ($answer['id'] ?? '');
+    }
+
+    /** A file onto an issue (the same as for a new ticket). */
+    public function attachFile(string $key, string $path, string $name): void
+    {
+        $response = $this->request()->withHeaders(['X-Atlassian-Token' => 'no-check'])
+            ->attach('file', fopen($path, 'r'), $name)
+            ->post('/rest/api/2/issue/'.rawurlencode($key).'/attachments');
+        if ($response->failed()) {
+            throw JiraException::fromResponse($response);
+        }
+    }
+
+    /**
+     * The status changes Jira offers from where the ticket is now, with the fields each asks for.
+     *
+     * @return list<array{id: string, name: string, to: string, category: ?string, fields: list<array{key: string, name: string, required: bool, options: list<array{id: string, name: string}>}>}>
+     */
+    public function transitions(string $key): array
+    {
+        $answer = $this->send('get', '/rest/api/2/issue/'.rawurlencode($key).'/transitions', ['expand' => 'transitions.fields']);
+
+        return array_map(fn ($transition) => [
+            'id' => (string) $transition['id'],
+            'name' => (string) ($transition['name'] ?? ''),
+            'to' => (string) ($transition['to']['name'] ?? $transition['name'] ?? ''),
+            'category' => $transition['to']['statusCategory']['key'] ?? null,
+            'fields' => collect($transition['fields'] ?? [])->map(fn ($field, $id) => [
+                'key' => (string) $id, 'name' => (string) ($field['name'] ?? $id), 'required' => (bool) ($field['required'] ?? false),
+                'options' => array_map(fn ($value) => ['id' => (string) ($value['id'] ?? ''), 'name' => (string) ($value['name'] ?? $value['value'] ?? $value['id'] ?? '')], $field['allowedValues'] ?? []),
+            ])->reject(fn ($field) => in_array($field['key'], ['comment', 'attachment'], true))->values()->all(),
+        ], $answer['transitions'] ?? []);
+    }
+
+    /** Make one of those changes, with the values for its fields. Only with JIRA_WRITE=real. */
+    public function transition(string $key, string $id, array $fields = []): void
+    {
+        $values = collect($fields)->filter(fn ($value) => $value !== null && $value !== '')
+            ->map(fn ($value) => is_array($value) ? $value : ['id' => (string) $value])->all();
+        $this->send('post', '/rest/api/2/issue/'.rawurlencode($key).'/transitions', array_filter(['transition' => ['id' => $id], 'fields' => $values ?: null]));
+    }
+
+    /** People the ticket can be assigned to, for a name typed. @return list<array{id: string, name: string}> */
+    public function assignable(string $key, string $query): array
+    {
+        $people = $this->send('get', '/rest/api/3/user/assignable/search', ['issueKey' => $key, 'query' => $query, 'maxResults' => 8]);
+
+        return collect($people)->filter(fn ($person) => ($person['active'] ?? true) && ($person['accountType'] ?? 'atlassian') === 'atlassian')
+            ->map(fn ($person) => ['id' => (string) $person['accountId'], 'name' => (string) ($person['displayName'] ?? '')])->values()->all();
+    }
+
+    /** Text as Atlassian's document format: paragraphs on blank lines, line breaks, web addresses as links. */
+    public static function adf(string $text): array
+    {
+        $paragraphs = [];
+        foreach (preg_split('/\n\s*\n/', trim(str_replace("\r\n", "\n", $text))) as $block) {
+            $content = [];
+            foreach (explode("\n", $block) as $i => $line) {
+                if ($i > 0) {
+                    $content[] = ['type' => 'hardBreak'];
+                }
+                foreach (preg_split('#(https?://[^\s<>]+[^\s<>.,;:!?)\]])#', $line, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) as $part) {
+                    $content[] = preg_match('#^https?://#', $part)
+                        ? ['type' => 'text', 'text' => $part, 'marks' => [['type' => 'link', 'attrs' => ['href' => $part]]]]
+                        : ['type' => 'text', 'text' => $part];
+                }
+            }
+            $paragraphs[] = ['type' => 'paragraph', 'content' => $content];
+        }
+
+        return ['type' => 'doc', 'version' => 1, 'content' => $paragraphs];
+    }
+
+    /** Text as wiki markup that shows as typed: formatting characters escaped. */
+    public static function wiki(string $text): string
+    {
+        return preg_replace('/([*_+^~\-{}\[\]|!#])/', '\\\\$1', str_replace("\r\n", "\n", trim($text)));
     }
 
     private function send(string $method, string $path, array $data = []): array

@@ -72,6 +72,9 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/draft-ticket', 'draftTicket')->name('draft-ticket');
     Route::post('/link', 'link')->name('link');
     Route::post('/done', 'done')->name('done');
+    Route::post('/send', 'send')->name('send');
+    Route::get('/send-options', 'sendOptions')->name('send-options');
+    Route::get('/assignable', 'assignable')->name('assignable');
     Route::post('/undone', 'undone')->name('undone');
     Route::post('/quick-scan', 'quickScan')->name('quick-scan');
     Route::get('/turns/{turn}/patch', 'patchFile')->name('patch.file');
