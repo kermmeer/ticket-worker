@@ -61,6 +61,9 @@ const hyperNext = computed(() => page.props.hyperNext);
 const flash = computed(() => page.props.flash ?? {});
 const gate = computed(() => page.props.app?.gate);
 const me = computed(() => page.props.me);
+// Something in the systems failed: a dot beside Systems (and on ☰ on a phone), with words for a screen reader.
+const trouble = computed(() => page.props.systemTrouble ?? []);
+const needsLook = (item) => item.href === '/systems' && trouble.value.length > 0;
 
 // On a phone: the whole menu in a panel from the left, behind ☰. The bar at the bottom keeps
 // the four things used most; this holds everything, so a phone can do all a desk can.
@@ -113,13 +116,15 @@ onBeforeUnmount(() => {
             <div class="flex w-full flex-wrap items-center gap-x-8 px-4 sm:px-6 lg:px-10">
                 <button
                     type="button"
-                    class="-ml-2 -mr-6 inline-flex size-10 items-center justify-center rounded-md text-muted hover:text-ink sm:hidden"
+                    class="relative -ml-2 -mr-6 inline-flex size-10 items-center justify-center rounded-md text-muted hover:text-ink sm:hidden"
                     aria-label="Menu"
                     :aria-expanded="menuOpen"
                     aria-controls="phone-menu"
                     @click="openMenu"
                 >
                     <svg aria-hidden="true" viewBox="0 0 20 20" class="size-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
+                    <span v-if="trouble.length" class="absolute top-2 right-2 size-2 rounded-full bg-signal" aria-hidden="true"></span>
+                    <span v-if="trouble.length" class="sr-only">: a system needs a look</span>
                 </button>
                 <Link href="/" class="flex items-center gap-2 py-2.5">
                     <img src="/favicon.svg" alt="" class="size-5" />
@@ -154,7 +159,7 @@ onBeforeUnmount(() => {
                         :class="item.active(url) ? 'border-signal text-ink' : 'border-transparent text-muted hover:text-ink'"
                         :aria-current="item.active(url) ? 'page' : undefined"
                     >
-                        {{ item.label }}
+                        <span v-if="needsLook(item)" class="mr-1.5 inline-block size-2 rounded-full bg-signal align-middle" aria-hidden="true"></span>{{ item.label }}<span v-if="needsLook(item)" class="sr-only"> (something failed: needs a look)</span>
                     </Link>
                 </nav>
             </div>
@@ -218,7 +223,7 @@ onBeforeUnmount(() => {
                             :class="item.active(url) ? 'border-signal font-medium text-ink' : 'border-transparent text-muted'"
                             :aria-current="item.active(url) ? 'page' : undefined"
                         >
-                            {{ item.label }}
+                            <span v-if="needsLook(item)" class="mr-2 inline-block size-2 rounded-full bg-signal" aria-hidden="true"></span>{{ item.label }}<span v-if="needsLook(item)" class="ml-2 text-sm text-signal">needs a look</span>
                         </Link>
                     </li>
                     <li>

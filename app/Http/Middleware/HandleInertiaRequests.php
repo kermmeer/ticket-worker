@@ -35,6 +35,8 @@ class HandleInertiaRequests extends Middleware
                 // APP_PASSWORD is set: the header offers to sign out.
                 'gate' => RequirePassword::enabled(),
             ],
+            // A dot on Systems in the menu when something there failed: for those who can fix it.
+            'systemTrouble' => fn () => $request->user()?->atLeast('editor') ? \App\Models\System::trouble() : [],
             'hyper' => fn () => Setting::hyper(),
             // When the schedule switches it next, for the header: "until 17:00", "on Mon 08:00".
             'hyperNext' => fn () => \App\Sync\HyperSchedule::next(),

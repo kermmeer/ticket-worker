@@ -1,6 +1,6 @@
 <script setup>
-import { onBeforeUnmount, ref, watchEffect } from 'vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, ref, watchEffect } from 'vue';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import ApiConnections from '../components/ApiConnections.vue';
 import DbConnections from '../components/DbConnections.vue';
 import DbServers from '../components/DbServers.vue';
@@ -104,6 +104,8 @@ const states = {
 // Every system folded on arrival: opened to look at or change, so nothing is changed by a stray click.
 const opened = ref(new Set());
 const isOpen = (system) => opened.value.has(system.id);
+const trouble = computed(() => usePage().props.systemTrouble ?? []);
+const openTrouble = (id) => (opened.value = new Set([...opened.value, id]));
 function toggle(system) {
     const next = new Set(opened.value);
     next.has(system.id) ? next.delete(system.id) : next.add(system.id);
@@ -233,10 +235,21 @@ const newProjectAuthKinds = Object.fromEntries(Object.entries(props.authKinds).f
 
     <DbServers :servers="dbServers" :drivers="dbDrivers" />
 
+    <!-- What failed, so the dot in the menu leads somewhere: each opens its system. -->
+    <section v-if="trouble.length" aria-label="Needs a look" class="card mt-10 border-l-4 border-l-signal p-5">
+        <h2 class="flex items-center gap-2 font-medium"><span class="size-2 rounded-full bg-signal" aria-hidden="true"></span>Needs a look</h2>
+        <ul class="mt-2 space-y-1 text-sm">
+            <li v-for="item in trouble" :key="item.id">
+                <a :href="`#system-${item.id}`" class="font-mono underline decoration-muted/50 underline-offset-2 hover:decoration-ink" @click="openTrouble(item.id)">{{ item.name }}</a>:
+                {{ item.what.join(', ') }}
+            </li>
+        </ul>
+    </section>
+
     <p v-if="systems.length === 0" class="mt-10 text-muted">No systems yet.</p>
 
     <ul class="mt-10 space-y-4">
-        <li v-for="system in systems" :key="system.id" class="card p-5">
+        <li v-for="system in systems" :id="`system-${system.id}`" :key="system.id" class="card scroll-mt-20 p-5">
             <!-- Folded until opened: what it is and how it stands, in one line; everything to change, inside. -->
             <button type="button" class="flex w-full flex-wrap items-baseline gap-x-4 gap-y-1 text-left" :aria-expanded="isOpen(system)" @click="toggle(system)">
                 <svg aria-hidden="true" viewBox="0 0 12 12" class="size-3 shrink-0 self-center text-muted transition-transform" :class="{ '-rotate-90': !isOpen(system) }" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

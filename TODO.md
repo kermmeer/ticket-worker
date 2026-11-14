@@ -252,5 +252,8 @@ to it, including work you finish.
       - [x] Your next ten, each with its reason; Mine (by Jira status) beside All (on trial)
       - [x] The ticket page in two columns on a wide screen: the work left, the ticket right
       - [x] The Design link out of the menu (the page and the document stay)
+- [x] A dot on Systems in the menu (and on ☰ on a phone) when something there failed: setup,
+      the scan, the checks, fetching, an API's docs; the Systems page lists them at the top,
+      each opening its system. For editors and admins only (2026-11-14)
 - [ ] Mine or All: decide after the trial which one the overview opens on, and whether All stays
 - [ ] `composer audit` reports 8 advisories in 5 packages (seen 2026-11-14 when adding symfony/yaml)

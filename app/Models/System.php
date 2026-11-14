@@ -76,6 +76,31 @@ class System extends Model
         return $this->checks_state === 'ready' ? $this->checks->where('enabled', true)->values() : collect();
     }
 
+    /**
+     * What failed in the systems and wants a look: setup, the scan, the checks, an API's docs.
+     * Shown as a dot on Systems in the menu, and listed at the top of that page.
+     *
+     * @return list<array{id: int, name: string, what: list<string>}>
+     */
+    public static function trouble(): array
+    {
+        $trouble = [];
+        foreach (self::query()->with('apis:id,system_id,name,docs_state')->get() as $system) {
+            $what = array_values(array_filter([
+                $system->state === self::FAILED ? 'setting it up failed' : null,
+                $system->scan_state === 'failed' ? 'the scan failed' : null,
+                $system->checks_state === 'failed' ? 'preparing its checks failed' : null,
+                $system->pull_state === 'failed' ? 'fetching it failed' : null,
+                ...$system->apis->where('docs_state', 'failed')->map(fn ($api) => "the docs of {$api->name} failed")->all(),
+            ]));
+            if ($what !== []) {
+                $trouble[] = ['id' => $system->id, 'name' => $system->name, 'what' => $what];
+            }
+        }
+
+        return $trouble;
+    }
+
     public function hasCode(): bool
     {
         return $this->kind !== self::API;
