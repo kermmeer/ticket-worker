@@ -36,6 +36,7 @@ const props = defineProps({
     freshAfter: { type: Number, default: 30 },
     replyTemplate: { type: String, default: null },
     jiraWrite: { type: Boolean, default: false },
+    seenBefore: { type: String, default: null },
     workTypes: { type: Array, default: () => [] },
 });
 
@@ -138,6 +139,9 @@ function startReply() {
 
 // Its own site's name for it: another Jira, or the outbox.
 const openLabel = props.ticket.open_label ?? usePage().props.openLabel ?? 'Jira';
+
+// Since your last look at this ticket: those comments are marked new.
+const isNew = (comment) => !!props.seenBefore && !!comment.created && new Date(comment.created) > new Date(props.seenBefore);
 
 // The latest word on top; the agent's ticket.md keeps Jira's order, oldest first.
 const newestFirst = computed(() => [...(props.issue?.comments ?? [])].reverse());
@@ -446,6 +450,7 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                 <div class="mt-2 space-y-4">
                     <div v-for="(comment, index) in newestFirst" :key="index" class="border-l-2 pl-3 text-sm" :class="comment.public ? 'border-line' : 'border-waiting/60'">
                         <p class="text-xs text-muted">
+                            <span v-if="isNew(comment)" class="mr-1 rounded-[3px] bg-signal px-1 font-mono text-[0.66rem] font-semibold tracking-wide text-page uppercase">new</span>
                             {{ comment.author }} · {{ short(comment.created) }}<span v-if="!comment.public" class="text-waiting"> · internal note</span>
                         </p>
                         <JiraText :text="comment.body" :attachments="issue.attachments" :file-url="fileUrl" class="mt-1" />

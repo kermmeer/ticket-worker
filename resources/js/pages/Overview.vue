@@ -20,12 +20,12 @@ const props = defineProps({
 // What each ticket needs from you (CONCEPT.md §6). Sleeping tickets wait on the
 // requester; they get a segment of their own below the rest, folded away.
 const groups = [
-    { key: 'needs-you', label: 'Needs you', hint: 'A proposal is ready, or the agent asked you something' },
+    { key: 'needs-you', label: 'Needs you', hint: 'The agent answered since you last looked' },
     { key: 'working', label: 'Working', hint: 'An agent is busy on it right now' },
     { key: 'own-work', label: 'Own work', hint: 'Started here, no Jira ticket yet' },
-    { key: 'new-activity', label: 'New activity', hint: 'Commented on or changed since the last analysis' },
+    { key: 'new-activity', label: 'New activity', hint: 'Changed in Jira since you last looked' },
     { key: 'not-analysed', label: 'Not analysed', hint: 'Synced, nothing started yet' },
-    { key: 'parked', label: 'Parked', hint: 'Session closed, ticket still open in Jira' },
+    { key: 'parked', label: 'Worked on', hint: 'Agent work on it, nothing waiting for you' },
     { key: 'dev-in-progress', label: 'Development · in progress', hint: 'Stories, improvements and bugs in progress in Jira' },
     { key: 'dev-to-do', label: 'Development · to do', hint: 'Not started in Jira yet' },
     { key: 'sleeping', label: 'Sleeping', hint: 'Waiting on the requester' },

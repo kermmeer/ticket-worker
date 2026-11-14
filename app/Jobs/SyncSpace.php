@@ -90,6 +90,10 @@ class SyncSpace implements ShouldBeUnique, ShouldQueue
         // mostly), which the search above no longer brings.
         $left = $space->tickets()->open()->where('local', false)->whereNotIn('jira_id', $seen)->get();
         $space->tickets()->whereKey($left->modelKeys())->update(['left_at' => $now]);
+        // Their chats are over: closed, unless an agent is still at work on one.
+        if ($left->isNotEmpty()) {
+            (new \App\Agent\CloseIdleChats)();
+        }
         foreach ($left->chunk(100) as $chunk) {
             try {
                 foreach ($jira->search('id in ('.$chunk->pluck('jira_id')->map(fn ($id) => (int) $id)->implode(',').')', ['status'])['issues'] as $issue) {

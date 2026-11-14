@@ -55,8 +55,14 @@ class TicketController extends Controller
         }
 
         $session = $ticket->openSession();
+        // Your last look before this one: what came since is marked new. A page's own polling is no look.
+        $seenBefore = $ticket->seenAt(auth()->user());
+        if (! request()->hasHeader('X-Inertia-Partial-Data')) {
+            $ticket->markSeen(auth()->user());
+        }
 
         return Inertia::render('Tickets/Show', [
+            'seenBefore' => $seenBefore?->toIso8601String(),
             'ticket' => [
                 'id' => $ticket->id,
                 'key' => $ticket->key,

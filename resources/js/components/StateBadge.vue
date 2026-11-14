@@ -13,7 +13,7 @@ const states = {
     working: { label: 'Working', tone: 'text-working', shape: 'half' },
     sleeping: { label: 'Sleeping', tone: 'text-waiting', shape: 'moon' },
     'not-analysed': { label: 'Not analysed', tone: 'text-muted', shape: 'ring' },
-    parked: { label: 'Parked', tone: 'text-muted', shape: 'pause' },
+    parked: { label: 'Worked on', tone: 'text-muted', shape: 'pause' },
     hidden: { label: 'Hidden', tone: 'text-muted', shape: 'ring' },
     'dev-in-progress': { label: 'In progress', tone: 'text-working', shape: 'half' },
     'dev-to-do': { label: 'To do', tone: 'text-muted', shape: 'ring' },

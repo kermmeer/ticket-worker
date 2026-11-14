@@ -44,6 +44,13 @@ class OverviewController extends Controller
 
         $followed = request()->user()?->followedSpaces()->pluck('spaces.id')->all() ?? [];
 
+        // Your last look at each ticket, and the agent's last answer on it (any chat).
+        $seen = \Illuminate\Support\Facades\DB::table('ticket_views')->where('user_id', auth()->id())->whereIn('ticket_id', $tickets->pluck('id'))->pluck('seen_at', 'ticket_id');
+        $answered = \Illuminate\Support\Facades\DB::table('agent_turns')->join('agent_sessions', 'agent_sessions.id', '=', 'agent_turns.agent_session_id')
+            ->whereIn('agent_sessions.ticket_id', $tickets->pluck('id'))->whereNotNull('agent_turns.finished_at')
+            ->selectRaw('agent_sessions.ticket_id as ticket, max(agent_turns.finished_at) as at')->groupBy('agent_sessions.ticket_id')->pluck('at', 'ticket');
+        $state = fn (Ticket $ticket) => $this->state($ticket, $sessions[$ticket->id] ?? null, $seen[$ticket->id] ?? null, $answered[$ticket->id] ?? null);
+
         return Inertia::render('Overview', [
             'hasSpaces' => Space::query()->exists(),
             // How often a sync is due: a space far past it has a worker down somewhere.
@@ -116,7 +123,10 @@ class OverviewController extends Controller
                 'branches' => $ticket->branches->map(fn ($branch) => [
                     'system' => $branch->system?->name, 'name' => $branch->name, 'commits' => $branch->commits, 'added' => $branch->added, 'removed' => $branch->removed,
                 ])->values(),
-                'group' => $this->group($ticket, $sessions[$ticket->id] ?? null, $byId[$ticket->space_id], $dev),
+                // Since your last look: an answer waiting, Jira changes; and whether it was marked done here.
+                ...($flags = $state($ticket)),
+                'done' => $ticket->done_at !== null,
+                'group' => $this->group($ticket, $sessions[$ticket->id] ?? null, $byId[$ticket->space_id], $dev, $flags),
             ]),
         ]);
     }
@@ -125,19 +135,41 @@ class OverviewController extends Controller
      * What a ticket needs from you (CONCEPT.md §6). Hidden by you beats everything; an
      * agent at work or waiting for you comes next; then sleep, a closed session, or nothing yet.
      */
-    private function group(Ticket $ticket, ?AgentSession $session, Space $space, bool $development = false): string
+    /**
+     * What happened since you last looked (CONCEPT.md, proposal of 14 November 2026, A):
+     * the agent answered (needs you), or Jira changed the ticket (new activity). Without a
+     * look of yours yet, the agent's last answer is where "since" starts.
+     *
+     * @return array{needs_you: bool, new_activity: bool, seen_at: ?string}
+     */
+    private function state(Ticket $ticket, ?AgentSession $session, ?string $seenAt, ?string $answeredAt): array
+    {
+        $seen = $seenAt ? \Illuminate\Support\Carbon::parse($seenAt) : null;
+        $answered = $answeredAt ? \Illuminate\Support\Carbon::parse($answeredAt) : null;
+        $last = $session?->turns->last();
+        $needsYou = $ticket->done_at === null && $session?->state === 'open' && $last?->state === AgentTurn::DONE
+            && $answered !== null && ($seen === null || $answered->gt($seen));
+        $since = $seen ?? $answered;
+        $mine = $answered !== null || Ticket::isMine($ticket->assignee_account_id, $ticket->assignee, auth()->user());
+        $newActivity = $ticket->done_at === null && $mine && $since !== null && $ticket->jira_updated_at?->gt($since);
+
+        return ['needs_you' => $needsYou, 'new_activity' => (bool) $newActivity, 'seen_at' => $seen?->toIso8601String()];
+    }
+
+    private function group(Ticket $ticket, ?AgentSession $session, Space $space, bool $development = false, array $flags = []): string
     {
         $last = $session?->turns->last();
 
         return match (true) {
             $ticket->hidden_at !== null => 'hidden',
             $session?->state === 'open' && in_array($last?->state, [AgentTurn::QUEUED, AgentTurn::RUNNING], true) => 'working',
-            $session?->state === 'open' && $last !== null => 'needs-you',
+            $flags['needs_you'] ?? false => 'needs-you',
+            $flags['new_activity'] ?? false => 'new-activity',
             (bool) $ticket->local => 'own-work',
             $space->sleeps($ticket->status) => 'sleeping',
             // Development goes by where it is in Jira, not by what an agent did.
             $development => $ticket->status_category === 'indeterminate' ? 'dev-in-progress' : 'dev-to-do',
-            $session?->state === 'closed' => 'parked',
+            $session !== null => 'parked',
             default => 'not-analysed',
         };
     }

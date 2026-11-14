@@ -21,7 +21,7 @@ class CasebookEntry extends Model
     public const RETIRED = 'retired';
 
     protected $fillable = [
-        'system_id', 'space_ids', 'title', 'symptoms', 'cause', 'solution', 'keywords',
+        'kind', 'system_id', 'space_ids', 'title', 'symptoms', 'cause', 'solution', 'keywords',
         'source_tickets', 'state', 'written_by', 'used_count', 'last_used_at',
     ];
 

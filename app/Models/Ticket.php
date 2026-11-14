@@ -21,7 +21,7 @@ class Ticket extends Model
         'space_id', 'site', 'jira_id', 'key', 'summary', 'status', 'status_category', 'priority',
         'issue_type', 'reporter', 'assignee', 'assignee_account_id', 'slas', 'casebook_entry_id', 'casebook_score', 'jira_created_at', 'jira_updated_at',
         'first_seen_at', 'last_seen_at', 'left_at', 'hidden_at',
-        'casebook_manual', 'local', 'local_description', 'local_user_id', 'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id', 'sla_warned',
+        'casebook_manual', 'done_at', 'done_by', 'done_how', 'done_verdict', 'done_note', 'local', 'local_description', 'local_user_id', 'quick_scan_state', 'quick_scan', 'quick_scan_steps', 'quick_scan_error', 'quick_scan_cost_usd', 'quick_scan_tokens', 'quick_scan_at', 'quick_scan_user_id', 'sla_warned',
     ];
 
     protected function casts(): array
@@ -38,6 +38,7 @@ class Ticket extends Model
             'quick_scan_steps' => 'array',
             'casebook_manual' => 'boolean',
             'local' => 'boolean',
+            'done_at' => 'datetime',
             'quick_scan_cost_usd' => 'float',
             'quick_scan_at' => 'datetime',
             'sla_warned' => 'array',
@@ -128,6 +129,29 @@ class Ticket extends Model
     public function matchText(): string
     {
         return (string) $this->summary;
+    }
+
+    /** How a ticket can end, as Done asks it. */
+    public const DONE_HOW = ['reply' => 'A reply', 'data' => 'A data fix', 'code' => 'A code change', 'config' => 'Configuration', 'not_ours' => 'Not ours', 'duplicate' => 'A duplicate', 'other' => 'Something else'];
+
+    public const VERDICTS = ['right' => 'Right', 'partly' => 'Partly', 'wrong' => 'Wrong'];
+
+    /** When this person last opened it; null when never. */
+    public function seenAt(?User $user): ?\Illuminate\Support\Carbon
+    {
+        if ($user === null) {
+            return null;
+        }
+        $at = \Illuminate\Support\Facades\DB::table('ticket_views')->where(['user_id' => $user->id, 'ticket_id' => $this->id])->value('seen_at');
+
+        return $at ? \Illuminate\Support\Carbon::parse($at) : null;
+    }
+
+    public function markSeen(?User $user): void
+    {
+        if ($user !== null) {
+            \Illuminate\Support\Facades\DB::table('ticket_views')->upsert([['user_id' => $user->id, 'ticket_id' => $this->id, 'seen_at' => now()]], ['user_id', 'ticket_id'], ['seen_at']);
+        }
     }
 
     /** Own work, not (yet) a Jira ticket. */

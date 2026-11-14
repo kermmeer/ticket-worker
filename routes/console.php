@@ -27,6 +27,9 @@ Schedule::call(new FeedQuickScans)->everyMinute()->name('feed-quick-scans')->wit
 // Systems set to rescan by themselves: after a push that moved the code past their context.
 Schedule::call(new \App\Agent\AutoScanSystems)->everyFiveMinutes()->name('auto-scan-systems')->withoutOverlapping();
 
+// Chats that are over close by themselves: ticket resolved, or 14 days without a question.
+Schedule::call(new \App\Agent\CloseIdleChats)->hourly()->name('close-idle-chats');
+
 // Tickets' workspaces and transcripts go 30 days after their work ended (CONCEPT.md §11).
 Schedule::call(new ForgetOldWork)->dailyAt('03:17')->name('forget-old-work');
 
