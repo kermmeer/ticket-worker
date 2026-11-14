@@ -478,7 +478,8 @@ own work.
   anything, including instructions aimed at the agent. The agent can only read code and talk
   to you, so the worst a hostile ticket can do is mislead the analysis. That is why it gets
   no open network, no Jira tool, and no write access outside its scratch copy. Data tools
-  (next) only read. Keep it that way when adding features.
+  (next) only read, or propose: a change through an API is never sent by the agent, only by a
+  person who pressed Run it. Keep it that way when adding features.
 - **Data, when a system offers it.** Normally the agent sees code and history only. Some
   systems come with API definitions and a token to fetch data, or a read-only database
   account. **APIs are built (2026-10-06):** on the Systems page each system can have any
@@ -495,6 +496,16 @@ own work.
   agent is told to ask for one record rather than a list. Patch turns do not get the tools.
   SELECT queries on a read-only database account are still to come, the same way. Keep
   tokens out of the code you push; put them in the system's settings instead.
+  *Changed 2026-11-14:* a system has one sign-in all its APIs can share ("as the system");
+  an API with a sign-in of its own keeps that. And per API, what the agent may do: **read**
+  (GET), **read and query** (GET, and POST for searches: what "allow POST" was), or **read,
+  and change after approval**. On that last kind a POST, PUT, PATCH or DELETE is not sent:
+  it becomes a proposal on the ticket page (method, path, body, the agent's reason), and an
+  editor or admin presses **Run it** or **Refuse**. Run, the tool sends it once (a second
+  press does nothing) with the API's sign-in, records it in the audit trail, and the agent
+  hears the outcome, or the refusal, with the next question. The sign-in must itself be
+  allowed to make those changes: the approval is the tool's line, the account's rights the
+  system's.
 - **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders, and the
   systems hold what you pushed, which is committed code, not a server's `.env`.
 - **Personal data.** Tickets carry names, email addresses and screenshots.

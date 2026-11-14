@@ -75,6 +75,12 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/draft', 'draft')->name('draft');
     Route::post('/assign-to-me', 'assignToMe')->name('assign-to-me');
 });
+
+// Changes the agent proposed through an API: run or refused by a person.
+Route::controller(\App\Http\Controllers\ApiCallController::class)->prefix('tickets/{ticket}/changes/{call}')->name('tickets.changes.')->group(function () {
+    Route::post('/run', 'run')->name('run');
+    Route::post('/refuse', 'refuse')->name('refuse');
+});
 Route::get('/tickets/{ticket}/attachments/{attachment}', AttachmentController::class)->where('attachment', '[0-9]+')->name('tickets.attachment');
 Route::post('/tickets/{ticket}/hide', [HiddenTicketController::class, 'store'])->name('tickets.hide');
 Route::delete('/tickets/{ticket}/hide', [HiddenTicketController::class, 'destroy'])->name('tickets.unhide');
@@ -126,6 +132,7 @@ Route::middleware('role:editor')->group(function () {
         Route::put('/{system}/context', 'updateContext')->name('context');
         Route::put('/{system}/checks', 'updateChecks')->name('checks');
         Route::post('/{system}/checks/prepare', 'prepareChecks')->name('checks.prepare');
+        Route::put('/{system}/api-sign-in', 'updateApiSignIn')->name('api-sign-in');
         Route::post('/{system}/apis', 'storeApi')->name('apis.store');
         Route::put('/{system}/apis/{api}', 'updateApi')->name('apis.update');
         Route::delete('/{system}/apis/{api}', 'destroyApi')->name('apis.destroy');

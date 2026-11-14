@@ -7,16 +7,29 @@ import { router, useForm } from '@inertiajs/vue3';
 const props = defineProps({
     system: { type: Object, required: true },
     authKinds: { type: Object, required: true },
+    accessKinds: { type: Object, default: () => ({}) },
 });
 
-const blank = { name: '', base_url: '', auth: 'basic', username: '', field: '', secret: '', allow_post: false, notes: '', clear_secret: false };
+// One sign-in for all of this system's APIs; an API set to "as the system" uses it.
+const shared = props.system.api_sign_in ?? { auth: 'none' };
+const signIn = useForm({ auth: shared.auth ?? 'none', username: shared.username ?? '', field: shared.field ?? '', secret: '' });
+const signInOpen = ref(false);
+function saveSignIn() {
+    signIn.put(`/systems/${props.system.id}/api-sign-in`, { preserveScroll: true, onSuccess: () => { signIn.secret = ''; signInOpen.value = false; } });
+}
+const ownKinds = Object.fromEntries(Object.entries(props.authKinds).filter(([key]) => key !== 'system'));
+const signInLine = () => (shared.auth && shared.auth !== 'none'
+    ? `${ownKinds[shared.auth] ?? shared.auth}${shared.username ? ` as ${shared.username}` : ''}${shared.field ? ` in ${shared.field}` : ''} · ${shared.has_secret ? 'secret set' : 'secret missing'}`
+    : 'none set');
+
+const blank = { name: '', base_url: '', auth: props.system.api_sign_in?.auth && props.system.api_sign_in.auth !== 'none' ? 'system' : 'basic', username: '', field: '', secret: '', access: 'read', notes: '', clear_secret: false };
 const editing = ref(null); // an api id, 'new', or null
 const form = useForm({ ...blank });
 const tryPath = ref({});
 
 function start(api = null) {
     form.clearErrors();
-    form.defaults(api ? { ...blank, ...api, username: api.username ?? '', field: api.field ?? '', notes: api.notes ?? '', secret: '' } : { ...blank });
+    form.defaults(api ? { ...blank, ...api, username: api.username ?? '', field: api.field ?? '', notes: api.notes ?? '', secret: '', access: api.access ?? (api.allow_post ? 'query' : 'read') } : { ...blank });
     form.reset();
     editing.value = api ? api.id : 'new';
 }
@@ -46,8 +59,36 @@ const secretLabel = { basic: 'Password or token', bearer: 'Token', header: 'Valu
     <div class="mt-5 border-t border-line pt-4">
         <div class="flex flex-wrap items-center gap-3">
             <p class="text-sm font-medium">APIs</p>
-            <span class="text-sm text-muted">for the agent to check tickets against real data; read-only, it never sees the secret</span>
+            <span class="text-sm text-muted">for the agent to check tickets against real data, and to propose changes where you allow it; it never sees a secret</span>
             <button v-if="editing === null" type="button" class="btn ml-auto px-3 py-1.5" @click="start()">Add an API</button>
+        </div>
+
+        <!-- The sign-in its APIs share. -->
+        <div class="mt-3 rounded-md border border-line p-3 text-sm">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span class="font-medium">Sign-in for all its APIs</span>
+                <span class="text-xs text-muted">{{ signInLine() }}</span>
+                <button type="button" class="ml-auto text-xs text-muted underline hover:text-ink" :aria-expanded="signInOpen" @click="signInOpen = !signInOpen">{{ signInOpen ? 'Close' : 'Set' }}</button>
+            </div>
+            <form v-if="signInOpen" class="mt-3 grid gap-3 sm:grid-cols-2" @submit.prevent="saveSignIn">
+                <label class="block">Kind
+                    <select v-model="signIn.auth" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5">
+                        <option v-for="(label, value) in ownKinds" :key="value" :value="value">{{ label }}</option>
+                    </select>
+                </label>
+                <label v-if="signIn.auth === 'basic'" class="block">Username
+                    <input v-model="signIn.username" autocomplete="off" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5" />
+                </label>
+                <label v-if="signIn.auth === 'header' || signIn.auth === 'query'" class="block">{{ signIn.auth === 'header' ? 'Header name' : 'Parameter name' }}
+                    <input v-model="signIn.field" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 font-mono" />
+                </label>
+                <label v-if="signIn.auth !== 'none'" class="block">{{ secretLabel[signIn.auth] }}
+                    <input v-model="signIn.secret" type="password" autocomplete="new-password" :placeholder="shared.has_secret ? 'set; leave empty to keep it' : ''" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 font-mono" />
+                </label>
+                <p v-if="Object.keys(signIn.errors).length" class="text-signal sm:col-span-2">{{ Object.values(signIn.errors)[0] }}</p>
+                <p class="text-xs text-muted sm:col-span-2">Each API set to "As the system" uses this; an API with a sign-in of its own keeps that. Stored encrypted, never shown again.</p>
+                <div class="sm:col-span-2"><button type="submit" class="btn btn-signal" :disabled="signIn.processing">Save</button></div>
+            </form>
         </div>
 
         <ul v-if="system.apis.length" class="mt-3 divide-y divide-line rounded-md border border-line">
@@ -56,9 +97,12 @@ const secretLabel = { basic: 'Password or token', bearer: 'Token', header: 'Valu
                     <span class="font-mono">{{ system.name }}/{{ api.name }}</span>
                     <span class="font-mono text-xs break-all text-muted">{{ api.base_url }}</span>
                     <span class="text-xs text-muted">
-                        {{ authKinds[api.auth] }}<template v-if="api.username"> as {{ api.username }}</template><template v-if="api.field"> in {{ api.field }}</template>
-                        · <span :class="api.auth === 'none' || api.has_secret ? '' : 'text-signal'">{{ api.auth === 'none' ? 'no secret' : api.has_secret ? 'secret set' : 'secret missing' }}</span>
-                        · {{ api.allow_post ? 'GET and POST' : 'GET only' }}
+                        <template v-if="api.auth === 'system'">as the system</template>
+                        <template v-else>
+                            {{ authKinds[api.auth] }}<template v-if="api.username"> as {{ api.username }}</template><template v-if="api.field"> in {{ api.field }}</template>
+                            · <span :class="api.auth === 'none' || api.has_secret ? '' : 'text-signal'">{{ api.auth === 'none' ? 'no secret' : api.has_secret ? 'secret set' : 'secret missing' }}</span>
+                        </template>
+                        · <span :class="{ 'font-medium text-waiting': api.access === 'write' }">{{ { read: 'read only', query: 'read and query', write: 'changes after approval' }[api.access ?? (api.allow_post ? 'query' : 'read')] }}</span>
                     </span>
                     <span class="ml-auto flex gap-2">
                         <button type="button" class="text-xs text-muted hover:text-ink" @click="start(api)">Edit</button>
@@ -102,7 +146,7 @@ const secretLabel = { basic: 'Password or token', bearer: 'Token', header: 'Valu
                 <input v-model="form.field" :placeholder="form.auth === 'header' ? 'X-Api-Key' : 'api_key'" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5 font-mono" />
                 <span v-if="form.errors.field" class="mt-1 block text-signal">{{ form.errors.field }}</span>
             </label>
-            <label v-if="form.auth !== 'none'" class="block">
+            <label v-if="form.auth !== 'none' && form.auth !== 'system'" class="block">
                 <span class="font-medium">{{ secretLabel[form.auth] }}</span>
                 <input
                     v-model="form.secret"
@@ -117,13 +161,17 @@ const secretLabel = { basic: 'Password or token', bearer: 'Token', header: 'Valu
                 <span class="font-medium">Notes for the agent</span>
                 <textarea v-model="form.notes" rows="3" placeholder="What it offers, e.g. GET /finance/view/service/{id} is a service with its recurring price. The API definition is in docs/api.yaml of this system." class="mt-1 w-full rounded-md border border-line bg-page px-2 py-1.5"></textarea>
             </label>
-            <label class="flex items-start gap-2 sm:col-span-2">
-                <input v-model="form.allow_post" type="checkbox" class="mt-1" />
-                <span>
-                    Allow POST too
-                    <span class="block text-xs text-muted">Only for APIs that need POST to search. A POST can change data: leave it off unless you know this API's POSTs only read.</span>
+            <fieldset class="sm:col-span-2">
+                <legend class="font-medium">What the agent may do with it</legend>
+                <label v-for="(label, value) in accessKinds" :key="value" class="mt-1.5 flex items-start gap-2">
+                    <input v-model="form.access" type="radio" :value="value" class="mt-1" />
+                    <span>{{ label }}</span>
+                </label>
+                <span class="mt-1 block text-xs text-muted">
+                    Read and query: only for APIs whose POSTs search. With changes after approval, nothing is sent until an editor presses Run it on the ticket;
+                    the sign-in above must be allowed to make those changes.
                 </span>
-            </label>
+            </fieldset>
             <div class="flex gap-2 sm:col-span-2">
                 <button type="submit" class="btn btn-signal" :disabled="form.processing">{{ editing === 'new' ? 'Add' : 'Save' }}</button>
                 <button type="button" class="btn" @click="editing = null">Cancel</button>

@@ -18,6 +18,7 @@ class ApiConnection extends Model
 {
     /** How the secret goes along. */
     public const AUTH = [
+        'system' => 'As the system (its sign-in for all its APIs)',
         'none' => 'None',
         'basic' => 'Username and password or token (basic)',
         'bearer' => 'Bearer token',
@@ -25,10 +26,20 @@ class ApiConnection extends Model
         'query' => 'A query parameter',
     ];
 
+    /** What the agent may do with it. */
+    public const ACCESS = [
+        'read' => 'Read: GET only',
+        'query' => 'Read and query: GET, and POST for searches',
+        'write' => 'Read, and change after approval: GET runs; POST, PUT, PATCH and DELETE wait for a person to run them',
+    ];
+
+    /** Methods that change something, on an API that allows changes: never run without a person. */
+    public const CHANGES = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
     /** What an answer may be before it is cut: the agent reads it, and it costs tokens. */
     public const MAX_ANSWER = 60_000;
 
-    protected $fillable = ['system_id', 'name', 'base_url', 'auth', 'username', 'field', 'secret', 'allow_post', 'notes'];
+    protected $fillable = ['system_id', 'name', 'base_url', 'auth', 'username', 'field', 'secret', 'allow_post', 'access', 'notes'];
 
     protected $hidden = ['secret'];
 
@@ -53,24 +64,57 @@ class ApiConnection extends Model
         return rtrim($this->base_url, '/').'/'.ltrim($path, '/');
     }
 
+    /** A call of this method waits for a person: a change, on an API that allows changes after approval. */
+    public function needsApproval(string $method): bool
+    {
+        return $this->access === 'write' && in_array(strtoupper($method), self::CHANGES, true);
+    }
+
+    /** @return list<string> what the agent may call it with (a change only as a proposal) */
+    public function methods(): array
+    {
+        return match ($this->access) {
+            'write' => ['GET', ...self::CHANGES],
+            'query' => ['GET', 'POST'],
+            default => ['GET'],
+        };
+    }
+
     /**
-     * One call, as the agent asked it. Never throws for what the API answers: a 404 is an
-     * answer too.
+     * One call, as the agent asked it: only what its access allows to run at once. Never
+     * throws for what the API answers: a 404 is an answer too.
      *
      * @return array{status: int, type: ?string, body: string, truncated: bool}
      */
     public function call(string $method, string $path, array $query = [], ?array $body = null): array
     {
         $method = strtoupper($method);
-        if (! in_array($method, $this->allow_post ? ['GET', 'POST'] : ['GET'], true)) {
-            throw new InvalidArgumentException($this->allow_post ? 'Only GET and POST.' : "Only GET: this API is read-only for you.");
+        if (! in_array($method, $this->methods(), true)) {
+            throw new InvalidArgumentException($this->access === 'query' ? 'Only GET and POST.' : 'Only GET: this API is read-only for you.');
+        }
+        if ($this->needsApproval($method)) {
+            throw new InvalidArgumentException("A {$method} changes something: it waits for a person to run it.");
         }
 
+        return $this->send($method, $path, $query, $body);
+    }
+
+    /**
+     * Send it. For calls its access allows, and for a change a person approved: the one
+     * caller that may change data is ApiCallController, after that approval.
+     *
+     * @return array{status: int, type: ?string, body: string, truncated: bool}
+     */
+    public function send(string $method, string $path, array $query = [], ?array $body = null): array
+    {
+        $method = strtoupper($method);
         $url = $this->urlFor($path);
         try {
             $response = match ($method) {
                 'GET' => $this->request()->get($url, $query ?: null),
-                'POST' => $this->request()->withQueryParameters($query)->post($url, $body ?? []),
+                'DELETE' => $this->request()->withQueryParameters($query)->delete($url, $body ?? []),
+                'POST', 'PUT', 'PATCH' => $this->request()->withQueryParameters($query)->{strtolower($method)}($url, $body ?? []),
+                default => throw new InvalidArgumentException("No method {$method}."),
             };
         } catch (ConnectionException $e) {
             return ['status' => 0, 'type' => null, 'body' => $this->redact('No answer: '.$e->getMessage()), 'truncated' => false];
@@ -90,10 +134,27 @@ class ApiConnection extends Model
         ];
     }
 
+    /**
+     * The sign-in it uses: its own, or its system's when it says "as the system".
+     *
+     * @return array{auth: string, username: ?string, field: ?string, secret: ?string}
+     */
+    public function signIn(): array
+    {
+        if ($this->auth === 'system') {
+            $system = $this->system;
+
+            return ['auth' => $system?->api_auth ?: 'none', 'username' => $system?->api_username, 'field' => $system?->api_field, 'secret' => $system?->api_secret];
+        }
+
+        return ['auth' => (string) $this->auth, 'username' => $this->username, 'field' => $this->field, 'secret' => $this->secret];
+    }
+
     /** Whatever an API echoes back, the secret never reaches the agent. */
     public function redact(string $text): string
     {
-        $secrets = array_filter([$this->secret, $this->secret ? base64_encode("{$this->username}:{$this->secret}") : null], fn ($value) => is_string($value) && strlen($value) >= 4);
+        $in = $this->signIn();
+        $secrets = array_filter([$in['secret'], $in['secret'] ? base64_encode("{$in['username']}:{$in['secret']}") : null], fn ($value) => is_string($value) && strlen($value) >= 4);
 
         return $secrets === [] ? $text : str_replace($secrets, '[secret]', $text);
     }
@@ -102,12 +163,13 @@ class ApiConnection extends Model
     {
         $request = Http::timeout(30)->connectTimeout(10)->acceptJson()->withoutRedirecting()
             ->withUserAgent('Ticket Worker');
+        $in = $this->signIn();
 
-        return match ($this->auth) {
-            'basic' => $request->withBasicAuth((string) $this->username, (string) $this->secret),
-            'bearer' => $request->withToken((string) $this->secret),
-            'header' => $request->withHeaders([(string) $this->field => (string) $this->secret]),
-            'query' => $request->withQueryParameters([(string) $this->field => (string) $this->secret]),
+        return match ($in['auth']) {
+            'basic' => $request->withBasicAuth((string) $in['username'], (string) $in['secret']),
+            'bearer' => $request->withToken((string) $in['secret']),
+            'header' => $request->withHeaders([(string) $in['field'] => (string) $in['secret']]),
+            'query' => $request->withQueryParameters([(string) $in['field'] => (string) $in['secret']]),
             default => $request,
         };
     }

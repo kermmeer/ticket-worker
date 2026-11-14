@@ -604,7 +604,9 @@ The commits since, with the files they touched:
 
         $notes = fn ($notes) => $notes ? ' ('.str_replace("\n", ' ', $notes).')' : '';
         $lines = [
-            ...$apis->map(fn ($api) => "- API {$api->system->name}/{$api->name}: {$api->base_url}".$notes($api->notes)),
+            ...$apis->map(fn ($api) => "- API {$api->system->name}/{$api->name}: {$api->base_url}"
+                .($api->access === 'write' ? ' (changes possible as proposals the engineer approves)' : ($api->access === 'query' ? ' (GET and POST queries)' : ' (read-only)'))
+                .$notes($api->notes)),
             ...$dbs->map(fn ($db) => "- database {$db->system->name}/{$db->name} ({$db->kind()})".$notes($db->notes)),
         ];
         $list = implode("\n", $lines);
@@ -621,6 +623,29 @@ The commits since, with the files they touched:
         back can hold customers' data: quote only what proves the point, and none of it in the reply draft
         beyond what the reporter already knows.
         TEXT;
+    }
+
+    /**
+     * What became of the changes the agent proposed, since it last heard: run (with the
+     * answer), failed or refused; and those still waiting. Each is told once.
+     */
+    public static function decidedChanges(Ticket $ticket): string
+    {
+        $calls = \App\Models\ApiCall::query()->with('api.system')->where('ticket_id', $ticket->id)
+            ->where(fn ($query) => $query->whereNull('reported_at')->orWhere('state', \App\Models\ApiCall::WAITING))->orderBy('id')->get();
+        if ($calls->isEmpty()) {
+            return '';
+        }
+
+        $lines = $calls->map(fn ($call) => match ($call->state) {
+            'done' => "- {$call->label()}: run by the engineer, HTTP {$call->status}. The answer:\n".\Illuminate\Support\Str::limit((string) $call->response, 3000),
+            'failed' => "- {$call->label()}: the engineer ran it, and it failed: ".\Illuminate\Support\Str::limit((string) $call->response, 1000),
+            'refused' => "- {$call->label()}: refused by the engineer. Do not propose it again unless they ask.",
+            default => "- {$call->label()}: still waiting for the engineer.",
+        });
+        \App\Models\ApiCall::query()->whereKey($calls->where('state', '!=', \App\Models\ApiCall::WAITING)->modelKeys())->update(['reported_at' => now()]);
+
+        return "\n\nThe changes you proposed, since your last answer:\n".$lines->implode("\n");
     }
 
     /**

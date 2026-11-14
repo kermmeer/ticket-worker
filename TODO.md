@@ -223,3 +223,6 @@ to it, including work you finish.
 - [x] On a phone, the whole menu behind ☰ beside the title (every page, New work, your account,
       the reference pages, hyper mode, day or night); the four-item bar stays. Every page checked
       at phone width (2026-11-14)
+- [x] One API sign-in per system, shared by APIs set to "as the system"; per API read, read and
+      query, or changes after approval: the agent proposes, an editor runs or refuses on the
+      ticket, and the agent hears the outcome (2026-11-14)

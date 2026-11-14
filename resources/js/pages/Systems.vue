@@ -10,6 +10,7 @@ import { reachable } from '../connection.js';
 import { tokens } from '../time.js';
 
 const props = defineProps({
+    accessKinds: { type: Object, default: () => ({}) },
     systems: { type: Array, required: true },
     agentReady: { type: Boolean, default: false },
     authKinds: { type: Object, default: () => ({}) },
@@ -137,6 +138,9 @@ function saveEdit(system) {
 function follow(system, branch) {
     router.put(`/systems/${system.id}`, { name: system.name, branch }, { preserveScroll: true });
 }
+
+// A new API-only project has no sign-in of its own to share yet.
+const newProjectAuthKinds = Object.fromEntries(Object.entries(props.authKinds).filter(([key]) => key !== 'system'));
 </script>
 
 <template>
@@ -200,7 +204,7 @@ function follow(system, branch) {
                 <div>
                     <label for="system-auth" class="text-sm font-medium">Sign-in</label>
                     <select id="system-auth" v-model="form.auth" class="mt-1 w-full rounded-md border border-line bg-page px-2 py-2 text-sm">
-                        <option v-for="(label, value) in authKinds" :key="value" :value="value">{{ label }}</option>
+                        <option v-for="(label, value) in newProjectAuthKinds" :key="value" :value="value">{{ label }}</option>
                     </select>
                 </div>
                 <div v-if="form.auth === 'basic'">
@@ -281,7 +285,7 @@ function follow(system, branch) {
                     ></textarea>
                     <button type="button" class="btn mt-2 px-3 py-1.5" :disabled="!(contexts[system.id] ?? '').trim()" @click="saveContext(system)">Save</button>
                 </div>
-                <ApiConnections :system="system" :auth-kinds="authKinds" />
+                <ApiConnections :system="system" :auth-kinds="authKinds" :access-kinds="accessKinds" />
                 <DbConnections :system="system" :drivers="dbDrivers" :servers="dbServers" />
             </template>
 
@@ -377,7 +381,7 @@ function follow(system, branch) {
 
                 <PullFrom :system="system" :ssh-available="sshAvailable" />
                 <SystemChecks :system="system" />
-                <ApiConnections :system="system" :auth-kinds="authKinds" />
+                <ApiConnections :system="system" :auth-kinds="authKinds" :access-kinds="accessKinds" />
                 <DbConnections :system="system" :drivers="dbDrivers" :servers="dbServers" />
             </template>
             </template>

@@ -43,6 +43,7 @@ class ApiToolServer
         private readonly ?Collection $dbs = null,
         private readonly ?\Closure $runChecks = null,
         private readonly array $checkNames = [],
+        private readonly ?AgentTurn $turn = null,
     ) {}
 
     /**
@@ -78,7 +79,7 @@ class ApiToolServer
             return new self(collect(), $log, collect(), $checks->isEmpty() ? null : fn () => app(Checks::class)->run($system, $copy), $checks->pluck('name')->all());
         }
 
-        return new self(self::apisOf($systems), $log, self::dbsOf($systems));
+        return new self(self::apisOf($systems), $log, self::dbsOf($systems), turn: $turn);
     }
 
     /** The tool names a build on this system is allowed. */
@@ -144,6 +145,7 @@ class ApiToolServer
         }
 
         $names = $this->apis->map(fn (ApiConnection $api) => $this->key($api))->values()->all();
+        $writable = $this->apis->contains(fn (ApiConnection $api) => $api->access === 'write');
         $dbNames = ($this->dbs ?? collect())->map(fn (DbConnection $db) => $db->system->name.'/'.$db->name)->values()->all();
         $databaseTools = $dbNames === [] ? [] : [
             [
@@ -176,13 +178,18 @@ class ApiToolServer
             [
                 'name' => 'call_api',
                 'description' => 'Call one of those APIs. The tool signs in for you; you never see or need a token. '
-                    .'Read-only: GET, or POST where an API allows it for queries. The answer is the status and the body.',
+                    .'GET reads; POST is for queries where an API allows it. '
+                    .($writable ? 'On an API that allows changes (list_apis says so), a POST, PUT, PATCH or DELETE does not run: it becomes a proposal '
+                        .'the engineer runs or refuses, and you hear which on your next turn. Give the reason. Propose a change only when the engineer '
+                        .'asked for it or it is the fix, one at a time, and read the record first. ' : '')
+                    .'The answer is the status and the body.',
                 'inputSchema' => [
                     'type' => 'object',
                     'required' => ['api', 'path'],
                     'properties' => [
                         'api' => ['type' => 'string', 'enum' => $names ?: ['none'], 'description' => 'system/name, from list_apis.'],
-                        'method' => ['type' => 'string', 'enum' => ['GET', 'POST'], 'default' => 'GET'],
+                        'method' => ['type' => 'string', 'enum' => $writable ? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] : ['GET', 'POST'], 'default' => 'GET'],
+                        'reason' => ['type' => 'string', 'description' => 'For a change: what it does and why, in one or two sentences, for the engineer who approves it.'],
                         'path' => ['type' => 'string', 'description' => 'Under the base address, like /finance/view/service/337800.'],
                         'query' => ['type' => 'object', 'additionalProperties' => ['type' => ['string', 'number', 'boolean']]],
                         'body' => ['type' => 'object', 'description' => 'JSON body, for POST.'],
@@ -219,7 +226,8 @@ class ApiToolServer
             $list = $this->apis->map(fn (ApiConnection $api) => [
                 'api' => $this->key($api),
                 'base' => $api->base_url,
-                'methods' => $api->allow_post ? ['GET', 'POST'] : ['GET'],
+                'methods' => $api->methods(),
+                'changes' => $api->access === 'write' ? 'POST, PUT, PATCH and DELETE are proposals: they wait for the engineer to run them' : 'none',
                 'notes' => $api->notes,
             ])->values();
 
@@ -240,6 +248,28 @@ class ApiToolServer
 
         $method = strtoupper((string) ($arguments['method'] ?? 'GET'));
         $path = (string) ($arguments['path'] ?? '');
+
+        // A change: held for a person, never sent from here.
+        if ($api->needsApproval($method)) {
+            if ($this->turn === null) {
+                return $this->text('Changes can only be proposed from a chat on a ticket.', true);
+            }
+            try {
+                $api->urlFor($path);
+            } catch (InvalidArgumentException $e) {
+                return $this->text($e->getMessage(), true);
+            }
+            $proposal = \App\Models\ApiCall::create([
+                'ticket_id' => $this->turn->session->ticket_id, 'agent_turn_id' => $this->turn->id, 'api_connection_id' => $api->id,
+                'method' => $method, 'path' => $path,
+                'query' => (array) ($arguments['query'] ?? []) ?: null, 'body' => isset($arguments['body']) ? (array) $arguments['body'] : null,
+                'reason' => isset($arguments['reason']) ? \Illuminate\Support\Str::limit((string) $arguments['reason'], 1000) : null,
+            ]);
+            $this->log("change proposed: {$method} {$path} on {$this->key($api)} (#{$proposal->id}), waiting for approval");
+
+            return $this->text("Not sent: {$proposal->label()} waits for the engineer, who runs or refuses it. You hear which on your next turn. "
+                .'Say in your answer what it does and why, and do not build on it as if it had run.');
+        }
 
         try {
             $answer = $api->call($method, $path, (array) ($arguments['query'] ?? []), isset($arguments['body']) ? (array) $arguments['body'] : null);

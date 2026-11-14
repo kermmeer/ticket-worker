@@ -26,9 +26,10 @@ class System extends Model
     /** Only APIs to call: nothing to push, nothing to read but its notes. */
     public const API = 'api';
 
-    protected $hidden = ['pull_secret'];
+    protected $hidden = ['api_secret', 'pull_secret'];
 
     protected $fillable = [
+        'api_auth', 'api_username', 'api_field', 'api_secret',
         'checks_node', 'checks_python', 'checks_setup', 'checks_redirects', 'checks_state', 'checks_log', 'checks_prepared_at',
         'name', 'kind', 'branch', 'state', 'error', 'context', 'context_commit', 'context_written_at',
         'scan_state', 'scan_stop_requested', 'scan_log', 'scan_error', 'scan_cost_usd',
@@ -39,6 +40,7 @@ class System extends Model
     protected function casts(): array
     {
         return [
+            'api_secret' => 'encrypted',
             'checks_prepared_at' => 'datetime',
             'pull_secret' => 'encrypted',
             'pulled_at' => 'datetime',

@@ -81,6 +81,9 @@ class TicketController extends Controller
                 // The code built for it, per repository: branch, commits, lines.
                 'branches' => $ticket->branches()->with('system:id,name')->get()->map->summary()->values(),
                 // Branches named after it already in its systems, built here or not: Build continues those.
+                // Changes the agent proposed through an API: waiting first, then the last decided.
+                'changes' => \App\Models\ApiCall::query()->with(['api.system', 'decider'])->where('ticket_id', $ticket->id)
+                    ->orderByRaw("state = 'waiting' desc")->latest('id')->limit(20)->get()->map->summary()->values(),
                 'repo_branches' => app(Workspace::class)->systems($ticket->load('space'))->filter->hasCode()
                     ->flatMap(fn ($system) => array_map(fn ($name) => ['system' => $system->name, 'name' => $name], Workspace::ticketBranches($system, $ticket->key)))->values(),
                 'base_branch' => SpaceSettings::for($ticket->space)->get('base_branch'),

@@ -8,6 +8,7 @@ import FoldingSection from '../../components/FoldingSection.vue';
 import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
 import OwnWork from '../../components/OwnWork.vue';
+import ProposedChanges from '../../components/ProposedChanges.vue';
 import QuickScanCard from '../../components/QuickScanCard.vue';
 import Refinement from '../../components/Refinement.vue';
 import SpaceLabel from '../../components/SpaceLabel.vue';
@@ -362,6 +363,9 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
             <template v-if="ticket.refinement.questions?.length"><dt class="text-muted">Open</dt><dd class="line-clamp-2">{{ ticket.refinement.questions.length }} {{ ticket.refinement.questions.length === 1 ? 'question' : 'questions' }} for the product owner: {{ ticket.refinement.questions[0] }}</dd></template>
         </dl>
         <p v-else-if="isDev && !proposal" class="mt-3 text-sm text-muted">Not refined yet.</p>
+        <p v-if="ticket.changes.some((change) => change.state === 'waiting')" class="mt-3 text-sm font-medium text-waiting">
+            <a href="#agent" class="underline">A change the agent proposes is waiting for you</a>: nothing is sent until it is run.
+        </p>
         <!-- The code built for it, per repository: at a glance, with the command to fetch it. -->
         <div v-if="ticket.branches.length" class="mt-3 space-y-1.5 text-sm">
             <p v-for="branch in ticket.branches" :key="branch.id" class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -596,6 +600,8 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                 </template>
 
                 </div>
+
+                <ProposedChanges :ticket-id="ticket.id" :changes="ticket.changes" :class="{ 'mt-6': session }" />
 
                 <!-- Ask, at the bottom like any chat. -->
                 <div v-if="agentReady && !busy" id="chat-box" class="scroll-mt-28" :class="{ 'mt-6': session }">

@@ -60,6 +60,8 @@ class SystemController extends Controller
                         ? preg_replace('#/systems/?$#', '', $base).'/agent/checks/packages/'.$system->name.'/'
                         : \App\Agent\Checks::packages($system).'/',
                 ] : null,
+                // The sign-in its APIs can share; a secret is only ever "set" or not.
+                'api_sign_in' => ['auth' => $system->api_auth ?? 'none', 'username' => $system->api_username, 'field' => $system->api_field, 'has_secret' => filled($system->api_secret)],
                 // Its APIs; a secret is only ever "set" or not.
                 'databases' => $system->databases->map(fn (DbConnection $db) => [
                     'id' => $db->id, 'name' => $db->name, 'db_server_id' => $db->db_server_id, 'server' => $db->server?->name,
@@ -70,10 +72,11 @@ class SystemController extends Controller
                 'apis' => $system->apis->map(fn (ApiConnection $api) => [
                     'id' => $api->id, 'name' => $api->name, 'base_url' => $api->base_url, 'auth' => $api->auth,
                     'username' => $api->username, 'field' => $api->field, 'has_secret' => filled($api->secret),
-                    'allow_post' => $api->allow_post, 'notes' => $api->notes,
+                    'allow_post' => $api->allow_post, 'access' => $api->access, 'notes' => $api->notes,
                 ]),
             ]),
             'authKinds' => ApiConnection::AUTH,
+            'accessKinds' => ApiConnection::ACCESS,
             'dbDrivers' => DbConnection::DRIVERS,
             'dbServers' => DbServer::query()->withCount('databases')->orderBy('name')->get()->map(fn (DbServer $server) => [
                 'id' => $server->id, 'name' => $server->name, 'driver' => $server->driver, 'host' => $server->host, 'port' => $server->port,
@@ -507,17 +510,45 @@ class SystemController extends Controller
             'username' => ['nullable', 'required_if:auth,basic', 'string', 'max:200'],
             'field' => ['nullable', 'required_if:auth,header,query', 'string', 'max:100', 'regex:/^[A-Za-z0-9_.-]+$/'],
             'secret' => ['nullable', 'string', 'max:4000'],
-            'allow_post' => ['boolean'],
+            'access' => ['nullable', Rule::in(array_keys(ApiConnection::ACCESS))],
             'notes' => ['nullable', 'string', 'max:4000'],
         ], [
             'name.regex' => 'Lower-case letters, digits and dashes, like boss-api.',
             'field.required_if' => 'Which header or query parameter carries the secret?',
         ]);
 
+        // allow_post is what access "query" was called before.
+        $data['access'] ??= $request->boolean('allow_post') ? 'query' : 'read';
+        $data['allow_post'] = $data['access'] !== 'read';
+
         return $data;
     }
 
-    /** Your own edit of the context: kept as a version like the agent's. */
+    /** One sign-in for all of a system's APIs: each API set to "as the system" uses it. */
+    public function updateApiSignIn(Request $request, System $system): RedirectResponse
+    {
+        $kinds = array_keys(collect(ApiConnection::AUTH)->except('system')->all());
+        $data = $request->validate([
+            'auth' => ['required', Rule::in($kinds)],
+            'username' => ['nullable', 'required_if:auth,basic', 'string', 'max:200'],
+            'field' => ['nullable', 'required_if:auth,header,query', 'string', 'max:100', 'regex:/^[A-Za-z0-9_.-]+$/'],
+            'secret' => ['nullable', 'string', 'max:4000'],
+        ], ['field.required_if' => 'Which header or query parameter carries the secret?']);
+
+        $changes = ['api_auth' => $data['auth'], 'api_username' => $data['username'] ?? null, 'api_field' => $data['field'] ?? null];
+        // As everywhere: a secret never follows to another kind of sign-in or another account.
+        $moved = $data['auth'] !== $system->api_auth || ($data['username'] ?? null) !== $system->api_username;
+        if (filled($data['secret'] ?? null)) {
+            $changes['api_secret'] = trim($data['secret']);
+        } elseif ($moved || $data['auth'] === 'none') {
+            $changes['api_secret'] = null;
+        }
+        $system->update($changes);
+        AuditEvent::record('system.api-sign-in', $system->name, ApiConnection::AUTH[$data['auth']].(filled($data['secret'] ?? null) ? ', secret changed' : ''));
+
+        return back()->with('success', "Saved. Its APIs set to \"as the system\" sign in with it.");
+    }
+
     /** The checks of a system, and how to prepare for them; a changed setup prepares again. */
     public function updateChecks(Request $request, System $system): RedirectResponse
     {
@@ -564,6 +595,7 @@ class SystemController extends Controller
         return back()->with('success', 'Preparing the checks workspace.');
     }
 
+    /** Your own edit of the context: kept as a version like the agent's. */
     public function updateContext(Request $request, System $system): RedirectResponse
     {
         $data = $request->validate(['context' => ['required', 'string', 'max:60000']]);
