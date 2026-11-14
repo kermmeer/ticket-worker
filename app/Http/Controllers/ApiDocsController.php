@@ -38,7 +38,7 @@ class ApiDocsController extends Controller
         ]);
     }
 
-    /** From its OpenAPI spec when there is one, else written from the code by an agent. */
+    /** From the OpenAPI spec it serves, else written from the code (and any spec in it) by an agent. */
     public function write(System $system, ApiConnection $api): RedirectResponse
     {
         abort_unless($api->system_id === $system->id, 404);
@@ -49,6 +49,6 @@ class ApiDocsController extends Controller
         WriteApiDocs::dispatch($api, auth()->id());
         AuditEvent::record('api.docs', "{$system->name}/{$api->name}", 'docs being written');
 
-        return back()->with('success', "Writing the docs of {$api->name}: from its spec if it has one (seconds), else from the code (a few minutes).");
+        return back()->with('success', "Writing the docs of {$api->name}: from the spec it serves if it does (seconds), else from the code and any spec in it (a few minutes).");
     }
 }
