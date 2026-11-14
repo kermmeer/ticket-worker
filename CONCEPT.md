@@ -975,3 +975,56 @@ the way `push-systems.sh` reaches GitLab. Speed: the chat is already on the ligh
   starts from its summary.
 - *The database behind the VPN* is boss's production database, the one the read-only data
   tools (database servers, §11) are for, not the tool's own. Reaching it stays for later.
+
+### Proposed on 14 November 2026: ticket handling that keeps track
+
+*For review: nothing below is built yet.*
+
+**Why.** Of 36 tickets worked in 60 days, 28 were resolved since: the agent work pays off. But
+the overview misleads: *New activity* is never filled, *Needs you* holds chats idle for weeks
+(7 of 8), 24 resolved tickets still have an open chat, and nothing records how a ticket ended,
+so the casebook stays at 2 cases. And the case hints match too easily: one case is tied to 38
+open tickets, the weakest of them unrelated (scores from 21, the cutoff 20), support cases
+match development stories, and nothing groups tickets on a link nobody checked.
+
+**A. The overview tells the truth.**
+1. *Seen.* The tool remembers when you last opened a ticket, per person.
+2. *New activity:* a ticket with agent work, or assigned to you, that Jira changed after you
+   last looked. The row says so ("updated 2 h ago, after your last look"); on the ticket the
+   comments since then are marked new. Unread, in short.
+3. *Needs you* only while the agent's last answer is newer than your last look. Opened since:
+   the ticket moves on (to Working on it, or by its Jira status).
+4. A chat closes by itself when its ticket leaves the open list, and after 14 days without a
+   question (the next question starts a fresh one, with the summary, as now).
+
+**B. A ticket ends somewhere.**
+5. *Done* on the ticket, and asked for by itself when a ticket with agent work leaves the list:
+   how it was solved (a reply, a data fix, a code change, configuration, not ours, a duplicate),
+   whether the agent's answer was right (yes, partly, no), a line of note. Closes the chat.
+6. From *Done*, one click: the agent drafts the case from the chat, for you to approve.
+7. The Agents page shows how often the agent was right, per kind of ticket.
+8. *Reply, status and assignee in one go* — open: see below.
+
+**C. Case links you can trust, and duplicates together.**
+9. A case hint shows only above a stricter score, and a case matches tickets of its own kind
+   (support or development) unless it says otherwise. The links made now are matched again.
+10. Every hint has two buttons where it shows (overview row, ticket page): *Yes, this case* and
+    *Not this case*. Yes confirms it; no unties it for good, as *Not related* on the case does.
+    An analysis that confirms a case confirms the link too.
+11. Only confirmed links group: tickets confirmed on one case show as one group on the overview
+    and on the case, handled once, one reply for all of them (each still its own Jira ticket).
+
+**D. Your next ten.** A short list at the top of the overview, each with its reason: new
+activity on a ticket you work, an answer waiting for you, an SLA still in time and due soonest
+(yours, then unassigned ones in your spaces), then high priority assigned to you. Sleeping,
+hidden and done tickets never; a ticket once only.
+
+**Later.** The triage lane for the untouched backlog: with the new work board. The production
+database: once the GlobalProtect proxy works (a machine inside the VPN with SSH can serve as
+the jump host of a database server's tunnel). API docs: written per API, ordering from its spec.
+
+**Open.**
+- Reply, status and assignee in one go: the outbox takes the reply only, status and assignee
+  are set by hand there. Either the outbox learns to take them in a draft (a change in the
+  outbox, not here), or Ticket Worker changes status and assignee in Jira itself
+  (`JIRA_WRITE=real`) and the reply still goes through the outbox.
