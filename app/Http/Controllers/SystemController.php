@@ -74,6 +74,8 @@ class SystemController extends Controller
                     'id' => $api->id, 'name' => $api->name, 'base_url' => $api->base_url, 'auth' => $api->auth,
                     'username' => $api->username, 'field' => $api->field, 'has_secret' => filled($api->secret),
                     'allow_post' => $api->allow_post, 'access' => $api->access, 'notes' => $api->notes,
+                    'docs_count' => is_array($api->docs) ? count($api->docs) : 0, 'docs_source' => $api->docs_source,
+                    'docs_state' => $api->docs_state, 'docs_error' => $api->docs_error,
                 ]),
             ]),
             'authKinds' => ApiConnection::AUTH,

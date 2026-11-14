@@ -268,6 +268,53 @@ class Instructions
         ];
     }
 
+    /** An API's endpoints, as an agent writes them from the code. */
+    public static function apiDocsSchema(): array
+    {
+        $text = ['type' => 'string'];
+
+        return [
+            'type' => 'object',
+            'required' => ['endpoints'],
+            'properties' => [
+                'endpoints' => ['type' => 'array', 'items' => [
+                    'type' => 'object',
+                    'required' => ['method', 'path', 'summary'],
+                    'properties' => [
+                        'method' => ['type' => 'string', 'enum' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']],
+                        'path' => $text + ['description' => 'Under the base address, as a client calls it, with {placeholders} for path parameters, e.g. /invoice/{id}.'],
+                        'summary' => $text + ['description' => 'What it does, in one line.'],
+                        'params' => ['type' => 'array', 'items' => ['type' => 'object', 'required' => ['name', 'in'], 'properties' => [
+                            'name' => $text, 'in' => ['type' => 'string', 'enum' => ['path', 'query', 'body']], 'type' => $text,
+                            'required' => ['type' => 'boolean'], 'description' => $text,
+                        ]]],
+                        'returns' => $text + ['description' => 'What comes back, briefly: the model or the fields.'],
+                        'source' => $text + ['description' => 'Where it is defined: system/path:line.'],
+                    ],
+                ]],
+            ],
+        ];
+    }
+
+    public static function apiDocsRequest(\App\Models\ApiConnection $api): string
+    {
+        $system = $api->system;
+
+        return <<<TEXT
+        Document the HTTP API that {$system->name} serves at {$api->base_url} (called "{$api->name}" here), from its code at
+        {$system->path()}, so that someone can call it without reading the code.
+
+        Find where this API's routes are defined: route files, URL rules, controllers and their actions, the module that the
+        host or path of the base address points to. List every endpoint it serves: the method and the path as a client calls it,
+        under the base address; what it does; its parameters (path, query, body) with types and whether they are required, from
+        the code that reads them; and what it returns. Mind how the framework turns names into paths (actionGeneratePdf in
+        InvoiceController is /invoice/generate-pdf in Yii) and which verbs each action allows.
+
+        Only what the code shows: no guessed endpoints, no guessed parameters. Where it is unclear, say so in the summary.
+        End with the JSON.
+        TEXT;
+    }
+
     /** A development ticket refined, as a team would before building it. */
     public static function refineSchema(): array
     {
@@ -617,8 +664,9 @@ The commits since, with the files they touched:
         databases; list_apis and list_databases show the details.
         {$list}
         Ask only for what the ticket needs: one record rather than a list, the columns you need, a WHERE.
-        Never guess an endpoint: find it in the API's own code first (its routes or controllers, and the
-        parameters they read), then call it. A guessed path ends in a 404 or a 500 and tells you nothing.
+        Never guess an endpoint: look it up with api_docs where an API has docs, else find it in the API's
+        own code (its routes or controllers, and the parameters they read), then call it. A guessed path
+        ends in a 404 or a 500 and tells you nothing.
         The tool signs in for you: never ask for a token or a password and never write one down. What comes
         back can hold customers' data: quote only what proves the point, and none of it in the reply draft
         beyond what the reporter already knows.

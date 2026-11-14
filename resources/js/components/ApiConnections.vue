@@ -110,6 +110,16 @@ const secretLabel = { basic: 'Password or token', bearer: 'Token', header: 'Valu
                     </span>
                 </div>
                 <p v-if="api.notes" class="mt-1 text-xs whitespace-pre-wrap text-muted">{{ api.notes }}</p>
+                <p class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <a v-if="api.docs_count" :href="`/apis/${api.id}`" class="underline hover:text-ink">Docs: {{ api.docs_count }} endpoints</a>
+                    <span v-else-if="['queued', 'writing'].includes(api.docs_state)" class="text-working">Docs being written…</span>
+                    <span v-else class="text-muted">No docs yet</span>
+                    <span v-if="api.docs_source" class="text-muted">{{ api.docs_source }}</span>
+                    <span v-if="api.docs_state === 'failed'" class="text-signal">{{ api.docs_error }}</span>
+                    <button v-if="!['queued', 'writing'].includes(api.docs_state)" type="button" class="text-muted underline hover:text-ink" @click="router.post(`/systems/${system.id}/apis/${api.id}/docs`, {}, { preserveScroll: true })">
+                        {{ api.docs_count ? 'Write them again' : 'Write its docs' }}
+                    </button>
+                </p>
                 <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="tryIt(api)">
                     <label :for="`try-${api.id}`" class="text-xs text-muted">Try a GET of</label>
                     <input :id="`try-${api.id}`" v-model="tryPath[api.id]" placeholder="/ or a path" class="min-w-0 flex-1 rounded-md border border-line bg-page px-2 py-1 font-mono text-xs" />

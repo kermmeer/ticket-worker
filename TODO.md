@@ -230,3 +230,7 @@ to it, including work you finish.
       and end only, a switch by hand holds; every open window follows it (2026-11-14)
 - [x] Rescan by itself after a push, per system: ten minutes after the last push, at most once
       an hour (2026-11-14)
+- [x] API docs (2026-11-14): from a served or committed OpenAPI spec, else written from the code
+      by an agent; an APIs page for everyone; `api_docs` for the agent. ordering-api has a spec
+      in boss (5 endpoints); the other eight are to be written from the code.
+- [ ] `composer audit` reports 8 advisories in 5 packages (seen 2026-11-14 when adding symfony/yaml)

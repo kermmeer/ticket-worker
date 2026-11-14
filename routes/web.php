@@ -46,6 +46,10 @@ Route::controller(AccountController::class)->group(function () {
 Route::get('/', OverviewController::class)->name('overview');
 Route::post('/quick-scans', [QuickScanBatchController::class, 'store'])->name('quick-scans.store');
 Route::delete('/quick-scans', [QuickScanBatchController::class, 'destroy'])->name('quick-scans.destroy');
+// The APIs' docs, for everyone.
+Route::get('/apis', [\App\Http\Controllers\ApiDocsController::class, 'index'])->name('apis.index');
+Route::get('/apis/{api}', [\App\Http\Controllers\ApiDocsController::class, 'show'])->name('apis.show');
+
 // Own work: started here, made a Jira ticket later.
 Route::controller(\App\Http\Controllers\OwnWorkController::class)->name('work.')->group(function () {
     Route::get('/work/new', 'create')->name('create');
@@ -135,6 +139,7 @@ Route::middleware('role:editor')->group(function () {
         Route::post('/{system}/checks/prepare', 'prepareChecks')->name('checks.prepare');
         Route::put('/{system}/api-sign-in', 'updateApiSignIn')->name('api-sign-in');
         Route::post('/{system}/apis', 'storeApi')->name('apis.store');
+        Route::post('/{system}/apis/{api}/docs', [\App\Http\Controllers\ApiDocsController::class, 'write'])->name('apis.docs');
         Route::put('/{system}/apis/{api}', 'updateApi')->name('apis.update');
         Route::delete('/{system}/apis/{api}', 'destroyApi')->name('apis.destroy');
         Route::post('/{system}/apis/{api}/try', 'tryApi')->name('apis.try');

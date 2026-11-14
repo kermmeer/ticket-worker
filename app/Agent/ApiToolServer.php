@@ -59,6 +59,9 @@ class ApiToolServer
         if (ApiConnection::whereIn('system_id', $ids)->exists()) {
             $names = ['mcp__ticket-worker__list_apis', 'mcp__ticket-worker__call_api'];
         }
+        if (ApiConnection::whereIn('system_id', $ids)->whereNotNull('docs')->exists()) {
+            $names[] = 'mcp__ticket-worker__api_docs';
+        }
         if (DbConnection::whereIn('system_id', $ids)->exists()) {
             $names = [...$names, 'mcp__ticket-worker__list_databases', 'mcp__ticket-worker__run_query'];
         }
@@ -169,7 +172,22 @@ class ApiToolServer
             ],
         ];
 
-        return [...$databaseTools, ...[
+        $documented = $this->apis->filter(fn (ApiConnection $api) => ! empty($api->docs))->map(fn (ApiConnection $api) => $this->key($api))->values()->all();
+        $docsTool = $documented === [] ? [] : [[
+            'name' => 'api_docs',
+            'description' => 'Look up endpoints in an API\'s docs: method, path, parameters and what comes back. Look here before calling: '
+                .'a guessed path ends in a 404. Search with words from the path or what you need, e.g. "invoice lines" or "phone number".',
+            'inputSchema' => [
+                'type' => 'object',
+                'required' => ['api'],
+                'properties' => [
+                    'api' => ['type' => 'string', 'enum' => $documented],
+                    'search' => ['type' => 'string', 'description' => 'Words that must all appear; empty lists the first endpoints.'],
+                ],
+            ],
+        ]];
+
+        return [...$databaseTools, ...$docsTool, ...[
             [
                 'name' => 'list_apis',
                 'description' => 'The APIs of this ticket\'s systems that you may call, with their base address and notes on what they offer.',
@@ -222,11 +240,28 @@ class ApiToolServer
             return $this->database($tool, $arguments);
         }
 
+        if ($tool === 'api_docs') {
+            $api = $this->apis->first(fn (ApiConnection $api) => $this->key($api) === ($arguments['api'] ?? null));
+            if ($api === null || empty($api->docs)) {
+                return $this->text('No docs for that API. list_apis shows which have them.', true);
+            }
+            $found = ApiDocs::search($api->docs, $arguments['search'] ?? null);
+            $this->log("docs {$this->key($api)}: ".($arguments['search'] ?? 'all').' → '.count($found));
+            if ($found === []) {
+                return $this->text('Nothing matches. Try other words, fewer of them, or look in the code.');
+            }
+
+            return $this->text(collect($found)->map(fn ($e) => "{$e['method']} {$e['path']}: {$e['summary']}"
+                .(empty($e['params']) ? '' : "\n  params: ".collect($e['params'])->map(fn ($p) => "{$p['name']} ({$p['in']}".(! empty($p['type']) ? ", {$p['type']}" : '').(! empty($p['required']) ? ', required' : '').')'.(! empty($p['description']) ? " {$p['description']}" : ''))->implode('; '))
+                .(empty($e['returns']) ? '' : "\n  returns: {$e['returns']}"))->implode("\n\n"));
+        }
+
         if ($tool === 'list_apis') {
             $list = $this->apis->map(fn (ApiConnection $api) => [
                 'api' => $this->key($api),
                 'base' => $api->base_url,
                 'methods' => $api->methods(),
+                'docs' => $api->docs ? count($api->docs).' endpoints documented: look them up with api_docs' : 'none: find endpoints in the code',
                 'changes' => $api->access === 'write' ? 'POST, PUT, PATCH and DELETE are proposals: they wait for the engineer to run them' : 'none',
                 'notes' => $api->notes,
             ])->values();

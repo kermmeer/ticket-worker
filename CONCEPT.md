@@ -510,6 +510,14 @@ own work.
   hears the outcome, or the refusal, with the next question. The sign-in must itself be
   allowed to make those changes: the approval is the tool's line, the account's rights the
   system's.
+  *Docs, 2026-11-14:* each API can have its endpoints written down: read from an OpenAPI or
+  Swagger spec the API serves (`/openapi.json` and the usual places under its base address)
+  or one in its system's code (named after the API, or with a server at its host), at no
+  cost; else written by an agent from the code where its routes are (the chat model, on the
+  scan budget). One shape either way: method, path under the base address, summary,
+  parameters, body, what comes back. Everyone reads them under *APIs* in the menu, searchable;
+  editors write them on the Systems page. The agent gets `api_docs` to look endpoints up and
+  is told to, before it calls: the guessed paths that ended in 404s (§17) were the reason.
 - **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders, and the
   systems hold what you pushed, which is committed code, not a server's `.env`.
 - **Personal data.** Tickets carry names, email addresses and screenshots.

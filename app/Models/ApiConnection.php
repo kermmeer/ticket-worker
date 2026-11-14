@@ -39,13 +39,13 @@ class ApiConnection extends Model
     /** What an answer may be before it is cut: the agent reads it, and it costs tokens. */
     public const MAX_ANSWER = 60_000;
 
-    protected $fillable = ['system_id', 'name', 'base_url', 'auth', 'username', 'field', 'secret', 'allow_post', 'access', 'notes'];
+    protected $fillable = ['system_id', 'name', 'base_url', 'auth', 'username', 'field', 'secret', 'allow_post', 'access', 'notes', 'docs', 'docs_source', 'docs_state', 'docs_error', 'docs_cost_usd', 'docs_written_at'];
 
     protected $hidden = ['secret'];
 
     protected function casts(): array
     {
-        return ['secret' => 'encrypted', 'allow_post' => 'boolean'];
+        return ['secret' => 'encrypted', 'allow_post' => 'boolean', 'docs' => 'array', 'docs_written_at' => 'datetime', 'docs_cost_usd' => 'float'];
     }
 
     public function system(): BelongsTo
