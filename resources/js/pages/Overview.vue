@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import FoldingSection from '../components/FoldingSection.vue';
+import MineView from '../components/MineView.vue';
 import SpaceLabel from '../components/SpaceLabel.vue';
 import StatusLabel from '../components/StatusLabel.vue';
 import TicketRow from '../components/TicketRow.vue';
@@ -11,6 +12,7 @@ import { ago, short } from '../time.js';
 import { byDueNext, dueAt, phrase, shortName, tone, urgency } from '../sla.js';
 
 const props = defineProps({
+    nextTen: { type: Array, default: () => [] },
     syncEvery: { type: Number, default: 10 },
     hasSpaces: { type: Boolean, required: true },
     spaces: { type: Array, required: true },
@@ -90,6 +92,9 @@ const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value ===
 const statusFilter = ref(null);
 const search = ref('');
 const searchBox = ref(null);
+
+const tab = ref(stored('overview.tab') === 'all' ? 'all' : 'mine');
+watch(tab, (value) => keep('overview.tab', value));
 
 const spacesById = computed(() => Object.fromEntries(props.spaces.map((space) => [space.id, space])));
 
@@ -361,6 +366,14 @@ onBeforeUnmount(() => {
             </li>
         </ul>
 
+        <!-- Yours first, the outbox's way; All is the overview as it was. Kept in this browser. -->
+        <div role="tablist" aria-label="Which tickets" class="mt-8 flex gap-1 border-b border-line">
+            <button v-for="choice in [{ key: 'mine', label: 'Mine' }, { key: 'all', label: 'All' }]" :key="choice.key" type="button" role="tab"
+                class="-mb-px border-b-2 px-4 py-2 text-sm" :class="tab === choice.key ? 'border-signal font-medium text-ink' : 'border-transparent text-muted hover:text-ink'"
+                :aria-selected="tab === choice.key" @click="tab = choice.key">{{ choice.label }}</button>
+        </div>
+        <MineView v-if="tab === 'mine'" :tickets="tickets" :next-ten="nextTen" :spaces-by-id="spacesById" />
+        <template v-else>
         <section aria-label="Ticket groups" class="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-3 xl:grid-cols-6">
             <div v-for="group in groups" :key="group.key" class="bg-surface p-3 sm:p-4">
                 <div class="flex items-baseline justify-between gap-3">
@@ -531,5 +544,6 @@ onBeforeUnmount(() => {
                 </FoldingSection>
             </template>
         </div>
+        </template>
     </template>
 </template>
