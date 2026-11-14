@@ -7,6 +7,7 @@ import CodeBlock from '../../components/CodeBlock.vue';
 import FoldingSection from '../../components/FoldingSection.vue';
 import JiraText from '../../components/JiraText.vue';
 import LogEntry from '../../components/LogEntry.vue';
+import DoneForm from '../../components/DoneForm.vue';
 import OwnWork from '../../components/OwnWork.vue';
 import ProposedChanges from '../../components/ProposedChanges.vue';
 import QuickScanCard from '../../components/QuickScanCard.vue';
@@ -37,6 +38,8 @@ const props = defineProps({
     replyTemplate: { type: String, default: null },
     jiraWrite: { type: Boolean, default: false },
     seenBefore: { type: String, default: null },
+    doneHow: { type: Object, default: () => ({}) },
+    verdicts: { type: Object, default: () => ({}) },
     workTypes: { type: Array, default: () => [] },
 });
 
@@ -407,6 +410,10 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
                 <a v-if="!session && agentReady" href="#chat-box" class="btn" :class="{ 'btn-signal': !proposal }" @click="focusChat">Ask about it</a>
                 <button v-if="!ticket.quick_scan && agentReady" type="button" class="btn" @click="router.post(`/tickets/${ticket.id}/quick-scan`, {}, { preserveScroll: true })">Quick scan</button>
             </template>
+        </div>
+        <!-- Done: asked by itself once Jira resolved a ticket the agent worked on. -->
+        <div v-if="!ticket.local" class="mt-3 flex flex-wrap items-center gap-2">
+            <DoneForm :ticket="ticket" :done-how="doneHow" :verdicts="verdicts" :asked="ticket.left && ticket.worked && !ticket.done" />
         </div>
     </section>
 

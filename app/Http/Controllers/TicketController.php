@@ -76,6 +76,12 @@ class TicketController extends Controller
                 'url' => $ticket->isLocal() ? null : $jira->browseUrl($ticket->key),
                 // Own work: what you wrote, your files, and the Jira ticket the agent drafted for it.
                 'local' => $ticket->isLocal(),
+                // How it ended here, when it did; and whether an agent worked on it (then Done asks about its answer).
+                'done' => $ticket->done_at ? [
+                    'at' => $ticket->done_at->toIso8601String(), 'by' => \App\Models\User::find($ticket->done_by)?->firstName(),
+                    'how' => $ticket->done_how, 'verdict' => $ticket->done_verdict, 'note' => $ticket->done_note,
+                ] : null,
+                'worked' => $ticket->sessions()->exists(),
                 'local_description' => $ticket->local_description,
                 'files' => $ticket->isLocal() ? array_map(fn ($file) => [...$file, 'url' => route('work.file', [$ticket, $file['name']], false)], $ticket->localFiles()) : [],
                 'ticket_draft' => $ticket->isLocal() ? AgentTurn::query()->whereIn('agent_session_id', $ticket->sessions()->select('id'))->whereNotNull('ticket_draft')->latest('id')->first()?->ticket_draft : null,
@@ -117,6 +123,8 @@ class TicketController extends Controller
             'systems' => app(Workspace::class)->systems($ticket)->map(fn ($system) => ['id' => $system->id, 'name' => $system->name, 'branch' => $system->branch, 'code' => $system->hasCode()])->values(),
             'outboxReady' => app(OutboxClient::class)->configured(),
             'jiraWrite' => config('services.jira.write') === 'real',
+            'doneHow' => Ticket::DONE_HOW,
+            'verdicts' => Ticket::VERDICTS,
             'workTypes' => \App\Http\Controllers\OwnWorkController::TYPES,
             // Your greeting and sign-off: an empty reply box fills with it, the agent's draft goes inside it.
             'replyTemplate' => \App\Models\Setting::replyTemplateFor(auth()->user()?->firstName() ?? $jira->firstName()),
@@ -400,7 +408,53 @@ class TicketController extends Controller
     /** The agent drafts a casebook case; you review it in the form before it exists. */
     public function draftCase(Ticket $ticket): RedirectResponse
     {
-        return $this->follow($ticket, 'case', Instructions::caseRequest());
+        abort_unless(Instructions::credentials() !== [], 409, 'No Anthropic sign-in yet: see Setup.');
+        if ($reason = $this->overBudget($ticket)) {
+            return back()->with('error', $reason);
+        }
+        if ($ticket->openSession()?->busy()) {
+            return back()->with('error', 'The agent is still working; wait or stop it.');
+        }
+        // In the chat that is open, or a fresh one with what the last one found (after Done, say).
+        [$session, $earlier] = $this->chat($ticket);
+        $this->turn($session, 'case', Instructions::caseRequest().(filled($earlier) ? "\n\n{$earlier}" : ''));
+
+        return back();
+    }
+
+    /**
+     * Done here: how it was solved, whether the agent's answer was right, a note. The chat
+     * closes, unless the agent is to write the case first; then it closes by itself later.
+     */
+    public function done(Request $request, Ticket $ticket): RedirectResponse
+    {
+        $data = $request->validate([
+            'how' => ['required', Rule::in(array_keys(Ticket::DONE_HOW))],
+            'verdict' => ['nullable', Rule::in(array_keys(Ticket::VERDICTS))],
+            'note' => ['nullable', 'string', 'max:500'],
+            'case' => ['nullable', 'boolean'],
+        ]);
+        $ticket->update(['done_at' => now(), 'done_by' => auth()->id(), 'done_how' => $data['how'], 'done_verdict' => $data['verdict'] ?? null, 'done_note' => $data['note'] ?? null]);
+        AuditEvent::record('ticket.done', $ticket->key, Ticket::DONE_HOW[$data['how']].(isset($data['verdict']) ? ', the agent '.strtolower(Ticket::VERDICTS[$data['verdict']]) : ''));
+
+        if ($data['case'] ?? false) {
+            return $this->draftCase($ticket)->with('success', 'Done. The agent writes the case now: review it when it is ready, below.');
+        }
+        $session = $ticket->openSession();
+        if ($session !== null && ! $session->busy()) {
+            $session->update(['state' => 'closed', 'closed_at' => now()]);
+        }
+
+        return back()->with('success', 'Done.');
+    }
+
+    /** Not done after all. */
+    public function undone(Ticket $ticket): RedirectResponse
+    {
+        $ticket->update(['done_at' => null, 'done_by' => null, 'done_how' => null, 'done_verdict' => null, 'done_note' => null]);
+        AuditEvent::record('ticket.done', $ticket->key, 'not done after all');
+
+        return back();
     }
 
     /** A quick first look, by hand: for a ticket from before quick scans were on, or again. */

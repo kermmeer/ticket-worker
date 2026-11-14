@@ -56,6 +56,9 @@ class AgentsController extends Controller
         return Inertia::render('Agents', [
             'working' => $turns->values(),
             'capacity' => \App\Models\Setting::agents(),
+            // How often the agent was right, from Done, over the last 90 days: by kind of ticket.
+            'verdicts' => \App\Models\Ticket::query()->with('space')->whereNotNull('done_verdict')->where('done_at', '>', now()->subDays(90))->get()
+                ->groupBy(fn ($ticket) => $ticket->kind())->map(fn ($tickets) => $tickets->countBy('done_verdict')->all()),
             'quickScans' => [
                 'running' => $scans->whereIn('quick_scan_state', ['queued', 'running'])->map(fn (Ticket $ticket) => [
                     'id' => "scan-{$ticket->id}", 'ticket' => $ticket->key, 'summary' => $ticket->summary, 'state' => $ticket->quick_scan_state,

@@ -8,6 +8,7 @@ import { ago, short } from '../time.js';
 // The agents at a glance: what works now and for whom, what your work signs in with, and
 // the settings in force per space.
 const props = defineProps({
+    verdicts: { type: Object, default: () => ({}) },
     capacity: { type: Number, default: 2 },
     working: { type: Array, required: true },
     quickScans: { type: Object, required: true },
@@ -46,6 +47,23 @@ const show = (key, value) => (value === null || value === undefined ? 'none' : k
         Up to {{ capacity }} at once<template v-if="busy > capacity">: {{ busy - capacity }} waiting their turn</template>.
         <Link v-if="$page.props.me?.is_admin" href="/setup#agents" class="underline hover:text-ink">Change</Link>
     </p>
+
+    <!-- How often it was right, from what you said when marking tickets done. -->
+    <section v-if="Object.keys(verdicts).length" class="card mt-8 p-5">
+        <h2 class="text-lg font-medium">How often the agent was right</h2>
+        <p class="mt-1 text-sm text-muted">From Done, the last 90 days.</p>
+        <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+            <div v-for="(counts, kind) in verdicts" :key="kind">
+                <dt class="text-sm text-muted">{{ kind === 'development' ? 'Development' : 'Support' }}</dt>
+                <dd class="mt-0.5">
+                    <span class="font-medium text-done">{{ counts.right ?? 0 }} right</span> ·
+                    <span class="text-waiting">{{ counts.partly ?? 0 }} partly</span> ·
+                    <span class="text-signal">{{ counts.wrong ?? 0 }} wrong</span>
+                    <span class="text-muted"> of {{ (counts.right ?? 0) + (counts.partly ?? 0) + (counts.wrong ?? 0) }}</span>
+                </dd>
+            </div>
+        </dl>
+    </section>
 
     <!-- What your work signs in with -->
     <section class="mt-8 grid gap-6 lg:grid-cols-2">
