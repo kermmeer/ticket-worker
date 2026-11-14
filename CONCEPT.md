@@ -976,7 +976,7 @@ the way `push-systems.sh` reaches GitLab. Speed: the chat is already on the ligh
 - *The database behind the VPN* is boss's production database, the one the read-only data
   tools (database servers, §11) are for, not the tool's own. Reaching it stays for later.
 
-### Proposed on 14 November 2026: ticket handling that keeps track
+### Built on 14 November 2026: ticket handling that keeps track
 
 *For review: nothing below is built yet.*
 
@@ -1052,3 +1052,8 @@ the jump host of a database server's tunnel). API docs: written per API, orderin
   being today's overview unchanged, so nothing is lost if *Mine* does not convince.
 - *Two columns* for the ticket page on a wide screen; one, with jumps, on a phone (13).
 - *Idle chats close after 14 days*; new activity and needs you mean "since your last look" (A).
+
+**Built the same day**, all of A to E with the decisions above. E14 differs from its text:
+Ticket Worker sends the reply and makes the changes itself, and the outbox keeps scheduling.
+The case hint needs a score of 35 in the ticket's own space (20 before). *Mine* opens the
+overview; *All* is one tab away.

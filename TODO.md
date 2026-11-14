@@ -233,4 +233,20 @@ to it, including work you finish.
 - [x] API docs (2026-11-14): from a served or committed OpenAPI spec, else written from the code
       by an agent; an APIs page for everyone; `api_docs` for the agent. ordering-api has a spec
       in boss (5 endpoints); the other eight are to be written from the code.
+- [x] Ticket handling that keeps track (2026-11-14, CONCEPT.md "Proposed on 14 November"):
+      - [x] Seen per person; new activity and needs you mean "since your last look"; comments
+            since then marked new on the ticket
+      - [x] Chats close by themselves when the ticket leaves, or after 14 days without a turn
+      - [x] Done: how it ended, whether the agent was right, a note; asked for once Jira
+            resolves a worked ticket; the case drafted from it; the Agents page counts it
+      - [x] Reply, status and assignee in one step, posted by Ticket Worker (`JIRA_WRITE=real`):
+            the transitions Jira allows and the fields they ask, files, public or internal; the
+            agent suggests status and assignee; a bare template is never posted
+      - [x] Case links: a stricter score, a case per kind (support, development or both), Yes
+            and Not this case wherever a hint shows, confirmed by an analysis that fits; only
+            confirmed links group; one reply to all confirmed tickets of a case
+      - [x] Your next ten, each with its reason; Mine (by Jira status) beside All (on trial)
+      - [x] The ticket page in two columns on a wide screen: the work left, the ticket right
+      - [x] The Design link out of the menu (the page and the document stay)
+- [ ] Mine or All: decide after the trial which one the overview opens on, and whether All stays
 - [ ] `composer audit` reports 8 advisories in 5 packages (seen 2026-11-14 when adding symfony/yaml)
