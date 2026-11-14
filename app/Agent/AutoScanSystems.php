@@ -46,7 +46,12 @@ class AutoScanSystems
         if ($system->context_written_at && $system->context_written_at->gt(now()->subMinutes(self::AT_MOST_EVERY_MINUTES))) {
             return false;
         }
-        // The last push: when the branch's ref last moved.
+        return self::quiet($system);
+    }
+
+    /** No push in the last ten minutes: the last one is when the branch's ref last moved. */
+    public static function quiet(System $system): bool
+    {
         $pushed = @filemtime($system->path().'/.git/logs/HEAD') ?: @filemtime($system->path().'/.git/refs/heads/'.$system->branch);
 
         return ! $pushed || $pushed < now()->subMinutes(self::QUIET_MINUTES)->getTimestamp();

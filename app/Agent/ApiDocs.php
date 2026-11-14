@@ -24,11 +24,11 @@ class ApiDocs
     public const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
     /**
-     * A spec, served or in the code: its endpoints and where they came from; null when there is none.
+     * A spec the API serves: the API as it runs, the whole of it. Null when it serves none.
      *
      * @return array{endpoints: list<array>, source: string}|null
      */
-    public function fromSpec(ApiConnection $api): ?array
+    public function served(ApiConnection $api): ?array
     {
         foreach ($this->servedCandidates($api) as $path) {
             try {
@@ -40,13 +40,49 @@ class ApiDocs
                 return ['endpoints' => self::endpoints($spec, $api), 'source' => 'served at '.$path];
             }
         }
+
+        return null;
+    }
+
+    /**
+     * Specs in the system's code for this API. Often they cover one feature only, so the
+     * code is read as well; they win where both describe an endpoint.
+     *
+     * @return array{endpoints: list<array>, files: list<string>}|null
+     */
+    public function inCode(ApiConnection $api): ?array
+    {
+        $endpoints = [];
+        $files = [];
         foreach ($this->repoCandidates($api) as $file) {
             if (($spec = self::parse((string) @file_get_contents($file))) !== null) {
-                return ['endpoints' => self::endpoints($spec, $api), 'source' => 'in the code: '.Str::after($file, $api->system->path().'/')];
+                $endpoints = self::merge($endpoints, self::endpoints($spec, $api));
+                $files[] = Str::after($file, $api->system->path().'/');
             }
         }
 
-        return null;
+        return $endpoints === [] ? null : ['endpoints' => $endpoints, 'files' => $files];
+    }
+
+    /** An endpoint's identity: its method and path, whatever its placeholders are called. */
+    public static function key(array $endpoint): string
+    {
+        return strtoupper((string) ($endpoint['method'] ?? '')).' '.strtolower(rtrim(preg_replace('/\{[^}]*\}/', '{}', (string) ($endpoint['path'] ?? '')), '/'));
+    }
+
+    /**
+     * Endpoints from two sources in one list: the second wins where both have one.
+     *
+     * @return list<array>
+     */
+    public static function merge(array $base, array $winning): array
+    {
+        $all = [];
+        foreach ([...$base, ...$winning] as $endpoint) {
+            $all[self::key($endpoint)] = $endpoint;
+        }
+
+        return array_values($all);
     }
 
     /** @return list<string> paths to try for a served spec, under the base address (no call ever leaves it) */

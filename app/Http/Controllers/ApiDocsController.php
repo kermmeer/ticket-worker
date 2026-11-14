@@ -32,7 +32,7 @@ class ApiDocsController extends Controller
             'api' => [
                 'id' => $api->id, 'system_id' => $api->system_id, 'system' => $api->system?->name, 'name' => $api->name, 'base_url' => $api->base_url,
                 'access' => $api->access, 'notes' => $api->notes, 'source' => $api->docs_source, 'state' => $api->docs_state, 'error' => $api->docs_error,
-                'written_at' => $api->docs_written_at?->toIso8601String(), 'cost_usd' => $api->docs_cost_usd,
+                'written_at' => $api->docs_written_at?->toIso8601String(), 'cost_usd' => $api->docs_cost_usd, 'follows' => $api->docs_commit !== null, 'files' => count($api->docs_files ?? []),
             ],
             'endpoints' => $api->docs ?? [],
         ]);

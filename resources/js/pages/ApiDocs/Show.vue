@@ -43,6 +43,9 @@ function tryGet(e) {
         <button v-if="mayWrite && !writing" type="button" class="ml-2 underline hover:text-ink" @click="write">{{ endpoints.length ? 'Write them again' : 'Write them' }}</button>
         <span v-if="writing" class="ml-2 text-working">being written…</span>
     </p>
+    <p v-if="api.follows && !writing" class="mt-1 text-sm text-muted">
+        Follows the code: brought up to date after a push<template v-if="api.files"> that changes one of its {{ api.files }} files</template>.
+    </p>
     <p v-if="api.error" class="mt-2 text-sm text-signal">{{ api.error }}</p>
     <p v-if="api.notes" class="mt-2 max-w-3xl text-sm whitespace-pre-wrap">{{ api.notes }}</p>
 

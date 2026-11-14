@@ -518,6 +518,14 @@ own work.
   parameters, body, what comes back. Everyone reads them under *APIs* in the menu, searchable;
   editors write them on the Systems page. The agent gets `api_docs` to look endpoints up and
   is told to, before it calls: the guessed paths that ended in 404s (§17) were the reason.
+  *Changed the same day:* a spec in the code no longer ends it. Those in boss covered one
+  feature each (1 to 3 endpoints of an API with more), so the agent reads the code as well,
+  told which endpoints the spec has; the spec wins where both describe one. A served spec
+  is still the whole API. And docs from the code follow the code: they remember the commit
+  and the files their endpoints come from, and once a push moved the system past it (ten
+  quiet minutes, at most hourly per API) they are brought up to date: for free when none of
+  those files changed, else the agent gets the diff and reports only what is new, changed or
+  gone, so 194 endpoints are not written again for one.
 - **No secrets in reach.** Permission rules deny `.env*`, keys and storage folders, and the
   systems hold what you pushed, which is committed code, not a server's `.env`.
 - **Personal data.** Tickets carry names, email addresses and screenshots.

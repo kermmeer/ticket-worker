@@ -13,6 +13,7 @@ use App\Models\System;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Settings\SpaceSettings;
+use Illuminate\Support\Str;
 
 /** What the agent is told: its role and rules once, then each turn's request (CONCEPT.md §7, §10). */
 class Instructions
@@ -270,37 +271,82 @@ class Instructions
         ];
     }
 
-    /** An API's endpoints, as an agent writes them from the code. */
-    public static function apiDocsSchema(): array
+    /**
+     * An API's endpoints, as an agent writes them from the code. Updating after a push, only
+     * what changed: endpoints new or different, and those that are gone.
+     */
+    public static function apiDocsSchema(bool $update = false): array
     {
         $text = ['type' => 'string'];
+        $endpoints = ['type' => 'array', 'items' => [
+            'type' => 'object',
+            'required' => ['method', 'path', 'summary'],
+            'properties' => [
+                'method' => ['type' => 'string', 'enum' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']],
+                'path' => $text + ['description' => 'Under the base address, as a client calls it, with {placeholders} for path parameters, e.g. /invoice/{id}.'],
+                'summary' => $text + ['description' => 'What it does, in one line.'],
+                'params' => ['type' => 'array', 'items' => ['type' => 'object', 'required' => ['name', 'in'], 'properties' => [
+                    'name' => $text, 'in' => ['type' => 'string', 'enum' => ['path', 'query', 'body']], 'type' => $text,
+                    'required' => ['type' => 'boolean'], 'description' => $text,
+                ]]],
+                'returns' => $text + ['description' => 'What comes back, briefly: the model or the fields.'],
+                'source' => $text + ['description' => 'Where it is defined: system/path:line.'],
+            ],
+        ]];
+        $files = ['type' => 'array', 'items' => $text, 'description' => 'Every file the endpoints are defined in or read their parameters from (routes, controllers, URL rules, request classes), as paths in the repository without the system name, e.g. billing/controllers/InvoiceController.php. A change to one of them brings the docs up to date.'];
+
+        if (! $update) {
+            return ['type' => 'object', 'required' => ['endpoints', 'files'], 'properties' => ['endpoints' => $endpoints, 'files' => $files]];
+        }
 
         return [
             'type' => 'object',
-            'required' => ['endpoints'],
+            'required' => ['changed', 'removed', 'files'],
             'properties' => [
-                'endpoints' => ['type' => 'array', 'items' => [
-                    'type' => 'object',
-                    'required' => ['method', 'path', 'summary'],
-                    'properties' => [
-                        'method' => ['type' => 'string', 'enum' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']],
-                        'path' => $text + ['description' => 'Under the base address, as a client calls it, with {placeholders} for path parameters, e.g. /invoice/{id}.'],
-                        'summary' => $text + ['description' => 'What it does, in one line.'],
-                        'params' => ['type' => 'array', 'items' => ['type' => 'object', 'required' => ['name', 'in'], 'properties' => [
-                            'name' => $text, 'in' => ['type' => 'string', 'enum' => ['path', 'query', 'body']], 'type' => $text,
-                            'required' => ['type' => 'boolean'], 'description' => $text,
-                        ]]],
-                        'returns' => $text + ['description' => 'What comes back, briefly: the model or the fields.'],
-                        'source' => $text + ['description' => 'Where it is defined: system/path:line.'],
-                    ],
-                ]],
+                'changed' => $endpoints + ['description' => 'Endpoints that are new, or whose path, parameters, summary or answer changed: each in full. Empty when none.'],
+                'removed' => ['type' => 'array', 'items' => $text, 'description' => 'Endpoints that are gone, as "METHOD /path" from the list you were given. Empty when none.'],
+                'files' => $files,
             ],
         ];
     }
 
-    public static function apiDocsRequest(\App\Models\ApiConnection $api): string
+    /**
+     * @param  list<array>  $known  endpoints a spec in the code already describes
+     * @param  array{current: list<array>, changed: list<string>, diff: ?string}|null  $update  after a push
+     */
+    public static function apiDocsRequest(\App\Models\ApiConnection $api, array $known = [], ?array $update = null): string
     {
         $system = $api->system;
+        $list = fn (array $endpoints) => collect($endpoints)->map(fn ($e) => "- {$e['method']} {$e['path']}: ".Str::limit((string) ($e['summary'] ?? ''), 120))->implode("\n");
+
+        if ($update !== null) {
+            $changed = collect($update['changed'])->take(300)->map(fn ($file) => "- {$file}")->implode("\n");
+            $diff = $update['diff'] ? "The changes themselves are in {$update['diff']}, as a git diff; read it first." : 'The diff was too large to hand over: read the changed files.';
+            $current = $list($update['current']);
+
+            return <<<TEXT
+            The docs of the HTTP API that {$system->name} serves at {$api->base_url} (called "{$api->name}" here) were written
+            from an earlier commit of its code. Code has been pushed since. Bring the docs up to date, from the code at
+            {$system->path()}.
+
+            Files changed since the docs were written:
+            {$changed}
+
+            {$diff}
+
+            The endpoints as documented now:
+            {$current}
+
+            Report only what changed: endpoints that are new or different (each in full: method, path under the base address,
+            summary, parameters from the code that reads them, what it returns), and those that are gone, as "METHOD /path"
+            from the list above. Nothing that only moved or was reformatted. When this API's endpoints did not change, both
+            lists are empty. Also list every file the API's endpoints are defined in, as before.
+
+            Only what the code shows: no guessed endpoints, no guessed parameters. End with the JSON.
+            TEXT;
+        }
+
+        $spec = $known === [] ? '' : "\n\nA spec in the code already describes these endpoints; it may cover only part of the API. Do not list\nthem again; list every other endpoint the code serves:\n".$list($known)."\n";
 
         return <<<TEXT
         Document the HTTP API that {$system->name} serves at {$api->base_url} (called "{$api->name}" here), from its code at
@@ -310,7 +356,9 @@ class Instructions
         host or path of the base address points to. List every endpoint it serves: the method and the path as a client calls it,
         under the base address; what it does; its parameters (path, query, body) with types and whether they are required, from
         the code that reads them; and what it returns. Mind how the framework turns names into paths (actionGeneratePdf in
-        InvoiceController is /invoice/generate-pdf in Yii) and which verbs each action allows.
+        InvoiceController is /invoice/generate-pdf in Yii) and which verbs each action allows.{$spec}
+
+        List the files the endpoints are defined in too: after a push, the docs are brought up to date when one of them changes.
 
         Only what the code shows: no guessed endpoints, no guessed parameters. Where it is unclear, say so in the summary.
         End with the JSON.
