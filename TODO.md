@@ -231,8 +231,12 @@ to it, including work you finish.
 - [x] Rescan by itself after a push, per system: ten minutes after the last push, at most once
       an hour (2026-11-14)
 - [x] API docs (2026-11-14): from a served or committed OpenAPI spec, else written from the code
-      by an agent; an APIs page for everyone; `api_docs` for the agent. ordering-api has a spec
-      in boss (5 endpoints); the other eight are to be written from the code.
+      by an agent; an APIs page for everyone; `api_docs` for the agent. All nine boss APIs
+      written the same day: five from the code ($5.77 together, 5 to 194 endpoints), four from
+      a spec in boss (1 to 5 endpoints).
+- [ ] A spec in the code wins over the code, even when it covers one feature only: auth-api (3),
+      inventory-api (2) and pcore-api (1) likely have more endpoints. Offer "write from the code"
+      beside a spec, or merge the two.
 - [x] Ticket handling that keeps track (2026-11-14, CONCEPT.md "Proposed on 14 November"):
       - [x] Seen per person; new activity and needs you mean "since your last look"; comments
             since then marked new on the ticket
