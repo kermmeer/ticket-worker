@@ -64,6 +64,8 @@ class CasebookController extends Controller
                     'keywords' => (string) ($draft['keywords'] ?? ''),
                     'source_tickets' => $turn->session->ticket->key,
                     'state' => CasebookEntry::DRAFT,
+                    // The kind of ticket it was written from: the kind it hints for.
+                    'kind' => $turn->session->ticket->kind(),
                 ],
                 'systems' => System::query()->orderBy('name')->get(['id', 'name']),
                 'spaces' => \App\Models\Space::query()->orderBy('label')->get(['id', 'label', 'colour']),
@@ -112,6 +114,40 @@ class CasebookController extends Controller
     }
 
     /** "Not related": untie the ticket, and never tie it to this case again. */
+    /**
+     * One reply to every open ticket confirmed on this case: one problem, one answer, each
+     * still its own Jira ticket. Your template alone is never posted.
+     */
+    public function replyAll(\Illuminate\Http\Request $request, CasebookEntry $entry): RedirectResponse
+    {
+        $data = $request->validate(['body' => ['required', 'string', 'max:32000'], 'visibility' => ['nullable', 'in:public,internal']]);
+        if (TicketController::onlyTemplate($data['body'])) {
+            return back()->with('error', 'Nothing written in the template: nothing to send.');
+        }
+        $tickets = $entry->tickets()->open()->where('casebook_manual', true)->where('local', false)->visibleTo(auth()->user())->with('space')->get();
+        if ($tickets->isEmpty()) {
+            return back()->with('error', 'No open ticket is confirmed on this case.');
+        }
+        if (config('services.jira.write') !== 'real') {
+            return back()->with('error', 'JIRA_WRITE=dummy: nothing was sent. With it real, this reply would now go to '.$tickets->pluck('key')->implode(', ').'.');
+        }
+
+        $sent = [];
+        $failed = [];
+        foreach ($tickets as $ticket) {
+            try {
+                $ticket->space->jira()->comment($ticket->key, trim($data['body']), ($data['visibility'] ?? 'public') === 'internal');
+                $ticket->markSeen(auth()->user());
+                $sent[] = $ticket->key;
+            } catch (\App\Jira\JiraException $e) {
+                $failed[] = "{$ticket->key} ({$e->getMessage()})";
+            }
+        }
+        AuditEvent::record('case.reply-all', $entry->title, 'posted to '.(implode(', ', $sent) ?: 'none').($failed ? '; failed: '.implode(', ', $failed) : ''));
+
+        return back()->with($failed ? 'error' : 'success', ($sent ? 'Posted to '.implode(', ', $sent).'.' : '').($failed ? ' Not to '.implode('; ', $failed).'.' : ''));
+    }
+
     /** Tie a ticket to this case yourself, by its key: also one whose words do not match, or one already done. */
     public function link(\Illuminate\Http\Request $request, CasebookEntry $entry): RedirectResponse
     {
@@ -136,7 +172,7 @@ class CasebookController extends Controller
         ]);
         if ($ticket->casebook_entry_id === $entry->id) {
             // The next best case, if one fits; else none.
-            $ticket->rememberMatch(Matcher::forSpace($ticket->space)->best($ticket->matchText(), Matcher::rejections()[$ticket->id] ?? []));
+            $ticket->rememberMatch(Matcher::forSpace($ticket->space)->best($ticket->matchText(), Matcher::rejections()[$ticket->id] ?? [], $ticket->kind()));
             $ticket->save();
         }
         if ($ticket->isDirty()) {
@@ -151,7 +187,7 @@ class CasebookController extends Controller
     public function relink(CasebookEntry $entry, Ticket $ticket): RedirectResponse
     {
         \Illuminate\Support\Facades\DB::table('casebook_rejections')->where(['casebook_entry_id' => $entry->id, 'ticket_id' => $ticket->id])->delete();
-        $ticket->rememberMatch(Matcher::forSpace($ticket->space)->best($ticket->matchText(), Matcher::rejections()[$ticket->id] ?? []));
+        $ticket->rememberMatch(Matcher::forSpace($ticket->space)->best($ticket->matchText(), Matcher::rejections()[$ticket->id] ?? [], $ticket->kind()));
         $ticket->save();
         AuditEvent::record('case.relink', $entry->title, "{$ticket->key} may match it again");
 
@@ -161,11 +197,13 @@ class CasebookController extends Controller
     public function edit(CasebookEntry $entry, JiraClient $jira): Response
     {
         return Inertia::render('Casebook/Form', [
+            'replyTemplate' => \App\Models\Setting::replyTemplateFor(auth()->user()?->firstName()),
             'entry' => [
                 'id' => $entry->id,
                 'title' => $entry->title,
                 'system_id' => $entry->system_id,
                 'space_ids' => $entry->space_ids ?? [],
+                'kind' => $entry->kind ?? 'both',
                 'symptoms' => $entry->symptoms,
                 'cause' => $entry->cause ?? '',
                 'solution' => $entry->solution,
@@ -223,6 +261,7 @@ class CasebookController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'system_id' => ['nullable', 'integer', Rule::exists('systems', 'id')],
             // Empty: every space.
+            'kind' => ['nullable', Rule::in(['support', 'development', 'both'])],
             'space_ids' => ['nullable', 'array'],
             'space_ids.*' => ['integer', Rule::exists('spaces', 'id')],
             'symptoms' => ['required', 'string', 'max:10000'],
@@ -234,6 +273,8 @@ class CasebookController extends Controller
         ]);
 
         $data['space_ids'] = array_values(array_map('intval', $data['space_ids'] ?? [])) ?: null;
+        // Both kinds: no kind at all, so the matcher offers it to every ticket.
+        $data['kind'] = in_array($data['kind'] ?? 'both', ['support', 'development'], true) ? $data['kind'] : null;
 
         // "SUP-1, SUP-2" in the form, a list in the database.
         $data['source_tickets'] = collect(preg_split('/[\s,;]+/', (string) ($data['source_tickets'] ?? ''), -1, PREG_SPLIT_NO_EMPTY))

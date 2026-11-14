@@ -269,6 +269,11 @@ class RunAgentTurn implements ShouldQueue
         if ($cost !== null) {
             $turn->session->increment('cost_usd', $cost);
         }
+        // An analysis that checked a case and found it fits: the link is confirmed, as by you.
+        if ($proposal !== null && ($proposal['casebook']['fit'] ?? null) === 'fits' && is_int($proposal['casebook']['case'] ?? null)
+            && \App\Models\CasebookEntry::query()->whereKey($proposal['casebook']['case'])->exists()) {
+            \App\Casebook\CaseLinks::confirm($turn->session->ticket, $proposal['casebook']['case'], 'an analysis');
+        }
         if ($publish ?? false) {
             PublishBranch::dispatch($turn->fresh());
         }

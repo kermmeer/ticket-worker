@@ -25,7 +25,7 @@ class Matcher
      */
     public const MIN_SHARED_IN_SPACE = 4;
 
-    public const MIN_SCORE_IN_SPACE = 20.0;
+    public const MIN_SCORE_IN_SPACE = 35.0;
 
     /** A word this common among the tickets says nothing (log(N / (1 + df)) at or below it). */
     private const COMMON = 0.7;
@@ -59,6 +59,9 @@ class Matcher
      * @param  iterable<CasebookEntry>  $entries
      * @param  list<string>|null  $corpus  the texts of the tickets it will match against
      */
+    /** @var array<int, ?string> each case's kind of ticket: support, development, or null for both */
+    private array $kinds = [];
+
     public function __construct(iterable $entries, ?array $corpus = null)
     {
         $documentFrequency = [];
@@ -71,6 +74,7 @@ class Matcher
                 }
             }
             $this->words[$entry->id] = $weights;
+            $this->kinds[$entry->id] = $entry->kind ?? null;
             foreach (array_keys($weights) as $word) {
                 $documentFrequency[$word] = ($documentFrequency[$word] ?? 0) + 1;
             }
@@ -121,10 +125,14 @@ class Matcher
      *
      * @return list<array{id: int, score: float}>
      */
-    public function ranked(string $text, int $limit = 3): array
+    public function ranked(string $text, int $limit = 3, ?string $kind = null): array
     {
         $all = [];
         foreach (array_keys($this->words) as $id) {
+            // A support case is no hint for a development story, nor the other way round.
+            if ($kind !== null && ($this->kinds[$id] ?? null) !== null && $this->kinds[$id] !== $kind) {
+                continue;
+            }
             if (($match = $this->score($id, array_unique(self::words($text)))) !== null) {
                 $all[] = $match;
             }
@@ -140,9 +148,9 @@ class Matcher
      * @param  list<int>  $except
      * @return array{id: int, score: float}|null
      */
-    public function best(string $text, array $except = []): ?array
+    public function best(string $text, array $except = [], ?string $kind = null): ?array
     {
-        foreach ($this->ranked($text, count($except) + 1) as $match) {
+        foreach ($this->ranked($text, count($except) + 1, $kind) as $match) {
             if (! in_array($match['id'], $except, true)) {
                 return $match;
             }

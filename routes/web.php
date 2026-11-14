@@ -72,6 +72,8 @@ Route::controller(TicketController::class)->prefix('tickets/{ticket}')->name('ti
     Route::post('/draft-ticket', 'draftTicket')->name('draft-ticket');
     Route::post('/link', 'link')->name('link');
     Route::post('/done', 'done')->name('done');
+    Route::post('/case/confirm', 'confirmCase')->name('case.confirm');
+    Route::post('/case/reject', 'rejectCase')->name('case.reject');
     Route::post('/send', 'send')->name('send');
     Route::get('/send-options', 'sendOptions')->name('send-options');
     Route::get('/assignable', 'assignable')->name('assignable');
@@ -128,6 +130,7 @@ Route::middleware('role:editor')->group(function () {
         Route::put('/{entry}', 'update')->name('update');
         Route::delete('/{entry}', 'destroy')->name('destroy');
         Route::post('/{entry}/tickets', 'link')->name('link');
+        Route::post('/{entry}/reply-all', 'replyAll')->name('reply-all');
         Route::post('/{entry}/tickets/{ticket}/unlink', 'unlink')->name('unlink');
         Route::post('/{entry}/tickets/{ticket}/relink', 'relink')->name('relink');
     });

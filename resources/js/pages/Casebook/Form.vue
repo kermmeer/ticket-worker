@@ -1,9 +1,10 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import TicketKey from '../../components/TicketKey.vue';
 
 const props = defineProps({
+    replyTemplate: { type: String, default: null },
     entry: { type: Object, required: true },
     systems: { type: Array, required: true },
     spaces: { type: Array, default: () => [] },
@@ -17,6 +18,14 @@ const strength = (score) => (score >= 35 ? { label: 'strong', tone: 'text-done' 
 
 function unlink(ticket) {
     router.post(`/casebook/${props.entry.id}/tickets/${ticket.id}/unlink`, {}, { preserveScroll: true });
+}
+
+// The reply to all confirmed tickets, in your template.
+const confirmedOpen = computed(() => props.linked.filter((t) => t.manual && !t.done));
+const all = useForm({ body: '', visibility: 'public' });
+const replyTemplate = props.replyTemplate;
+function startAll() {
+    if (replyTemplate && !all.body.trim()) all.body = replyTemplate.replace('{reply}', '');
 }
 
 // Tie a ticket to it yourself, by its key.
@@ -36,6 +45,7 @@ const form = useForm({
     system_id: props.entry.system_id,
     // Empty: for every space.
     space_ids: [...(props.entry.space_ids ?? [])],
+    kind: props.entry.kind ?? 'support',
     symptoms: props.entry.symptoms,
     cause: props.entry.cause,
     solution: props.entry.solution,
@@ -118,6 +128,15 @@ const fieldClass = 'mt-1 w-full rounded-md border border-line bg-page px-3 py-2 
                         <option v-for="system in systems" :key="system.id" :value="system.id">{{ system.name }}</option>
                     </select>
                 </div>
+                <div>
+                    <label for="kind" class="text-sm font-medium">For which tickets</label>
+                    <select id="kind" v-model="form.kind" :class="fieldClass">
+                        <option value="support">Support: incidents, questions</option>
+                        <option value="development">Development: stories, improvements, bugs</option>
+                        <option value="both">Both</option>
+                    </select>
+                    <p class="mt-1 text-sm text-muted">A support case is no hint for a story, nor the other way round.</p>
+                </div>
                 <fieldset>
                     <legend class="text-sm font-medium">For which spaces</legend>
                     <p class="text-sm text-muted">None ticked: every space. Tick some to offer it only to their tickets.</p>
@@ -145,7 +164,7 @@ const fieldClass = 'mt-1 w-full rounded-md border border-line bg-page px-3 py-2 
 
             <div v-if="entry.id" class="card p-5">
                 <p class="text-sm font-medium">Tickets tied to it <span v-if="linked.length" class="font-normal text-muted">· {{ linked.length }}</span></p>
-                <p class="mt-1 text-xs text-muted">Those you added, then the open tickets whose words match it, strongest first. Not related? Untie it: it will not be tied to this case again.</p>
+                <p class="mt-1 text-xs text-muted">Confirmed ones first (by you, on a ticket, or by an analysis), then the open tickets whose words match it, strongest first. Not related? Untie it: it will not be tied to this case again.</p>
                 <div class="mt-3 flex gap-2">
                     <label for="link-key" class="sr-only">Ticket key</label>
                     <input id="link-key" v-model="newKey" placeholder="Add a ticket: DEVBESUP-3218" class="min-w-0 flex-1 rounded-md border border-line bg-page px-2 py-1.5 font-mono text-sm placeholder:font-sans placeholder:text-muted" @keydown.enter.prevent="link" />
@@ -157,11 +176,22 @@ const fieldClass = 'mt-1 w-full rounded-md border border-line bg-page px-3 py-2 
                     <li v-for="ticket in linked" :key="ticket.id" class="flex flex-wrap items-start gap-x-2 gap-y-1 py-2">
                         <Link :href="ticket.page" class="shrink-0"><TicketKey :value="ticket.key" /></Link>
                         <Link :href="ticket.page" class="min-w-0 flex-1 break-words hover:underline">{{ ticket.summary }}</Link>
-                        <span v-if="ticket.manual" class="shrink-0 text-xs text-working">added by you<template v-if="ticket.done"> · done</template></span>
+                        <span v-if="ticket.manual" class="shrink-0 text-xs text-working">confirmed<template v-if="ticket.done"> · done</template></span>
                         <span v-else class="shrink-0 text-xs" :class="strength(ticket.score).tone">{{ strength(ticket.score).label }}</span>
                         <button type="button" class="shrink-0 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-signal" @click="unlink(ticket)">{{ ticket.manual ? 'Remove' : 'Not related' }}</button>
                     </li>
                 </ul>
+                <!-- One problem, one answer: to every open ticket confirmed on this case. -->
+                <div v-if="confirmedOpen.length" class="mt-4 border-t border-line pt-3 text-sm">
+                    <p class="font-medium">Reply to all {{ confirmedOpen.length }} confirmed {{ confirmedOpen.length === 1 ? 'ticket' : 'tickets' }}</p>
+                    <p class="mt-1 text-xs text-muted">{{ confirmedOpen.map((t) => t.key).join(', ') }}: the same reply on each, each still its own Jira ticket.</p>
+                    <textarea v-model="all.body" rows="5" class="mt-2 w-full rounded-md border border-line bg-page px-3 py-2 text-sm" :placeholder="replyTemplate ? 'Click to start from your template' : ''" @focus="startAll"></textarea>
+                    <div class="mt-2 flex flex-wrap items-center gap-3">
+                        <label class="flex items-center gap-1.5"><input v-model="all.visibility" type="radio" value="public" /> Reply</label>
+                        <label class="flex items-center gap-1.5"><input v-model="all.visibility" type="radio" value="internal" /> Internal note</label>
+                        <button type="button" class="btn btn-signal ml-auto" :disabled="all.processing || !all.body.trim()" @click="all.post(`/casebook/${entry.id}/reply-all`, { preserveScroll: true, onSuccess: () => (all.body = '') })">Send to all</button>
+                    </div>
+                </div>
                 <details v-if="unlinked.length" class="mt-3 text-sm">
                     <summary class="cursor-pointer text-muted hover:text-ink">Said to be not related · {{ unlinked.length }}</summary>
                     <ul class="mt-2 divide-y divide-line">

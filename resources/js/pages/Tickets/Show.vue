@@ -403,6 +403,15 @@ const confidenceTone = { high: 'text-done', medium: 'text-waiting', low: 'text-s
         <p v-if="ticket.changes.some((change) => change.state === 'waiting')" class="mt-3 text-sm font-medium text-waiting">
             <a href="#agent" class="underline">A change the agent proposes is waiting for you</a>: nothing is sent until it is run.
         </p>
+        <!-- The case it looks like: judged here, right or not. -->
+        <p v-if="ticket.case" class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span class="text-muted">{{ ticket.case.confirmed ? 'Case' : 'Looks like' }}</span>
+            <Link :href="$page.props.me?.is_editor ? `/casebook/${ticket.case.id}/edit` : '/casebook'" class="text-working hover:underline">{{ ticket.case.title }}</Link>
+            <template v-if="!ticket.case.confirmed">
+                <button type="button" class="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-ink" @click="post('case/confirm')">Yes, this case</button>
+                <button type="button" class="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-signal" @click="post('case/reject')">Not this case</button>
+            </template>
+        </p>
         <!-- The code built for it, per repository: at a glance, with the command to fetch it. -->
         <div v-if="ticket.branches.length" class="mt-3 space-y-1.5 text-sm">
             <p v-for="branch in ticket.branches" :key="branch.id" class="flex flex-wrap items-center gap-x-2 gap-y-1">

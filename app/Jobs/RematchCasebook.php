@@ -24,9 +24,10 @@ class RematchCasebook implements ShouldBeUnique, ShouldQueue
         foreach (Space::query()->where('state', Space::ACTIVE)->get() as $space) {
             $casebook = Matcher::forSpace($space);
             $rejected = Matcher::rejections();
+            $types = \App\Settings\SpaceSettings::for($space)->types('development_types');
 
-            $space->tickets()->open()->each(function (Ticket $ticket) use ($casebook, $rejected) {
-                $ticket->rememberMatch($casebook->best($ticket->matchText(), $rejected[$ticket->id] ?? []));
+            $space->tickets()->open()->each(function (Ticket $ticket) use ($casebook, $rejected, $types) {
+                $ticket->rememberMatch($casebook->best($ticket->matchText(), $rejected[$ticket->id] ?? [], $ticket->kindAmong($types)));
                 if ($ticket->isDirty()) {
                     $ticket->save();
                 }

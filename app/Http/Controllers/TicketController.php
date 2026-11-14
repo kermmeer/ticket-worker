@@ -76,6 +76,8 @@ class TicketController extends Controller
                 'url' => $ticket->isLocal() ? null : $jira->browseUrl($ticket->key),
                 // Own work: what you wrote, your files, and the Jira ticket the agent drafted for it.
                 'local' => $ticket->isLocal(),
+                // The case it looks like, and whether that was confirmed (by you, or by an analysis).
+                'case' => $ticket->casebookEntry ? ['id' => $ticket->casebookEntry->id, 'title' => $ticket->casebookEntry->title, 'confirmed' => (bool) $ticket->casebook_manual] : null,
                 // How it ended here, when it did; and whether an agent worked on it (then Done asks about its answer).
                 'done' => $ticket->done_at ? [
                     'at' => $ticket->done_at->toIso8601String(), 'by' => \App\Models\User::find($ticket->done_by)?->firstName(),
@@ -565,6 +567,22 @@ class TicketController extends Controller
         } catch (JiraException $e) {
             return response()->json(['people' => [], 'error' => $e->getMessage()]);
         }
+    }
+
+    /** The case hint is right: it is that case. */
+    public function confirmCase(Ticket $ticket): RedirectResponse
+    {
+        \App\Casebook\CaseLinks::confirm($ticket);
+
+        return back();
+    }
+
+    /** The case hint is wrong: not this case, for good. */
+    public function rejectCase(Ticket $ticket): RedirectResponse
+    {
+        \App\Casebook\CaseLinks::reject($ticket);
+
+        return back()->with('success', 'Not that case: it will not be suggested for this ticket again.');
     }
 
     /** Not done after all. */

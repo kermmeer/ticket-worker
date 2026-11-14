@@ -208,6 +208,12 @@ class Ticket extends Model
         return in_array(mb_strtolower((string) $this->issue_type), $types, true) ? 'development' : 'support';
     }
 
+    /** The kind among a space's development types, worked out once for many tickets. */
+    public function kindAmong(array $developmentTypes): string
+    {
+        return in_array(mb_strtolower((string) $this->issue_type), $developmentTypes, true) ? 'development' : 'support';
+    }
+
     public function isDevelopment(): bool
     {
         return $this->kind() === 'development';

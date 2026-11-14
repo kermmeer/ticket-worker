@@ -20,6 +20,10 @@ function when(iso) {
     return iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 }
 
+function judge(how) {
+    router.post(`/tickets/${props.ticket.id}/case/${how}`, {}, { preserveScroll: true, preserveState: true });
+}
+
 // A first look from the overview itself; the row says "Quick scan…" until it is done.
 function quickScan() {
     router.post(`/tickets/${props.ticket.id}/quick-scan`, {}, { preserveScroll: true, preserveState: true });
@@ -110,10 +114,16 @@ function toggleHidden() {
                 <span class="font-mono text-xs"><span class="text-done">+{{ branch.added }}</span> <span class="text-signal">−{{ branch.removed }}</span></span>
             </p>
             <QuickScanLine v-if="ticket.quick_scan" :scan="ticket.quick_scan" />
-            <p v-if="ticket.casebook" class="mt-1.5 text-sm">
+            <p v-if="ticket.casebook" class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                 <Link :href="$page.props.me?.is_editor ? `/casebook/${ticket.casebook.id}/edit` : '/casebook'" class="text-working hover:underline">
-                    Looks like a known case: {{ ticket.casebook.title }}
+                    <template v-if="ticket.casebook.confirmed">Case: {{ ticket.casebook.title }}<template v-if="ticket.casebook.others"> · with {{ ticket.casebook.others }} other {{ ticket.casebook.others === 1 ? 'ticket' : 'tickets' }}</template></template>
+                    <template v-else>Looks like a known case: {{ ticket.casebook.title }}</template>
                 </Link>
+                <!-- Judged where it shows: right, or not this case for good. Not the row's own click. -->
+                <template v-if="!ticket.casebook.confirmed">
+                    <button type="button" class="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-ink" @click.stop="judge('confirm')">Yes</button>
+                    <button type="button" class="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-signal" @click.stop="judge('reject')">Not this case</button>
+                </template>
             </p>
         </div>
 

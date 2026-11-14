@@ -516,7 +516,7 @@ The commits since, with the files they touched:
     {
         // Rare words among this space's tickets; cases you said are unrelated stay out.
         $rejected = Matcher::rejections()[$ticket->id] ?? [];
-        $ranked = collect(Matcher::forSpace($ticket->space)->ranked($ticket->matchText(), 3 + count($rejected)))
+        $ranked = collect(Matcher::forSpace($ticket->space)->ranked($ticket->matchText(), 3 + count($rejected), $ticket->kind()))
             ->reject(fn ($match) => in_array($match['id'], $rejected, true))->take(3);
         $entries = CasebookEntry::query()->whereKey($ranked->pluck('id'))->get()->keyBy('id');
         $matches = $ranked

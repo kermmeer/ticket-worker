@@ -44,6 +44,9 @@ class OverviewController extends Controller
 
         $followed = request()->user()?->followedSpaces()->pluck('spaces.id')->all() ?? [];
 
+        // Tickets confirmed on each case: one problem, handled together.
+        $confirmed = $tickets->where('casebook_manual', true)->whereNotNull('casebook_entry_id')->countBy('casebook_entry_id');
+
         // Your last look at each ticket, and the agent's last answer on it (any chat).
         $seen = \Illuminate\Support\Facades\DB::table('ticket_views')->where('user_id', auth()->id())->whereIn('ticket_id', $tickets->pluck('id'))->pluck('seen_at', 'ticket_id');
         $answered = \Illuminate\Support\Facades\DB::table('agent_turns')->join('agent_sessions', 'agent_sessions.id', '=', 'agent_turns.agent_session_id')
@@ -88,10 +91,13 @@ class OverviewController extends Controller
                     'assignee' => $message['assignee']['displayName'] ?? null,
                     'url' => $message['url'] ?? null,
                 ])->all(),
-                // A hint, not a verdict: the approved case this ticket looks most like.
+                // A hint, not a verdict: the approved case this ticket looks most like. Confirmed,
+                // it groups with the other tickets confirmed on that case.
                 'casebook' => $ticket->casebookEntry === null ? null : [
                     'id' => $ticket->casebookEntry->id,
                     'title' => $ticket->casebookEntry->title,
+                    'confirmed' => (bool) $ticket->casebook_manual,
+                    'others' => $ticket->casebook_manual ? max(0, ($confirmed[$ticket->casebook_entry_id] ?? 1) - 1) : 0,
                 ],
                 'created_at' => $ticket->jira_created_at?->toIso8601String(),
                 'updated_at' => $ticket->jira_updated_at?->toIso8601String(),
