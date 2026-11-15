@@ -23,7 +23,7 @@ class Space extends Model
     public const PLAIN = 'plain';
 
     /** Label colours, each defined for Day and Night in app.css. */
-    public const COLOURS = ['teal', 'violet', 'rose', 'sky', 'olive', 'slate'];
+    public const COLOURS = ['teal', 'violet', 'rose', 'sky', 'olive', 'slate', 'amber', 'indigo', 'fuchsia', 'brown'];
 
     public const DEFAULT_DONE_RULE = 'statusCategory = Done';
 

@@ -33,6 +33,10 @@
     --space-sky: #0369a1;
     --space-olive: #4d7c0f;
     --space-slate: #475569;
+    --space-amber: #b45309;
+    --space-indigo: #4338ca;
+    --space-fuchsia: #a21caf;
+    --space-brown: #78350f;
 
     /* Status labels: text in these colours, so each is at least 4.5:1 on page, surface
        and sunken in its theme (checked 2026-10-02). */
@@ -64,6 +68,10 @@
     --space-sky: #38bdf8;
     --space-olive: #a3e635;
     --space-slate: #94a3b8;
+    --space-amber: #fbbf24;
+    --space-indigo: #818cf8;
+    --space-fuchsia: #e879f9;
+    --space-brown: #c08457;
 
     --tone-grey: #a8a29e;
     --tone-blue: #6fa0ff;
