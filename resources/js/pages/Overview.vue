@@ -40,8 +40,9 @@ const folds = [
     { key: 'hidden', label: 'Hidden', hint: 'Tickets you will not take on; they stay hidden until you unhide them' },
 ];
 
-// null: every space; 'mine': the spaces you follow; or one space's id. With spaces followed,
-// the overview starts with yours.
+// null: every space; 'mine': the spaces you follow; or the spaces picked, one or more. A space
+// picked from every space is the only one; another adds to it; picking one again drops it, and
+// the last one dropped is every space again. With spaces followed, the overview starts with yours.
 const followed = computed(() => new Set(props.spaces.filter((space) => space.followed).map((space) => space.id)));
 // The choice is kept in this browser, so a refresh or a new tab opens on it. A space you can
 // no longer see (removed, or no longer yours) falls back to the default.
@@ -60,10 +61,13 @@ const keep = (key, value) => {
     }
 };
 const savedSpace = stored('overview.space');
+// An earlier single space (a number) carries over as a pick of one.
+const savedPicks = (Array.isArray(savedSpace) ? savedSpace : typeof savedSpace === 'number' ? [savedSpace] : [])
+    .filter((id) => props.spaces.some((space) => space.id === id));
 const spaceFilter = ref(
     savedSpace === 'all' ? null
     : savedSpace === 'mine' && props.spaces.some((space) => space.followed) ? 'mine'
-    : typeof savedSpace === 'number' && props.spaces.some((space) => space.id === savedSpace) ? savedSpace
+    : savedPicks.length ? savedPicks
     : props.spaces.some((space) => space.followed) ? 'mine' : null,
 );
 watch(spaceFilter, (value) => keep('overview.space', value ?? 'all'));
@@ -88,7 +92,9 @@ const ofPerson = (ticket) => (kindFilter.value === null || ticket.kind === kindF
         ? ticket.mine || isMe(ticket.assignee) || isMe(ticket.reporter)
         : ticket.assignee === personFilter.value || ticket.reporter === personFilter.value));
 
-const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value === 'mine' ? followed.value.has(ticket.space_id) : ticket.space_id === spaceFilter.value);
+const inSpace = (ticket) => spaceFilter.value === null || (spaceFilter.value === 'mine' ? followed.value.has(ticket.space_id) : spaceFilter.value.includes(ticket.space_id));
+const picked = (id) => Array.isArray(spaceFilter.value) && spaceFilter.value.includes(id);
+const spaceTickets = computed(() => props.tickets.filter(inSpace));
 const statusFilter = ref(null);
 const search = ref('');
 const searchBox = ref(null);
@@ -268,7 +274,16 @@ function pickStatus(status) {
 }
 
 function pickSpace(id) {
-    spaceFilter.value = id;
+    if (id === null || id === 'mine') {
+        spaceFilter.value = id;
+    } else if (!Array.isArray(spaceFilter.value)) {
+        spaceFilter.value = [id];
+    } else if (spaceFilter.value.includes(id)) {
+        const rest = spaceFilter.value.filter((other) => other !== id);
+        spaceFilter.value = rest.length ? rest : null;
+    } else {
+        spaceFilter.value = [...spaceFilter.value, id];
+    }
     statusFilter.value = null;
 }
 
@@ -372,7 +387,40 @@ onBeforeUnmount(() => {
                 class="-mb-px border-b-2 px-4 py-2 text-sm" :class="tab === choice.key ? 'border-signal font-medium text-ink' : 'border-transparent text-muted hover:text-ink'"
                 :aria-selected="tab === choice.key" @click="tab = choice.key">{{ choice.label }}</button>
         </div>
-        <MineView v-if="tab === 'mine'" :tickets="tickets" :next-ten="nextTen" :spaces-by-id="spacesById" />
+        <!-- Which spaces, for Mine and All alike: one, a few, yours or every one. Kept in this browser. -->
+        <div v-if="spaces.length > 1" role="group" aria-label="Spaces" class="mt-4 flex flex-wrap items-center gap-2">
+            <button
+                v-if="followed.size"
+                type="button"
+                class="rounded-full border px-3 py-1 text-sm transition-colors"
+                :class="spaceFilter === 'mine' ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
+                :aria-pressed="spaceFilter === 'mine'"
+                @click="pickSpace('mine')"
+            >
+                My spaces<span class="ml-1.5 tabular-nums opacity-70">{{ openIn([...followed]) }}</span>
+            </button>
+            <button
+                type="button"
+                class="rounded-full border px-3 py-1 text-sm transition-colors"
+                :class="spaceFilter === null ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
+                :aria-pressed="spaceFilter === null"
+                @click="pickSpace(null)"
+            >
+                All spaces<span class="ml-1.5 tabular-nums opacity-70">{{ openIn(spaces.map((space) => space.id)) }}</span>
+            </button>
+            <button
+                v-for="space in spaces"
+                :key="space.id"
+                type="button"
+                class="rounded-full border px-3 py-1 text-sm transition-colors"
+                :class="picked(space.id) ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
+                :aria-pressed="picked(space.id)"
+                @click="pickSpace(space.id)"
+            >
+                <SpaceLabel :label="space.label" :colour="space.colour" /><span class="ml-1.5 tabular-nums opacity-70">{{ openPerSpace[space.id] ?? 0 }}</span>
+            </button>
+        </div>
+        <MineView v-if="tab === 'mine'" :tickets="spaceTickets" :next-ten="nextTen" :spaces-by-id="spacesById" />
         <template v-else>
         <section aria-label="Ticket groups" class="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-3 xl:grid-cols-6">
             <div v-for="group in groups" :key="group.key" class="bg-surface p-3 sm:p-4">
@@ -415,36 +463,6 @@ onBeforeUnmount(() => {
                     <option v-for="person in people" :key="person" :value="person">{{ person }} (assigned or created)</option>
                 </select>
             </label>
-            <button
-                v-if="followed.size"
-                type="button"
-                class="rounded-full border px-3 py-1 text-sm transition-colors"
-                :class="spaceFilter === 'mine' ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
-                :aria-pressed="spaceFilter === 'mine'"
-                @click="pickSpace('mine')"
-            >
-                My spaces<span class="ml-1.5 tabular-nums opacity-70">{{ openIn([...followed]) }}</span>
-            </button>
-            <button
-                type="button"
-                class="rounded-full border px-3 py-1 text-sm transition-colors"
-                :class="spaceFilter === null ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
-                :aria-pressed="spaceFilter === null"
-                @click="pickSpace(null)"
-            >
-                All spaces<span class="ml-1.5 tabular-nums opacity-70">{{ openIn(spaces.map((space) => space.id)) }}</span>
-            </button>
-            <button
-                v-for="space in spaces"
-                :key="space.id"
-                type="button"
-                class="rounded-full border px-3 py-1 text-sm transition-colors"
-                :class="spaceFilter === space.id ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:text-ink'"
-                :aria-pressed="spaceFilter === space.id"
-                @click="pickSpace(space.id)"
-            >
-                <SpaceLabel :label="space.label" :colour="space.colour" /><span class="ml-1.5 tabular-nums opacity-70">{{ openPerSpace[space.id] ?? 0 }}</span>
-            </button>
             <label class="ml-auto flex items-center gap-2 text-sm">
                 <span class="text-muted">Sort</span>
                 <select :value="sort" class="rounded-md border border-line bg-surface px-2 py-1.5 text-sm" @change="setSort($event.target.value)">

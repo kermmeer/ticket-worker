@@ -149,10 +149,14 @@ class OverviewController extends Controller
     /**
      * Your next ten: new activity on a ticket you work, then an answer waiting for you, then
      * an SLA still in time and due soonest (yours, then nobody's in your spaces), then high
-     * priority assigned to you. Never sleeping, hidden or done; each ticket once.
+     * priority assigned to you. Never sleeping, hidden or done; each ticket once. Ranked deeper
+     * than ten, so that the page can keep the first ten of the spaces you picked.
      *
      * @return list<array{id: int, reason: string}>
      */
+    /** How far the next ten are ranked: the page shows the first ten in the spaces picked. */
+    public const NEXT_RANKED = 60;
+
     private function nextTen(\Illuminate\Support\Collection $rows, \Illuminate\Support\Collection $sessions): array
     {
         $mineToWork = fn (array $row) => $row['mine'] || ($sessions[$row['id']]->user_id ?? null) === auth()->id() || ($row['local'] ?? false);
@@ -162,7 +166,7 @@ class OverviewController extends Controller
         $picked = [];
         $take = function (iterable $candidates, callable $reason) use (&$picked) {
             foreach ($candidates as $row) {
-                if (count($picked) >= 10) {
+                if (count($picked) >= self::NEXT_RANKED) {
                     return;
                 }
                 $picked[$row['id']] ??= ['id' => $row['id'], 'reason' => $reason($row)];

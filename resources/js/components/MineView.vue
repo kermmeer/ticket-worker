@@ -32,7 +32,8 @@ watch(hideWaiting, (value) => {
 const search = ref('');
 
 const byId = computed(() => Object.fromEntries(props.tickets.map((ticket) => [ticket.id, ticket])));
-const next = computed(() => props.nextTen.map((entry) => ({ ...entry, ticket: byId.value[entry.id] })).filter((entry) => entry.ticket));
+// Ranked deeper than ten: the first ten of the spaces picked (the tickets given are theirs).
+const next = computed(() => props.nextTen.map((entry) => ({ ...entry, ticket: byId.value[entry.id] })).filter((entry) => entry.ticket).slice(0, 10));
 const mine = computed(() => {
     const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
     return props.tickets.filter((ticket) => (ticket.mine || ticket.on_it === 'you' || ticket.local) && ticket.group !== 'hidden')

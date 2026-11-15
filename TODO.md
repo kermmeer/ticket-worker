@@ -255,5 +255,8 @@ to it, including work you finish.
 - [x] A dot on Systems in the menu (and on ☰ on a phone) when something there failed: setup,
       the scan, the checks, fetching, an API's docs; the Systems page lists them at the top,
       each opening its system. For editors and admins only (2026-11-14)
+- [x] Spaces on the overview for Mine and All alike: pick one, add more, pick one again to drop
+      it (the last dropped is every space again); kept in this browser. The next ten are the
+      first ten in the spaces picked (2026-11-15)
 - [ ] Mine or All: decide after the trial which one the overview opens on, and whether All stays
 - [ ] `composer audit` reports 8 advisories in 5 packages (seen 2026-11-14 when adding symfony/yaml)
